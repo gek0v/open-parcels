@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 gv-factory contributors
+
 package detector
 
 import (
@@ -142,7 +145,111 @@ func (d *Detector) initRules() {
 			Description:    "Correos Express 23-digit shipment identifier",
 		},
 
-		// 11. CTT Express (Spain & Portugal)
+		// 11. NACEX specific prefix NX and 4/7 albarán (XXXX/XXXXXXX)
+		{
+			CarrierSlug:    "nacex",
+			CarrierName:    "NACEX",
+			Country:        "ES",
+			CountryName:    "Spain",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       83,
+			ConfidenceBase: 0.94,
+			Regex:          regexp.MustCompile(`^(NX[0-9A-Z]{6,14}|\d{4}/\d{7})$`),
+			Description:    "NACEX tracking number (NX prefix or XXXX/XXXXXXX albarán)",
+		},
+
+		// 12. Envialia specific prefix ENV and 4/6 albarán (XXXX/XXXXXX)
+		{
+			CarrierSlug:    "envialia",
+			CarrierName:    "Envialia",
+			Country:        "ES",
+			CountryName:    "Spain",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       83,
+			ConfidenceBase: 0.94,
+			Regex:          regexp.MustCompile(`^(ENV[0-9A-Z]{6,14}|\d{4}/\d{6})$`),
+			Description:    "Envialia tracking number (ENV prefix or XXXX/XXXXXX albarán)",
+		},
+
+		// 13. TIPSA specific prefix TIPSA / TIP
+		{
+			CarrierSlug:    "tipsa",
+			CarrierName:    "TIPSA",
+			Country:        "ES",
+			CountryName:    "Spain",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       82,
+			ConfidenceBase: 0.93,
+			Regex:          regexp.MustCompile(`^(TIPSA[0-9A-Z]{5,14}|TIP[0-9A-Z]{6,14})$`),
+			Description:    "TIPSA tracking code (TIPSA prefix)",
+		},
+
+		// 14. Zeleris specific prefixes ZEL and EXP
+		{
+			CarrierSlug:    "zeleris",
+			CarrierName:    "Zeleris",
+			Country:        "ES",
+			CountryName:    "Spain",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       82,
+			ConfidenceBase: 0.93,
+			Regex:          regexp.MustCompile(`^(ZEL[0-9A-Z]{6,14}|EXP[0-9A-Z]{6,14})$`),
+			Description:    "Zeleris tracking number (ZEL or EXP prefix)",
+		},
+
+		// 15. Ontime Transporte specific prefix ONT
+		{
+			CarrierSlug:    "ontime",
+			CarrierName:    "Ontime Transporte",
+			Country:        "ES",
+			CountryName:    "Spain",
+			CarrierType:    models.CarrierTypeLogistics,
+			Priority:       82,
+			ConfidenceBase: 0.93,
+			Regex:          regexp.MustCompile(`^ONT[0-9A-Z]{6,14}$`),
+			Description:    "Ontime Transporte tracking code (ONT prefix)",
+		},
+
+		// 16. Sending Transporte Urgente specific prefix SND
+		{
+			CarrierSlug:    "sending",
+			CarrierName:    "Sending Transporte Urgente",
+			Country:        "ES",
+			CountryName:    "Spain",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       82,
+			ConfidenceBase: 0.93,
+			Regex:          regexp.MustCompile(`^SND[0-9A-Z]{6,14}$`),
+			Description:    "Sending Transporte tracking code (SND prefix)",
+		},
+
+		// 17. Redur specific prefix R followed by digits / RDR
+		{
+			CarrierSlug:    "redur",
+			CarrierName:    "Redur",
+			Country:        "ES",
+			CountryName:    "Spain",
+			CarrierType:    models.CarrierTypeLogistics,
+			Priority:       82,
+			ConfidenceBase: 0.93,
+			Regex:          regexp.MustCompile(`^(R\d{8,12}|RDR\d{7,12})$`),
+			Description:    "Redur tracking reference (R prefix followed by digits)",
+		},
+
+		// 18. GLS Spain (ASM) prefix
+		{
+			CarrierSlug:    "gls-spain",
+			CarrierName:    "GLS Spain",
+			Country:        "ES",
+			CountryName:    "Spain",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       82,
+			ConfidenceBase: 0.93,
+			Regex:          regexp.MustCompile(`^(ASM[0-9A-Z]{6,14}|GLSES[0-9A-Z]{6,14})$`),
+			Description:    "GLS Spain / ASM parcel barcode",
+		},
+
+		// 19. CTT Express (Spain & Portugal)
 		{
 			CarrierSlug:    "ctt-express",
 			CarrierName:    "CTT Express",
@@ -155,7 +262,7 @@ func (d *Detector) initRules() {
 			Description:    "CTT Express tracking number (000..., EXP..., 6...)",
 		},
 
-		// 12. SEUR (14 to 16 digits)
+		// 20. SEUR (14 to 16 digits)
 		{
 			CarrierSlug:    "seur",
 			CarrierName:    "SEUR",
@@ -168,7 +275,7 @@ func (d *Detector) initRules() {
 			Description:    "SEUR Spain parcel number (14-16 digits)",
 		},
 
-		// 13. Paack Delivery
+		// 21. Paack Delivery
 		{
 			CarrierSlug:    "paack",
 			CarrierName:    "Paack Logistics",
@@ -181,7 +288,7 @@ func (d *Detector) initRules() {
 			Description:    "Paack Logistics parcel code (PCK/PAACK prefix)",
 		},
 
-		// 14. MRW (12 digits or 5 agency + 7 order)
+		// 22. MRW (12 digits or 5 agency + 7 order)
 		{
 			CarrierSlug:    "mrw",
 			CarrierName:    "MRW",
@@ -194,7 +301,98 @@ func (d *Detector) initRules() {
 			Description:    "MRW Spain 12-digit franchise parcel code",
 		},
 
-		// 15. GLS (8, 9, 11 or 12 digits, or GLS prefix)
+		// 23. NACEX 10 digits
+		{
+			CarrierSlug:    "nacex",
+			CarrierName:    "NACEX",
+			Country:        "ES",
+			CountryName:    "Spain",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       72,
+			ConfidenceBase: 0.84,
+			Regex:          regexp.MustCompile(`^\d{10}$`),
+			Description:    "NACEX 10-digit domestic tracking code",
+		},
+
+		// 24. TIPSA 10-14 digits
+		{
+			CarrierSlug:    "tipsa",
+			CarrierName:    "TIPSA",
+			Country:        "ES",
+			CountryName:    "Spain",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       70,
+			ConfidenceBase: 0.83,
+			Regex:          regexp.MustCompile(`^\d{10,14}$`),
+			Description:    "TIPSA 10-14 digit domestic barcode",
+		},
+
+		// 25. Zeleris 10-12 digits
+		{
+			CarrierSlug:    "zeleris",
+			CarrierName:    "Zeleris",
+			Country:        "ES",
+			CountryName:    "Spain",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       70,
+			ConfidenceBase: 0.83,
+			Regex:          regexp.MustCompile(`^\d{10,12}$`),
+			Description:    "Zeleris 10-12 digit reference number",
+		},
+
+		// 26. Envialia 10-12 digits
+		{
+			CarrierSlug:    "envialia",
+			CarrierName:    "Envialia",
+			Country:        "ES",
+			CountryName:    "Spain",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       70,
+			ConfidenceBase: 0.83,
+			Regex:          regexp.MustCompile(`^\d{10,12}$`),
+			Description:    "Envialia 10-12 digit service code",
+		},
+
+		// 27. Ontime 10-14 digits
+		{
+			CarrierSlug:    "ontime",
+			CarrierName:    "Ontime Transporte",
+			Country:        "ES",
+			CountryName:    "Spain",
+			CarrierType:    models.CarrierTypeLogistics,
+			Priority:       70,
+			ConfidenceBase: 0.83,
+			Regex:          regexp.MustCompile(`^\d{10,14}$`),
+			Description:    "Ontime Transporte 10-14 digit waybill",
+		},
+
+		// 28. Sending 10-14 digits
+		{
+			CarrierSlug:    "sending",
+			CarrierName:    "Sending Transporte Urgente",
+			Country:        "ES",
+			CountryName:    "Spain",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       70,
+			ConfidenceBase: 0.83,
+			Regex:          regexp.MustCompile(`^\d{10,14}$`),
+			Description:    "Sending Transporte 10-14 digit consignment",
+		},
+
+		// 29. Redur 10-12 digits
+		{
+			CarrierSlug:    "redur",
+			CarrierName:    "Redur",
+			Country:        "ES",
+			CountryName:    "Spain",
+			CarrierType:    models.CarrierTypeLogistics,
+			Priority:       70,
+			ConfidenceBase: 0.83,
+			Regex:          regexp.MustCompile(`^\d{10,12}$`),
+			Description:    "Redur 10-12 digit parcel number",
+		},
+
+		// 30. GLS (8, 9, 11 or 12 digits, or GLS prefix)
 		{
 			CarrierSlug:    "gls",
 			CarrierName:    "GLS",
@@ -207,7 +405,7 @@ func (d *Detector) initRules() {
 			Description:    "GLS parcel tracking number (8, 11, 12 digits or GLS prefix)",
 		},
 
-		// 16. USPS 20-22 digits (94, 92, 93, 95...)
+		// 31. USPS 20-22 digits (94, 92, 93, 95...)
 		{
 			CarrierSlug:    "usps",
 			CarrierName:    "USPS",
@@ -220,7 +418,7 @@ func (d *Detector) initRules() {
 			Description:    "USPS 20-22 digit domestic package barcode",
 		},
 
-		// 17. USPS UPU S10 (ending in US)
+		// 32. USPS UPU S10 (ending in US)
 		{
 			CarrierSlug:    "usps",
 			CarrierName:    "USPS",
@@ -234,7 +432,7 @@ func (d *Detector) initRules() {
 			Description:    "USPS International UPU S10 (e.g. EA123456789US)",
 		},
 
-		// 18. FedEx 12, 15, 20 digits or 96 prefix
+		// 33. FedEx 12, 15, 20 digits or 96 prefix
 		{
 			CarrierSlug:    "fedex",
 			CarrierName:    "FedEx",
@@ -247,7 +445,7 @@ func (d *Detector) initRules() {
 			Description:    "FedEx Ground or Express tracking number (12, 15, or 20 digits)",
 		},
 
-		// 19. DHL Express 10 digits
+		// 34. DHL Express 10 digits
 		{
 			CarrierSlug:    "dhl-express",
 			CarrierName:    "DHL Express",
@@ -260,7 +458,7 @@ func (d *Detector) initRules() {
 			Description:    "DHL Express 10-digit Air Waybill / Tracking Number",
 		},
 
-		// 20. DHL eCommerce / Parcel (GM..., JJ..., JJD...)
+		// 35. DHL eCommerce / Parcel (GM..., JJ..., JJD...)
 		{
 			CarrierSlug:    "dhl-parcel",
 			CarrierName:    "DHL Parcel",
@@ -273,7 +471,7 @@ func (d *Detector) initRules() {
 			Description:    "DHL eCommerce & Parcel international barcode",
 		},
 
-		// 21. Royal Mail (UK UPU S10 ending in GB)
+		// 36. Royal Mail (UK UPU S10 ending in GB)
 		{
 			CarrierSlug:    "royal-mail",
 			CarrierName:    "Royal Mail",
@@ -287,7 +485,7 @@ func (d *Detector) initRules() {
 			Description:    "Royal Mail International UPU S10 postal format",
 		},
 
-		// 22. Colissimo / La Poste France
+		// 37. Colissimo / La Poste France
 		{
 			CarrierSlug:    "colissimo",
 			CarrierName:    "Colissimo / La Poste",
@@ -300,7 +498,7 @@ func (d *Detector) initRules() {
 			Description:    "Colissimo / La Poste French postal tracking",
 		},
 
-		// 23. InPost / Mondial Relay
+		// 38. InPost / Mondial Relay
 		{
 			CarrierSlug:    "inpost",
 			CarrierName:    "InPost / Mondial Relay",
@@ -313,7 +511,7 @@ func (d *Detector) initRules() {
 			Description:    "InPost Locker / Mondial Relay parcel number",
 		},
 
-		// 24. General UPU S10 International Postal
+		// 39. General UPU S10 International Postal
 		{
 			CarrierSlug:    "upu-s10",
 			CarrierName:    "Universal Postal Union (UPU S10)",

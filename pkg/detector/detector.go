@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 gv-factory contributors
+
 package detector
 
 import (
@@ -7,6 +10,11 @@ import (
 	"unicode"
 
 	"open-parcels/pkg/models"
+)
+
+var (
+	awbRegex           = regexp.MustCompile(`^\d{3}-\d{8}$`)
+	albaranHyphenRegex = regexp.MustCompile(`^(\d{4,5})\s*-\s*(\d{6,7})$`)
 )
 
 // PatternRule defines a single detection rule for a carrier.
@@ -106,18 +114,22 @@ func (d *Detector) BestMatch(rawNumber string, destCountryHint string) *models.D
 	return &matches[0]
 }
 
-// CleanTrackingNumber removes spaces, dashes (unless AWB), and non-printable characters.
+// CleanTrackingNumber removes spaces, dashes (unless AWB or albarán), and non-printable characters.
 func CleanTrackingNumber(raw string) string {
 	raw = strings.TrimSpace(raw)
 	// Check if it's an Air Waybill pattern: 3 digits, dash, 8 digits
-	awbRegex := regexp.MustCompile(`^\d{3}-\d{8}$`)
 	if awbRegex.MatchString(raw) {
 		return raw
 	}
 
+	// Support common Spanish albarán separators: agency/number (e.g. 1234/1234567, 1234-1234567, 12345/1234567)
+	if m := albaranHyphenRegex.FindStringSubmatch(raw); len(m) == 3 {
+		return m[1] + "/" + m[2]
+	}
+
 	var sb strings.Builder
 	for _, r := range raw {
-		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '/' {
 			sb.WriteRune(unicode.ToUpper(r))
 		}
 	}

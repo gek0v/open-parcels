@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 gv-factory contributors
+
 package carriers
 
 import (
@@ -22,10 +25,12 @@ type Carrier interface {
 	Track(ctx context.Context, trackingNumber string, opts models.TrackOptions) (*models.Shipment, error)
 }
 
-// Registry manages the set of available carrier adapters.
+// Registry manages the set of available carrier adapters and alias mappings.
 type Registry struct {
-	mu       sync.RWMutex
-	carriers map[string]Carrier
+	mu             sync.RWMutex
+	carriers       map[string]Carrier
+	aliases        map[string]string
+	reverseAliases map[string][]string
 }
 
 var (
@@ -37,7 +42,9 @@ var (
 func GetRegistry() *Registry {
 	once.Do(func() {
 		defaultRegistry = &Registry{
-			carriers: make(map[string]Carrier),
+			carriers:       make(map[string]Carrier),
+			aliases:        make(map[string]string),
+			reverseAliases: make(map[string][]string),
 		}
 		registerDefaultCarriers(defaultRegistry)
 	})
@@ -65,21 +72,113 @@ func registerDefaultCarriers(r *Registry) {
 	r.Register(NewColissimoCarrier())
 	r.Register(NewAirCargoCarrier())
 	r.Register(NewOceanContainerCarrier())
+
+	// Spanish carriers
+	r.Register(NewNacexCarrier())
+	r.Register(NewSendingCarrier())
+	r.Register(NewRedurCarrier())
+	r.Register(NewTipsaCarrier())
+	r.Register(NewZelerisCarrier())
+	r.Register(NewEnvialiaCarrier())
+	r.Register(NewOntimeCarrier())
+	r.Register(NewGLSSpainCarrier())
+
+	// Aliases
+	r.RegisterAlias("mrw-spain", "mrw")
+	r.RegisterAlias("correosexpress", "correos-express")
+	r.RegisterAlias("tourline", "ctt-express")
+	r.RegisterAlias("nacex-spain", "nacex")
+	r.RegisterAlias("sending-es", "sending")
+	r.RegisterAlias("redur-spain", "redur")
+	r.RegisterAlias("redur-spain-ref", "redur")
+	r.RegisterAlias("redur-tracking", "redur")
+	r.RegisterAlias("inpost-es", "inpost")
+	r.RegisterAlias("asm-gls-spain", "gls-spain")
 }
 
 // Register adds a carrier to the registry.
 func (r *Registry) Register(c Carrier) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.carriers[strings.ToLower(c.Slug())] = c
+	if r.carriers == nil {
+		r.carriers = make(map[string]Carrier)
+	}
+	r.carriers[strings.ToLower(strings.TrimSpace(c.Slug()))] = c
 }
 
-// Get finds a carrier by its slug.
+// RegisterAlias registers an alternate slug for a canonical carrier slug.
+func (r *Registry) RegisterAlias(alias, canonicalSlug string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	a := strings.ToLower(strings.TrimSpace(alias))
+	c := strings.ToLower(strings.TrimSpace(canonicalSlug))
+	if a == "" || c == "" || a == c {
+		return
+	}
+	if r.aliases == nil {
+		r.aliases = make(map[string]string)
+	}
+	if r.reverseAliases == nil {
+		r.reverseAliases = make(map[string][]string)
+	}
+	r.aliases[a] = c
+
+	found := false
+	for _, rev := range r.reverseAliases[c] {
+		if rev == a {
+			found = true
+			break
+		}
+	}
+	if !found {
+		r.reverseAliases[c] = append(r.reverseAliases[c], a)
+	}
+}
+
+// Get finds a carrier by its slug or alias.
 func (r *Registry) Get(slug string) (Carrier, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	c, ok := r.carriers[strings.ToLower(slug)]
-	return c, ok
+
+	norm := strings.ToLower(strings.TrimSpace(slug))
+	if norm == "" {
+		return nil, false
+	}
+
+	if c, ok := r.carriers[norm]; ok {
+		return c, true
+	}
+
+	// Follow alias forward chain
+	visited := make(map[string]bool)
+	curr := norm
+	for {
+		if visited[curr] {
+			break
+		}
+		visited[curr] = true
+
+		canonical, ok := r.aliases[curr]
+		if !ok {
+			break
+		}
+		if c, found := r.carriers[canonical]; found {
+			return c, true
+		}
+		curr = canonical
+	}
+
+	// Check reverse aliases
+	if revs, ok := r.reverseAliases[norm]; ok {
+		for _, rev := range revs {
+			if c, found := r.carriers[rev]; found {
+				return c, true
+			}
+		}
+	}
+
+	return nil, false
 }
 
 // List returns metadata for all registered carriers.
@@ -89,13 +188,44 @@ func (r *Registry) List(query string) []models.CarrierInfo {
 
 	q := strings.ToLower(strings.TrimSpace(query))
 	var list []models.CarrierInfo
+	seen := make(map[string]bool)
 
 	for _, c := range r.carriers {
 		info := c.Info()
-		if q == "" || strings.Contains(strings.ToLower(info.Slug), q) ||
+		canonicalSlug := strings.ToLower(strings.TrimSpace(info.Slug))
+		if seen[canonicalSlug] {
+			continue
+		}
+
+		matched := false
+		if q == "" ||
+			strings.Contains(canonicalSlug, q) ||
 			strings.Contains(strings.ToLower(info.Name), q) ||
 			strings.Contains(strings.ToLower(info.Country), q) ||
 			strings.Contains(strings.ToLower(info.CountryName), q) {
+			matched = true
+		} else {
+			// Check if any alias for this carrier matches the query
+			for alias, target := range r.aliases {
+				if (target == canonicalSlug || strings.EqualFold(target, info.Slug)) && strings.Contains(alias, q) {
+					matched = true
+					break
+				}
+			}
+			if !matched {
+				if revs, ok := r.reverseAliases[canonicalSlug]; ok {
+					for _, rev := range revs {
+						if strings.Contains(rev, q) {
+							matched = true
+							break
+						}
+					}
+				}
+			}
+		}
+
+		if matched {
+			seen[canonicalSlug] = true
 			list = append(list, info)
 		}
 	}
@@ -136,12 +266,12 @@ func NewBaseCarrier(slug, name, country, countryName string, cType models.Carrie
 	}
 }
 
-func (b BaseCarrier) Slug() string                   { return b.slug }
-func (b BaseCarrier) Name() string                   { return b.name }
-func (b BaseCarrier) Country() string                { return b.country }
-func (b BaseCarrier) CountryName() string            { return b.countryName }
-func (b BaseCarrier) Type() models.CarrierType       { return b.carrierType }
-func (b BaseCarrier) Website() string                { return b.website }
+func (b BaseCarrier) Slug() string             { return b.slug }
+func (b BaseCarrier) Name() string             { return b.name }
+func (b BaseCarrier) Country() string          { return b.country }
+func (b BaseCarrier) CountryName() string      { return b.countryName }
+func (b BaseCarrier) Type() models.CarrierType { return b.carrierType }
+func (b BaseCarrier) Website() string          { return b.website }
 func (b BaseCarrier) TrackingURL(num string) string {
 	if b.urlTemplate == "" {
 		return ""
