@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 gv-factory contributors
+
 package detector
 
 import (
@@ -229,4 +232,13 @@ func validateUPUS10(clean string) bool {
 	}
 	expectedCheck := int(clean[10] - '0')
 	return check == expectedCheck
+}
+
+func validateSDA(clean string) bool {
+	// If it has UPU S10 format (2 letters + 9 digits + 2 letters), it is an international postal code, not SDA
+	if len(clean) == 13 && unicode.IsLetter(rune(clean[0])) && unicode.IsLetter(rune(clean[1])) &&
+		unicode.IsLetter(rune(clean[11])) && unicode.IsLetter(rune(clean[12])) {
+		return false
+	}
+	return true
 }

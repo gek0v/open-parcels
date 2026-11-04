@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 gv-factory contributors
+
 package carriers
 
 import (
@@ -31,5 +34,17 @@ func TestRegistry(t *testing.T) {
 	}
 	if shipment.LastMileCarrier == nil {
 		t.Errorf("expected cainiao to provide last-mile carrier information")
+	}
+
+	// Test all registered carriers
+	all := reg.AllCarriers()
+	for slug, carrier := range all {
+		s, err := carrier.Track(context.Background(), "TEST123456", models.TrackOptions{})
+		if err != nil {
+			t.Errorf("unexpected error tracking %s: %v", slug, err)
+		}
+		if s == nil {
+			t.Errorf("expected shipment for %s, got nil", slug)
+		}
 	}
 }

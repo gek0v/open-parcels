@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 gv-factory contributors
+
 package carriers
 
 import (
@@ -65,6 +68,12 @@ func registerDefaultCarriers(r *Registry) {
 	r.Register(NewColissimoCarrier())
 	r.Register(NewAirCargoCarrier())
 	r.Register(NewOceanContainerCarrier())
+	r.Register(NewPosteItalianeCarrier())
+	r.Register(NewBRTBartoliniCarrier())
+	r.Register(NewBRTItalyParcelIDCarrier())
+	r.Register(NewSDACarrier())
+	r.Register(NewGLSItalyCarrier())
+	r.Register(NewPosteSanMarinoCarrier())
 }
 
 // Register adds a carrier to the registry.
@@ -136,12 +145,12 @@ func NewBaseCarrier(slug, name, country, countryName string, cType models.Carrie
 	}
 }
 
-func (b BaseCarrier) Slug() string                   { return b.slug }
-func (b BaseCarrier) Name() string                   { return b.name }
-func (b BaseCarrier) Country() string                { return b.country }
-func (b BaseCarrier) CountryName() string            { return b.countryName }
-func (b BaseCarrier) Type() models.CarrierType       { return b.carrierType }
-func (b BaseCarrier) Website() string                { return b.website }
+func (b BaseCarrier) Slug() string             { return b.slug }
+func (b BaseCarrier) Name() string             { return b.name }
+func (b BaseCarrier) Country() string          { return b.country }
+func (b BaseCarrier) CountryName() string      { return b.countryName }
+func (b BaseCarrier) Type() models.CarrierType { return b.carrierType }
+func (b BaseCarrier) Website() string          { return b.website }
 func (b BaseCarrier) TrackingURL(num string) string {
 	if b.urlTemplate == "" {
 		return ""

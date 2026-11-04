@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 gv-factory contributors
+
 package detector
 
 import (
@@ -192,6 +195,139 @@ func (d *Detector) initRules() {
 			ConfidenceBase: 0.87,
 			Regex:          regexp.MustCompile(`^\d{5}/\d{7}$|^\d{12}$`),
 			Description:    "MRW Spain 12-digit franchise parcel code",
+		},
+
+		// 15. Poste Italiane UPU S10 (ending in IT)
+		{
+			CarrierSlug:    "poste-italiane",
+			CarrierName:    "Poste Italiane",
+			Country:        "IT",
+			CountryName:    "Italy",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       86,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^[A-Z]{2}\d{9}IT$`),
+			Validator:      validateUPUS10,
+			Description:    "Poste Italiane UPU S10 postal format (XX123456789IT)",
+		},
+
+		// 16. Poste Italiane domestic / Raccomandata / Crono
+		{
+			CarrierSlug:    "poste-italiane",
+			CarrierName:    "Poste Italiane",
+			Country:        "IT",
+			CountryName:    "Italy",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       82,
+			ConfidenceBase: 0.90,
+			Regex:          regexp.MustCompile(`^(CRONO[0-9A-Z]{6,16}|\d{12})$`),
+			Description:    "Poste Italiane domestic, Raccomandata, or Crono parcel (12 digits or CRONO prefix)",
+		},
+
+		// 17. BRT Bartolini Spedizione (12 digits)
+		{
+			CarrierSlug:    "brt-bartolini",
+			CarrierName:    "BRT Bartolini",
+			Country:        "IT",
+			CountryName:    "Italy",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       81,
+			ConfidenceBase: 0.89,
+			Regex:          regexp.MustCompile(`^\d{12}$`),
+			Description:    "BRT Bartolini 12-digit shipment number (Spedizione)",
+		},
+
+		// 18. BRT Bartolini ID Collo / Parcel ID (14 and 18 digits)
+		{
+			CarrierSlug:    "brt-italy-parcelid",
+			CarrierName:    "BRT Bartolini (Parcel ID)",
+			Country:        "IT",
+			CountryName:    "Italy",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       84,
+			ConfidenceBase: 0.93,
+			Regex:          regexp.MustCompile(`^(\d{14}|\d{18})$`),
+			Description:    "BRT Bartolini ID Collo / Parcel ID (14 or 18 digits)",
+		},
+
+		// 19. BRT Bartolini ID Collo (candidate under brt-bartolini slug)
+		{
+			CarrierSlug:    "brt-bartolini",
+			CarrierName:    "BRT Bartolini",
+			Country:        "IT",
+			CountryName:    "Italy",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       80,
+			ConfidenceBase: 0.88,
+			Regex:          regexp.MustCompile(`^(\d{14}|\d{18})$`),
+			Description:    "BRT Bartolini ID Collo (14 or 18 digits)",
+		},
+
+		// 20. SDA Express Courier (13 alphanumeric characters or 12 digits)
+		{
+			CarrierSlug:    "sda",
+			CarrierName:    "SDA Express Courier",
+			Country:        "IT",
+			CountryName:    "Italy",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       81,
+			ConfidenceBase: 0.89,
+			Regex:          regexp.MustCompile(`^([A-Z0-9]{13}|\d{12})$`),
+			Validator:      validateSDA,
+			Description:    "SDA Express Courier tracking number (13 alphanumeric or 12 digits)",
+		},
+
+		// 21. GLS Italy (GLSIT prefix, branch code or 9 digits)
+		{
+			CarrierSlug:    "gls-italy",
+			CarrierName:    "GLS Italy",
+			Country:        "IT",
+			CountryName:    "Italy",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       83,
+			ConfidenceBase: 0.92,
+			Regex:          regexp.MustCompile(`^(GLSIT[0-9A-Z]+|[A-Z]\d{9}|\d{9})$`),
+			Description:    "GLS Italy parcel tracking number (GLSIT prefix, branch code or 9 digits)",
+		},
+
+		// 22. Poste San Marino UPU S10 (ending in SM)
+		{
+			CarrierSlug:    "poste-san-marino",
+			CarrierName:    "Poste San Marino",
+			Country:        "SM",
+			CountryName:    "San Marino",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       86,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^[A-Z]{2}\d{9}SM$`),
+			Validator:      validateUPUS10,
+			Description:    "Poste San Marino UPU S10 postal format (XX123456789SM)",
+		},
+
+		// 23. Poste San Marino domestic parcel or registered mail
+		{
+			CarrierSlug:    "poste-san-marino",
+			CarrierName:    "Poste San Marino",
+			Country:        "SM",
+			CountryName:    "San Marino",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       83,
+			ConfidenceBase: 0.93,
+			Regex:          regexp.MustCompile(`^(SM\d{8,12}|SM[0-9A-Z]{6,12})$`),
+			Description:    "Poste San Marino domestic parcel or registered mail",
+		},
+
+		// 24. Poste San Marino domestic 12-digit parcel
+		{
+			CarrierSlug:    "poste-san-marino",
+			CarrierName:    "Poste San Marino",
+			Country:        "SM",
+			CountryName:    "San Marino",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       75,
+			ConfidenceBase: 0.84,
+			Regex:          regexp.MustCompile(`^\d{12}$`),
+			Description:    "Poste San Marino domestic 12-digit parcel barcode",
 		},
 
 		// 15. GLS (8, 9, 11 or 12 digits, or GLS prefix)
