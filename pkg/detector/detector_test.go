@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 gv-factory contributors
+
 package detector
 
 import (
@@ -30,6 +33,15 @@ func TestDetector(t *testing.T) {
 		{"Correos Spain UPU S10", "PQ4F6P07000000000000000", "ES", "correos-spain"},
 		{"Royal Mail UPU", "RN123456789GB", "GB", "royal-mail"},
 		{"Colissimo", "6A12345678901", "FR", "colissimo"},
+		{"PostNL UPU", "CD123456785NL", "NL", "postnl"},
+		{"PostNL domestic 3S", "3SABCD1234567", "NL", "postnl"},
+		{"PostNL domestic KG", "KG1234567890123456", "NL", "postnl"},
+		{"bpost UPU", "CD123456785BE", "BE", "bpost"},
+		{"bpost domestic 3232", "323212345678901234", "BE", "bpost"},
+		{"bpost domestic 2182", "218212345678901234", "BE", "bpost"},
+		{"bpost domestic 24d", "123456789012345678901234", "BE", "bpost"},
+		{"POST Luxembourg UPU", "CD123456785LU", "LU", "luxembourg-post"},
+		{"POST Luxembourg domestic", "LU123456789012", "LU", "luxembourg-post"},
 	}
 
 	for _, tt := range tests {

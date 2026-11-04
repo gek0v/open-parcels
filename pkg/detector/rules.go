@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 gv-factory contributors
+
 package detector
 
 import (
@@ -313,7 +316,88 @@ func (d *Detector) initRules() {
 			Description:    "InPost Locker / Mondial Relay parcel number",
 		},
 
-		// 24. General UPU S10 International Postal
+		// 24. PostNL (Netherlands UPU S10 ending in NL)
+		{
+			CarrierSlug:    "postnl",
+			CarrierName:    "PostNL",
+			Country:        "NL",
+			CountryName:    "Netherlands",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       85,
+			ConfidenceBase: 0.92,
+			Regex:          regexp.MustCompile(`^[A-Z]{2}\d{9}NL$`),
+			Validator:      validateUPUS10,
+			Description:    "PostNL International UPU S10 postal format",
+		},
+
+		// 25. PostNL domestic 3S / KG format
+		{
+			CarrierSlug:    "postnl",
+			CarrierName:    "PostNL",
+			Country:        "NL",
+			CountryName:    "Netherlands",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       83,
+			ConfidenceBase: 0.93,
+			Regex:          regexp.MustCompile(`^(3S[A-Z0-9]{11,20}|KG\d{16})$`),
+			Description:    "PostNL domestic parcel barcode (3S / KG format)",
+		},
+
+		// 26. bpost (Belgium UPU S10 ending in BE)
+		{
+			CarrierSlug:    "bpost",
+			CarrierName:    "bpost",
+			Country:        "BE",
+			CountryName:    "Belgium",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       85,
+			ConfidenceBase: 0.92,
+			Regex:          regexp.MustCompile(`^[A-Z]{2}\d{9}BE$`),
+			Validator:      validateUPUS10,
+			Description:    "bpost International UPU S10 postal format",
+		},
+
+		// 27. bpost domestic barcode (3232, 2182, or 24 digits)
+		{
+			CarrierSlug:    "bpost",
+			CarrierName:    "bpost",
+			Country:        "BE",
+			CountryName:    "Belgium",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       82,
+			ConfidenceBase: 0.92,
+			Regex:          regexp.MustCompile(`^(3232\d{14,20}|2182\d{14,20}|\d{24})$`),
+			Description:    "bpost domestic parcel barcode (3232, 2182, or 24 digits)",
+		},
+
+		// 28. POST Luxembourg (UPU S10 ending in LU)
+		{
+			CarrierSlug:    "luxembourg-post",
+			CarrierName:    "POST Luxembourg",
+			Country:        "LU",
+			CountryName:    "Luxembourg",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       85,
+			ConfidenceBase: 0.92,
+			Regex:          regexp.MustCompile(`^[A-Z]{2}\d{9}LU$`),
+			Validator:      validateUPUS10,
+			Description:    "POST Luxembourg International UPU S10 postal format",
+		},
+
+		// 29. POST Luxembourg national format (LU prefix)
+		{
+			CarrierSlug:    "luxembourg-post",
+			CarrierName:    "POST Luxembourg",
+			Country:        "LU",
+			CountryName:    "Luxembourg",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       82,
+			ConfidenceBase: 0.92,
+			Regex:          regexp.MustCompile(`^LU\d{10,16}$`),
+			Description:    "POST Luxembourg domestic tracking format (LU prefix)",
+		},
+
+		// 30. General UPU S10 International Postal
 		{
 			CarrierSlug:    "upu-s10",
 			CarrierName:    "Universal Postal Union (UPU S10)",
