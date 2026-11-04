@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 gv-factory contributors
+
 package detector
 
 import (
@@ -155,7 +158,73 @@ func (d *Detector) initRules() {
 			Description:    "CTT Express tracking number (000..., EXP..., 6...)",
 		},
 
-		// 12. SEUR (14 to 16 digits)
+		// 12. Portugal Post / CTT Portugal (UPU S10 ending in PT)
+		{
+			CarrierSlug:    "portugal-post",
+			CarrierName:    "CTT Portugal",
+			Country:        "PT",
+			CountryName:    "Portugal",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       86,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^[A-Z]{2}\d{9}PT$`),
+			Validator:      validateUPUS10,
+			Description:    "CTT Portugal UPU S10 postal format (XX123456789PT)",
+		},
+
+		// 13. DPD Portugal (14 digits starting with 058, 099, 140, 082)
+		{
+			CarrierSlug:    "dpd-portugal",
+			CarrierName:    "DPD Portugal",
+			Country:        "PT",
+			CountryName:    "Portugal",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       84,
+			ConfidenceBase: 0.94,
+			Regex:          regexp.MustCompile(`^(058|099|140|082)\d{11}$`),
+			Description:    "DPD Portugal 14-digit parcel consignment number (058/099/140/082)",
+		},
+
+		// 14. CTT Expresso domestic barcode (DA..., 0...)
+		{
+			CarrierSlug:    "portugal-post",
+			CarrierName:    "CTT Portugal",
+			Country:        "PT",
+			CountryName:    "Portugal",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       83,
+			ConfidenceBase: 0.92,
+			Regex:          regexp.MustCompile(`^(DA|EA|EM|LX|RF|RR)\d{9}PT$|^0\d{12,13}$`),
+			Description:    "CTT Expresso domestic barcode (DA..., 0...)",
+		},
+
+		// 15. Vasp Expresso (VASP / VP prefix)
+		{
+			CarrierSlug:    "vasp-expresso",
+			CarrierName:    "VASP Expresso",
+			Country:        "PT",
+			CountryName:    "Portugal",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       84,
+			ConfidenceBase: 0.94,
+			Regex:          regexp.MustCompile(`^(VASP\d{8,12}|VP\d{10})$`),
+			Description:    "VASP Expresso shipment tracking code (VASP/VP prefix)",
+		},
+
+		// 16. Delnext (DLN / DN prefix)
+		{
+			CarrierSlug:    "delnext",
+			CarrierName:    "Delnext",
+			Country:        "PT",
+			CountryName:    "Portugal",
+			CarrierType:    models.CarrierTypeLogistics,
+			Priority:       84,
+			ConfidenceBase: 0.94,
+			Regex:          regexp.MustCompile(`^(DLN|DN)\d{8,12}$`),
+			Description:    "Delnext Portugal waybill number (DLN/DN prefix)",
+		},
+
+		// 17. SEUR (14 to 16 digits)
 		{
 			CarrierSlug:    "seur",
 			CarrierName:    "SEUR",
@@ -168,7 +237,7 @@ func (d *Detector) initRules() {
 			Description:    "SEUR Spain parcel number (14-16 digits)",
 		},
 
-		// 13. Paack Delivery
+		// 18. Paack Delivery
 		{
 			CarrierSlug:    "paack",
 			CarrierName:    "Paack Logistics",
@@ -181,7 +250,7 @@ func (d *Detector) initRules() {
 			Description:    "Paack Logistics parcel code (PCK/PAACK prefix)",
 		},
 
-		// 14. MRW (12 digits or 5 agency + 7 order)
+		// 19. MRW (12 digits or 5 agency + 7 order)
 		{
 			CarrierSlug:    "mrw",
 			CarrierName:    "MRW",
@@ -194,7 +263,7 @@ func (d *Detector) initRules() {
 			Description:    "MRW Spain 12-digit franchise parcel code",
 		},
 
-		// 15. GLS (8, 9, 11 or 12 digits, or GLS prefix)
+		// 20. GLS (8, 9, 11 or 12 digits, or GLS prefix)
 		{
 			CarrierSlug:    "gls",
 			CarrierName:    "GLS",
@@ -207,7 +276,7 @@ func (d *Detector) initRules() {
 			Description:    "GLS parcel tracking number (8, 11, 12 digits or GLS prefix)",
 		},
 
-		// 16. USPS 20-22 digits (94, 92, 93, 95...)
+		// 21. USPS 20-22 digits (94, 92, 93, 95...)
 		{
 			CarrierSlug:    "usps",
 			CarrierName:    "USPS",
@@ -220,7 +289,7 @@ func (d *Detector) initRules() {
 			Description:    "USPS 20-22 digit domestic package barcode",
 		},
 
-		// 17. USPS UPU S10 (ending in US)
+		// 22. USPS UPU S10 (ending in US)
 		{
 			CarrierSlug:    "usps",
 			CarrierName:    "USPS",
@@ -234,7 +303,7 @@ func (d *Detector) initRules() {
 			Description:    "USPS International UPU S10 (e.g. EA123456789US)",
 		},
 
-		// 18. FedEx 12, 15, 20 digits or 96 prefix
+		// 23. FedEx 12, 15, 20 digits or 96 prefix
 		{
 			CarrierSlug:    "fedex",
 			CarrierName:    "FedEx",
@@ -247,7 +316,7 @@ func (d *Detector) initRules() {
 			Description:    "FedEx Ground or Express tracking number (12, 15, or 20 digits)",
 		},
 
-		// 19. DHL Express 10 digits
+		// 24. DHL Express 10 digits
 		{
 			CarrierSlug:    "dhl-express",
 			CarrierName:    "DHL Express",
@@ -260,7 +329,7 @@ func (d *Detector) initRules() {
 			Description:    "DHL Express 10-digit Air Waybill / Tracking Number",
 		},
 
-		// 20. DHL eCommerce / Parcel (GM..., JJ..., JJD...)
+		// 25. DHL eCommerce / Parcel (GM..., JJ..., JJD...)
 		{
 			CarrierSlug:    "dhl-parcel",
 			CarrierName:    "DHL Parcel",
@@ -273,7 +342,7 @@ func (d *Detector) initRules() {
 			Description:    "DHL eCommerce & Parcel international barcode",
 		},
 
-		// 21. Royal Mail (UK UPU S10 ending in GB)
+		// 26. Royal Mail (UK UPU S10 ending in GB)
 		{
 			CarrierSlug:    "royal-mail",
 			CarrierName:    "Royal Mail",
@@ -287,7 +356,7 @@ func (d *Detector) initRules() {
 			Description:    "Royal Mail International UPU S10 postal format",
 		},
 
-		// 22. Colissimo / La Poste France
+		// 27. Colissimo / La Poste France
 		{
 			CarrierSlug:    "colissimo",
 			CarrierName:    "Colissimo / La Poste",
@@ -300,7 +369,7 @@ func (d *Detector) initRules() {
 			Description:    "Colissimo / La Poste French postal tracking",
 		},
 
-		// 23. InPost / Mondial Relay
+		// 28. InPost / Mondial Relay
 		{
 			CarrierSlug:    "inpost",
 			CarrierName:    "InPost / Mondial Relay",
@@ -313,7 +382,7 @@ func (d *Detector) initRules() {
 			Description:    "InPost Locker / Mondial Relay parcel number",
 		},
 
-		// 24. General UPU S10 International Postal
+		// 29. General UPU S10 International Postal
 		{
 			CarrierSlug:    "upu-s10",
 			CarrierName:    "Universal Postal Union (UPU S10)",

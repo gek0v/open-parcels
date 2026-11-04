@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 gv-factory contributors
+
 package carriers
 
 import (
@@ -65,6 +68,13 @@ func registerDefaultCarriers(r *Registry) {
 	r.Register(NewColissimoCarrier())
 	r.Register(NewAirCargoCarrier())
 	r.Register(NewOceanContainerCarrier())
+	ptPost := NewPortugalPostCarrier()
+	r.Register(ptPost)
+	r.RegisterAlias("ctt-portugal", ptPost)
+	r.RegisterAlias("ctt", ptPost)
+	r.Register(NewDPDPortugalCarrier())
+	r.Register(NewVaspExpressoCarrier())
+	r.Register(NewDelnextCarrier())
 }
 
 // Register adds a carrier to the registry.
@@ -72,6 +82,13 @@ func (r *Registry) Register(c Carrier) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.carriers[strings.ToLower(c.Slug())] = c
+}
+
+// RegisterAlias registers an existing carrier under an alias slug.
+func (r *Registry) RegisterAlias(alias string, c Carrier) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.carriers[strings.ToLower(strings.TrimSpace(alias))] = c
 }
 
 // Get finds a carrier by its slug.
@@ -89,13 +106,19 @@ func (r *Registry) List(query string) []models.CarrierInfo {
 
 	q := strings.ToLower(strings.TrimSpace(query))
 	var list []models.CarrierInfo
+	seen := make(map[string]bool)
 
-	for _, c := range r.carriers {
+	for key, c := range r.carriers {
 		info := c.Info()
+		if seen[info.Slug] {
+			continue
+		}
 		if q == "" || strings.Contains(strings.ToLower(info.Slug), q) ||
+			strings.Contains(strings.ToLower(key), q) ||
 			strings.Contains(strings.ToLower(info.Name), q) ||
 			strings.Contains(strings.ToLower(info.Country), q) ||
 			strings.Contains(strings.ToLower(info.CountryName), q) {
+			seen[info.Slug] = true
 			list = append(list, info)
 		}
 	}
@@ -136,12 +159,12 @@ func NewBaseCarrier(slug, name, country, countryName string, cType models.Carrie
 	}
 }
 
-func (b BaseCarrier) Slug() string                   { return b.slug }
-func (b BaseCarrier) Name() string                   { return b.name }
-func (b BaseCarrier) Country() string                { return b.country }
-func (b BaseCarrier) CountryName() string            { return b.countryName }
-func (b BaseCarrier) Type() models.CarrierType       { return b.carrierType }
-func (b BaseCarrier) Website() string                { return b.website }
+func (b BaseCarrier) Slug() string             { return b.slug }
+func (b BaseCarrier) Name() string             { return b.name }
+func (b BaseCarrier) Country() string          { return b.country }
+func (b BaseCarrier) CountryName() string      { return b.countryName }
+func (b BaseCarrier) Type() models.CarrierType { return b.carrierType }
+func (b BaseCarrier) Website() string          { return b.website }
 func (b BaseCarrier) TrackingURL(num string) string {
 	if b.urlTemplate == "" {
 		return ""
