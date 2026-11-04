@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 gv-factory contributors
+
 package detector
 
 import (
@@ -22,7 +25,7 @@ func (d *Detector) initRules() {
 			Description:    "IATA Air Waybill standard with Mod 7 checksum",
 		},
 
-		// 2. ISO 6346 Shipping Container
+		// 2. ISO 6346 Shipping Container (Preserved for backward compatibility)
 		{
 			CarrierSlug:    "ocean-container",
 			CarrierName:    "ISO Ocean Container",
@@ -36,7 +39,150 @@ func (d *Detector) initRules() {
 			Description:    "ISO 6346 standard container identification code",
 		},
 
-		// 3. UPS standard 1Z
+		// 3. Evergreen Marine Bill of Lading (EGLV + 10-12 digits)
+		{
+			CarrierSlug:    "evergreen",
+			CarrierName:    "Evergreen",
+			Country:        "GLOBAL",
+			CountryName:    "International",
+			CarrierType:    models.CarrierTypeOcean,
+			Priority:       92,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^(EGLV|EISU|EGSU)\d{9,12}$`),
+			Description:    "Evergreen Marine Bill of Lading (B/L)",
+		},
+
+		// 4. Maersk Line Bill of Lading (MAEU / MSK / MSKU + 9-12 digits)
+		{
+			CarrierSlug:    "maersk-line",
+			CarrierName:    "Maersk Line",
+			Country:        "GLOBAL",
+			CountryName:    "International",
+			CarrierType:    models.CarrierTypeOcean,
+			Priority:       92,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^(MAEU|MSK|MSKU)\d{9,12}$`),
+			Description:    "Maersk Line Bill of Lading (B/L)",
+		},
+
+		// 5. MSC Bill of Lading (MEDU / MSCU + 8-12 chars, or MSC + 7-12 chars)
+		{
+			CarrierSlug:    "msc",
+			CarrierName:    "MSC",
+			Country:        "GLOBAL",
+			CountryName:    "International",
+			CarrierType:    models.CarrierTypeOcean,
+			Priority:       92,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^(MEDU|MSCU)[A-Z0-9]{8,12}$|^MSC[A-Z0-9]{7,12}$`),
+			Description:    "MSC Mediterranean Shipping Company Bill of Lading (B/L)",
+		},
+
+		// 6. Hapag-Lloyd Bill of Lading (HLCU / HLXU + 8-12 chars, or HLD + 7-10 digits)
+		{
+			CarrierSlug:    "hapag-lloyd",
+			CarrierName:    "Hapag Lloyd",
+			Country:        "GLOBAL",
+			CountryName:    "International",
+			CarrierType:    models.CarrierTypeOcean,
+			Priority:       92,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^(HLCU|HLXU)[A-Z0-9]{8,12}$|^HLD\d{7,10}$`),
+			Description:    "Hapag-Lloyd Bill of Lading (B/L)",
+		},
+
+		// 7. COSCO Shipping Bill of Lading (COSU / COAU / CCLU + 9-12 digits or 8-12 chars)
+		{
+			CarrierSlug:    "cosco",
+			CarrierName:    "COSCO Shipping",
+			Country:        "GLOBAL",
+			CountryName:    "International",
+			CarrierType:    models.CarrierTypeOcean,
+			Priority:       92,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^(COSU|COAU|CCLU)\d{9,12}$|^COSU[A-Z0-9]{8,12}$`),
+			Description:    "COSCO Shipping Bill of Lading (B/L)",
+		},
+
+		// 8. CMA CGM Bill of Lading
+		{
+			CarrierSlug:    "cma-cgm",
+			CarrierName:    "CMA CGM",
+			Country:        "GLOBAL",
+			CountryName:    "International",
+			CarrierType:    models.CarrierTypeOcean,
+			Priority:       92,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^(CMAU|CGMU|ANLU)[A-Z0-9]{8,12}$|^NAM\d{7,10}$`),
+			Description:    "CMA CGM Bill of Lading (B/L)",
+		},
+
+		// 9. ONE (Ocean Network Express) Bill of Lading
+		{
+			CarrierSlug:    "one-line",
+			CarrierName:    "ONE Ocean Network Express",
+			Country:        "GLOBAL",
+			CountryName:    "International",
+			CarrierType:    models.CarrierTypeOcean,
+			Priority:       92,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^(ONEU|ONEY)[A-Z0-9]{8,12}$`),
+			Description:    "ONE Ocean Network Express Bill of Lading (B/L)",
+		},
+
+		// 10. Yang Ming Bill of Lading
+		{
+			CarrierSlug:    "yang-ming",
+			CarrierName:    "Yang Ming",
+			Country:        "GLOBAL",
+			CountryName:    "International",
+			CarrierType:    models.CarrierTypeOcean,
+			Priority:       92,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^YMLU[A-Z0-9]{8,12}$`),
+			Description:    "Yang Ming Bill of Lading (B/L)",
+		},
+
+		// 11. HMM Bill of Lading
+		{
+			CarrierSlug:    "hmm",
+			CarrierName:    "HMM",
+			Country:        "GLOBAL",
+			CountryName:    "International",
+			CarrierType:    models.CarrierTypeOcean,
+			Priority:       92,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^HDMU[A-Z0-9]{8,12}$`),
+			Description:    "HMM Bill of Lading (B/L)",
+		},
+
+		// 12. ZIM Bill of Lading
+		{
+			CarrierSlug:    "zim",
+			CarrierName:    "ZIM",
+			Country:        "GLOBAL",
+			CountryName:    "International",
+			CarrierType:    models.CarrierTypeOcean,
+			Priority:       92,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^ZIMU[A-Z0-9]{8,12}$`),
+			Description:    "ZIM Bill of Lading (B/L)",
+		},
+
+		// 13. Dole Ocean Cargo Bill of Lading
+		{
+			CarrierSlug:    "dole-ocean-cargo",
+			CarrierName:    "Dole Ocean Cargo",
+			Country:        "GLOBAL",
+			CountryName:    "International",
+			CarrierType:    models.CarrierTypeOcean,
+			Priority:       92,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^DOLU[A-Z0-9]{8,12}$`),
+			Description:    "Dole Ocean Cargo Bill of Lading (B/L)",
+		},
+
+		// 14. UPS standard 1Z
 		{
 			CarrierSlug:    "ups",
 			CarrierName:    "UPS",
@@ -50,7 +196,7 @@ func (d *Detector) initRules() {
 			Description:    "UPS 1Z Tracking number with Mod 10 check digit",
 		},
 
-		// 4. YunExpress (YT + 16 or 18 digits)
+		// 15. YunExpress (YT + 16 or 18 digits)
 		{
 			CarrierSlug:    "yunexpress",
 			CarrierName:    "YunExpress",
@@ -63,7 +209,7 @@ func (d *Detector) initRules() {
 			Description:    "YunExpress cross-border parcel format (YT prefix)",
 		},
 
-		// 5. Cainiao / AliExpress
+		// 16. Cainiao / AliExpress
 		{
 			CarrierSlug:    "cainiao",
 			CarrierName:    "Cainiao Global",
@@ -76,7 +222,7 @@ func (d *Detector) initRules() {
 			Description:    "Cainiao / AliExpress standard tracking (LP, CAINIAO, CNESP, UN...CN)",
 		},
 
-		// 6. 4PX
+		// 17. 4PX
 		{
 			CarrierSlug:    "four-px",
 			CarrierName:    "4PX Express",
@@ -89,7 +235,7 @@ func (d *Detector) initRules() {
 			Description:    "4PX Express international tracking number",
 		},
 
-		// 7. Correos España (UPU S10 ending in ES)
+		// 18. Correos España (UPU S10 ending in ES)
 		{
 			CarrierSlug:    "correos-spain",
 			CarrierName:    "Correos España",
@@ -103,7 +249,7 @@ func (d *Detector) initRules() {
 			Description:    "Correos España UPU S10 postal code (XX123456789ES)",
 		},
 
-		// 8. Correos España domestic barcode (PK, PQ, PA, 72 + 23 alphanumeric/digits)
+		// 19. Correos España domestic barcode (PK, PQ, PA, 72 + 23 alphanumeric/digits)
 		{
 			CarrierSlug:    "correos-spain",
 			CarrierName:    "Correos España",
@@ -116,7 +262,7 @@ func (d *Detector) initRules() {
 			Description:    "Correos España 23-digit domestic parcel barcode",
 		},
 
-		// 9. Correos Express (16 digits starting with 69, 32, 00, 08)
+		// 20. Correos Express (16 digits starting with 69, 32, 00, 08)
 		{
 			CarrierSlug:    "correos-express",
 			CarrierName:    "Correos Express",
@@ -129,7 +275,7 @@ func (d *Detector) initRules() {
 			Description:    "Correos Express 16-digit parcel tracking number",
 		},
 
-		// 10. Correos Express 23-digit format
+		// 21. Correos Express 23-digit format
 		{
 			CarrierSlug:    "correos-express",
 			CarrierName:    "Correos Express",
@@ -142,7 +288,7 @@ func (d *Detector) initRules() {
 			Description:    "Correos Express 23-digit shipment identifier",
 		},
 
-		// 11. CTT Express (Spain & Portugal)
+		// 22. CTT Express (Spain & Portugal)
 		{
 			CarrierSlug:    "ctt-express",
 			CarrierName:    "CTT Express",
@@ -155,7 +301,7 @@ func (d *Detector) initRules() {
 			Description:    "CTT Express tracking number (000..., EXP..., 6...)",
 		},
 
-		// 12. SEUR (14 to 16 digits)
+		// 23. SEUR (14 to 16 digits)
 		{
 			CarrierSlug:    "seur",
 			CarrierName:    "SEUR",
@@ -168,7 +314,7 @@ func (d *Detector) initRules() {
 			Description:    "SEUR Spain parcel number (14-16 digits)",
 		},
 
-		// 13. Paack Delivery
+		// 24. Paack Delivery
 		{
 			CarrierSlug:    "paack",
 			CarrierName:    "Paack Logistics",
@@ -181,7 +327,7 @@ func (d *Detector) initRules() {
 			Description:    "Paack Logistics parcel code (PCK/PAACK prefix)",
 		},
 
-		// 14. MRW (12 digits or 5 agency + 7 order)
+		// 25. MRW (12 digits or 5 agency + 7 order)
 		{
 			CarrierSlug:    "mrw",
 			CarrierName:    "MRW",
@@ -194,7 +340,7 @@ func (d *Detector) initRules() {
 			Description:    "MRW Spain 12-digit franchise parcel code",
 		},
 
-		// 15. GLS (8, 9, 11 or 12 digits, or GLS prefix)
+		// 26. GLS (8, 9, 11 or 12 digits, or GLS prefix)
 		{
 			CarrierSlug:    "gls",
 			CarrierName:    "GLS",
@@ -207,7 +353,7 @@ func (d *Detector) initRules() {
 			Description:    "GLS parcel tracking number (8, 11, 12 digits or GLS prefix)",
 		},
 
-		// 16. USPS 20-22 digits (94, 92, 93, 95...)
+		// 27. USPS 20-22 digits (94, 92, 93, 95...)
 		{
 			CarrierSlug:    "usps",
 			CarrierName:    "USPS",
@@ -220,7 +366,7 @@ func (d *Detector) initRules() {
 			Description:    "USPS 20-22 digit domestic package barcode",
 		},
 
-		// 17. USPS UPU S10 (ending in US)
+		// 28. USPS UPU S10 (ending in US)
 		{
 			CarrierSlug:    "usps",
 			CarrierName:    "USPS",
@@ -234,7 +380,7 @@ func (d *Detector) initRules() {
 			Description:    "USPS International UPU S10 (e.g. EA123456789US)",
 		},
 
-		// 18. FedEx 12, 15, 20 digits or 96 prefix
+		// 29. FedEx 12, 15, 20 digits or 96 prefix
 		{
 			CarrierSlug:    "fedex",
 			CarrierName:    "FedEx",
@@ -247,7 +393,7 @@ func (d *Detector) initRules() {
 			Description:    "FedEx Ground or Express tracking number (12, 15, or 20 digits)",
 		},
 
-		// 19. DHL Express 10 digits
+		// 30. DHL Express 10 digits
 		{
 			CarrierSlug:    "dhl-express",
 			CarrierName:    "DHL Express",
@@ -260,7 +406,7 @@ func (d *Detector) initRules() {
 			Description:    "DHL Express 10-digit Air Waybill / Tracking Number",
 		},
 
-		// 20. DHL eCommerce / Parcel (GM..., JJ..., JJD...)
+		// 31. DHL eCommerce / Parcel (GM..., JJ..., JJD...)
 		{
 			CarrierSlug:    "dhl-parcel",
 			CarrierName:    "DHL Parcel",
@@ -273,7 +419,7 @@ func (d *Detector) initRules() {
 			Description:    "DHL eCommerce & Parcel international barcode",
 		},
 
-		// 21. Royal Mail (UK UPU S10 ending in GB)
+		// 32. Royal Mail (UK UPU S10 ending in GB)
 		{
 			CarrierSlug:    "royal-mail",
 			CarrierName:    "Royal Mail",
@@ -287,7 +433,7 @@ func (d *Detector) initRules() {
 			Description:    "Royal Mail International UPU S10 postal format",
 		},
 
-		// 22. Colissimo / La Poste France
+		// 33. Colissimo / La Poste France
 		{
 			CarrierSlug:    "colissimo",
 			CarrierName:    "Colissimo / La Poste",
@@ -300,7 +446,7 @@ func (d *Detector) initRules() {
 			Description:    "Colissimo / La Poste French postal tracking",
 		},
 
-		// 23. InPost / Mondial Relay
+		// 34. InPost / Mondial Relay
 		{
 			CarrierSlug:    "inpost",
 			CarrierName:    "InPost / Mondial Relay",
@@ -313,7 +459,7 @@ func (d *Detector) initRules() {
 			Description:    "InPost Locker / Mondial Relay parcel number",
 		},
 
-		// 24. General UPU S10 International Postal
+		// 35. General UPU S10 International Postal
 		{
 			CarrierSlug:    "upu-s10",
 			CarrierName:    "Universal Postal Union (UPU S10)",

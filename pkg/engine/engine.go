@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 gv-factory contributors
+
 package engine
 
 import (
@@ -155,6 +158,122 @@ func (e *Engine) ToParcelsAppResponse(shipment *models.Shipment, reqID string) *
 		attrs = append(attrs, models.ParcelsAppAttribute{Label: "destination", Val: shipment.Destination.Name, Code: shipment.Destination.Code})
 	}
 
+	if shipment.FromPort != "" {
+		attrs = append(attrs, models.ParcelsAppAttribute{Label: "from_port", Val: shipment.FromPort, Code: shipment.FromPort})
+	}
+	if shipment.ToPort != "" {
+		attrs = append(attrs, models.ParcelsAppAttribute{Label: "to_port", Val: shipment.ToPort, Code: shipment.ToPort})
+	}
+
+	// Enrich with maritime attributes (vessel, voyage, pol, pod, UN/LOCODEs)
+	originUNLOCODE := shipment.FromPort
+	destUNLOCODE := shipment.ToPort
+
+	if len(shipment.SeaLegs) > 0 {
+		firstLeg := shipment.SeaLegs[0]
+		if firstLeg.OriginUNLOCODE != "" && originUNLOCODE == "" {
+			originUNLOCODE = firstLeg.OriginUNLOCODE
+		}
+		if firstLeg.DestinationUNLOCODE != "" && destUNLOCODE == "" {
+			destUNLOCODE = firstLeg.DestinationUNLOCODE
+		}
+
+		if firstLeg.Vessel != nil && firstLeg.Vessel.Name != "" {
+			attrs = append(attrs, models.ParcelsAppAttribute{
+				Label: "vessel",
+				Val:   firstLeg.Vessel.Name,
+				Code:  firstLeg.Vessel.IMO,
+			})
+		}
+
+		if firstLeg.VoyageNumber != "" {
+			attrs = append(attrs, models.ParcelsAppAttribute{
+				Label: "voyage",
+				Val:   firstLeg.VoyageNumber,
+			})
+		}
+
+		polName := firstLeg.OriginPort
+		if polName == "" {
+			polName = firstLeg.Origin
+		}
+		polCode := firstLeg.OriginUNLOCODE
+		if polCode == "" {
+			polCode = originUNLOCODE
+		}
+		if polName == "" {
+			polName = polCode
+		}
+		if polName != "" || polCode != "" {
+			attrs = append(attrs, models.ParcelsAppAttribute{
+				Label: "pol",
+				Val:   polName,
+				Code:  polCode,
+			})
+		}
+
+		podName := firstLeg.DestinationPort
+		if podName == "" {
+			podName = firstLeg.Destination
+		}
+		podCode := firstLeg.DestinationUNLOCODE
+		if podCode == "" {
+			podCode = destUNLOCODE
+		}
+		if podName == "" {
+			podName = podCode
+		}
+		if podName != "" || podCode != "" {
+			attrs = append(attrs, models.ParcelsAppAttribute{
+				Label: "pod",
+				Val:   podName,
+				Code:  podCode,
+			})
+		}
+	} else {
+		if originUNLOCODE != "" {
+			attrs = append(attrs, models.ParcelsAppAttribute{
+				Label: "pol",
+				Val:   originUNLOCODE,
+				Code:  originUNLOCODE,
+			})
+		}
+		if destUNLOCODE != "" {
+			attrs = append(attrs, models.ParcelsAppAttribute{
+				Label: "pod",
+				Val:   destUNLOCODE,
+				Code:  destUNLOCODE,
+			})
+		}
+	}
+
+	if originUNLOCODE != "" {
+		attrs = append(attrs, models.ParcelsAppAttribute{
+			Label: "origin_unlocode",
+			Val:   originUNLOCODE,
+			Code:  originUNLOCODE,
+		})
+	}
+	if destUNLOCODE != "" {
+		attrs = append(attrs, models.ParcelsAppAttribute{
+			Label: "destination_unlocode",
+			Val:   destUNLOCODE,
+			Code:  destUNLOCODE,
+		})
+	}
+
+	if shipment.Container != nil {
+		if shipment.Container.Number != "" {
+			attrs = append(attrs, models.ParcelsAppAttribute{Label: "container", Val: shipment.Container.Number})
+		}
+		if shipment.Container.Type != "" {
+			attrs = append(attrs, models.ParcelsAppAttribute{Label: "container_type", Val: shipment.Container.Type})
+		}
+		if shipment.Container.SealNumber != "" {
+			attrs = append(attrs, models.ParcelsAppAttribute{Label: "seal_number", Val: shipment.Container.SealNumber})
+		}
+	}
+
 	var extTrack []models.ParcelsAppExternalTrack
 	if shipment.Carrier.TrackingURL != "" {
 		extTrack = append(extTrack, models.ParcelsAppExternalTrack{
@@ -179,6 +298,8 @@ func (e *Engine) ToParcelsAppResponse(shipment *models.Shipment, reqID string) *
 		Destination:     shipment.Destination.Name,
 		OriginCode:      shipment.Origin.Code,
 		DestinationCode: shipment.Destination.Code,
+		FromPort:        originUNLOCODE,
+		ToPort:          destUNLOCODE,
 		States:          states,
 		Services:        services,
 		DetectedCarrier: models.ParcelsAppServiceItem{
@@ -190,6 +311,8 @@ func (e *Engine) ToParcelsAppResponse(shipment *models.Shipment, reqID string) *
 		Attributes:       attrs,
 		ExternalTracking: extTrack,
 		FlightLegs:       shipment.FlightLegs,
+		SeaLegs:          shipment.SeaLegs,
+		Container:        shipment.Container,
 		Error:            shipment.Error,
 	}
 

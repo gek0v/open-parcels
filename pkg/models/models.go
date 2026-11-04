@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 gv-factory contributors
+
 package models
 
 import (
@@ -41,22 +44,23 @@ const (
 type CarrierType string
 
 const (
-	CarrierTypePostal     CarrierType = "postal"
-	CarrierTypeExpress    CarrierType = "express"
-	CarrierTypeLogistics  CarrierType = "logistics"
-	CarrierTypeFreight    CarrierType = "freight"
+	CarrierTypePostal      CarrierType = "postal"
+	CarrierTypeExpress     CarrierType = "express"
+	CarrierTypeLogistics   CarrierType = "logistics"
+	CarrierTypeFreight     CarrierType = "freight"
 	CarrierTypeCrossBorder CarrierType = "cross_border"
+	CarrierTypeOcean       CarrierType = "ocean"
 )
 
 // CarrierInfo provides metadata about a logistics carrier.
 type CarrierInfo struct {
 	Slug        string      `json:"slug"`
 	Name        string      `json:"name"`
-	Country     string      `json:"country,omitempty"`     // ISO-2 country code (e.g. "ES", "CN", "US", "GLOBAL")
-	CountryName string      `json:"country_name,omitempty"`// e.g. "Spain", "China"
+	Country     string      `json:"country,omitempty"`      // ISO-2 country code (e.g. "ES", "CN", "US", "GLOBAL")
+	CountryName string      `json:"country_name,omitempty"` // e.g. "Spain", "China"
 	Type        CarrierType `json:"type,omitempty"`
 	Website     string      `json:"website,omitempty"`
-	TrackingURL string      `json:"tracking_url,omitempty"`// Template or base URL
+	TrackingURL string      `json:"tracking_url,omitempty"` // Template or base URL
 	Phone       string      `json:"phone,omitempty"`
 	Logo        string      `json:"logo,omitempty"`
 }
@@ -94,28 +98,76 @@ type FlightLeg struct {
 	ActualArrival          string `json:"actual_arrival,omitempty"`
 }
 
+// VesselInfo represents maritime vessel identification and registry details.
+type VesselInfo struct {
+	Name     string `json:"name,omitempty"`
+	IMO      string `json:"imo,omitempty"`
+	MMSI     string `json:"mmsi,omitempty"`
+	CallSign string `json:"call_sign,omitempty"`
+	Flag     string `json:"flag,omitempty"`
+}
+
+// ContainerDetails represents intermodal container specifications and status.
+type ContainerDetails struct {
+	Number        string `json:"number,omitempty"`
+	Type          string `json:"type,omitempty"`
+	ISOType       string `json:"iso_type,omitempty"`
+	Status        string `json:"status,omitempty"`
+	SealNumber    string `json:"seal_number,omitempty"`
+	TareWeight    string `json:"tare_weight,omitempty"`
+	PayloadWeight string `json:"payload_weight,omitempty"`
+	GrossWeight   string `json:"gross_weight,omitempty"`
+}
+
+// SeaLeg models ocean freight navigation legs between ports.
+type SeaLeg struct {
+	Vessel                 *VesselInfo `json:"vessel,omitempty"`
+	VoyageNumber           string      `json:"voyage_number,omitempty"`
+	Origin                 string      `json:"origin,omitempty"`
+	Destination            string      `json:"destination,omitempty"`
+	OriginPort             string      `json:"origin_port,omitempty"`
+	DestinationPort        string      `json:"destination_port,omitempty"`
+	OriginUNLOCODE         string      `json:"origin_unlocode,omitempty"`
+	DestinationUNLOCODE    string      `json:"destination_unlocode,omitempty"`
+	Status                 string      `json:"status,omitempty"`
+	ScheduledDepartureDate string      `json:"scheduled_departure_date,omitempty"`
+	ScheduledDeparture     string      `json:"scheduled_departure,omitempty"`
+	ScheduledArrival       string      `json:"scheduled_arrival,omitempty"`
+	ActualDeparture        string      `json:"actual_departure,omitempty"`
+	ActualArrival          string      `json:"actual_arrival,omitempty"`
+}
+
 // Shipment is the complete unified view of a tracked parcel.
 type Shipment struct {
-	TrackingNumber           string          `json:"tracking_number"`
-	Carrier                  CarrierInfo     `json:"carrier"`
-	AdditionalCarriers       []CarrierInfo   `json:"additional_carriers,omitempty"`
-	LastMileTrackingNumber   string          `json:"last_mile_tracking_number,omitempty"`
-	LastMileCarrier          *CarrierInfo    `json:"last_mile_carrier,omitempty"`
-	Status                   Status          `json:"status"`
-	StatusText               string          `json:"status_text"`
-	Progress                 int             `json:"progress"` // 0 to 100%
-	Origin                   CountryInfo     `json:"origin,omitempty"`
-	Destination              CountryInfo     `json:"destination,omitempty"`
-	EstimatedDelivery        *time.Time      `json:"estimated_delivery,omitempty"`
-	DeliveredAt              *time.Time      `json:"delivered_at,omitempty"`
-	Events                   []TrackingEvent `json:"events"`
-	DaysInTransit            int             `json:"days_in_transit"`
-	Weight                   string          `json:"weight,omitempty"`
-	ServiceType              string          `json:"service_type,omitempty"`
-	FlightLegs               []FlightLeg     `json:"flight_legs,omitempty"`
-	FromCache                bool            `json:"from_cache"`
-	UpdatedAt                time.Time       `json:"updated_at"`
-	Error                    string          `json:"error,omitempty"`
+	TrackingNumber         string            `json:"tracking_number"`
+	Carrier                CarrierInfo       `json:"carrier"`
+	AdditionalCarriers     []CarrierInfo     `json:"additional_carriers,omitempty"`
+	LastMileTrackingNumber string            `json:"last_mile_tracking_number,omitempty"`
+	LastMileCarrier        *CarrierInfo      `json:"last_mile_carrier,omitempty"`
+	Status                 Status            `json:"status"`
+	StatusText             string            `json:"status_text"`
+	Progress               int               `json:"progress"` // 0 to 100%
+	Origin                 CountryInfo       `json:"origin,omitempty"`
+	Destination            CountryInfo       `json:"destination,omitempty"`
+	EstimatedDelivery      *time.Time        `json:"estimated_delivery,omitempty"`
+	DeliveredAt            *time.Time        `json:"delivered_at,omitempty"`
+	Events                 []TrackingEvent   `json:"events"`
+	DaysInTransit          int               `json:"days_in_transit"`
+	Weight                 string            `json:"weight,omitempty"`
+	ServiceType            string            `json:"service_type,omitempty"`
+	FlightLegs             []FlightLeg       `json:"flight_legs,omitempty"`
+	SeaLegs                []SeaLeg          `json:"sea_legs,omitempty"`
+	Container              *ContainerDetails `json:"container,omitempty"`
+	FromPort               string            `json:"from_port,omitempty"`
+	ToPort                 string            `json:"to_port,omitempty"`
+	FromCache              bool              `json:"from_cache"`
+	UpdatedAt              time.Time         `json:"updated_at"`
+	Error                  string            `json:"error,omitempty"`
+}
+
+// HasOceanData returns true if the shipment includes container, sea legs, or port LOCODEs.
+func (s *Shipment) HasOceanData() bool {
+	return s.Container != nil || len(s.SeaLegs) > 0 || s.FromPort != "" || s.ToPort != ""
 }
 
 // DetectResult represents a candidate carrier match from the detector engine.
@@ -140,9 +192,9 @@ type TrackOptions struct {
 
 // ParcelsApp v4 API compatibility response types
 type ParcelsAppTrackingRequest struct {
-	Language        string                 `json:"language,omitempty"`
-	WebhookURL      string                 `json:"webhook_url,omitempty"`
-	Shipments       []ParcelsAppShipmentIn `json:"shipments"`
+	Language   string                 `json:"language,omitempty"`
+	WebhookURL string                 `json:"webhook_url,omitempty"`
+	Shipments  []ParcelsAppShipmentIn `json:"shipments"`
 }
 
 type ParcelsAppShipmentIn struct {
@@ -156,12 +208,12 @@ type ParcelsAppShipmentIn struct {
 }
 
 type ParcelsAppResponse struct {
-	RequestID string                  `json:"request_id"`
-	Status    string                  `json:"status"` // "completed" | "processing"
-	Done      bool                    `json:"done"`
-	ExpiresAt string                  `json:"expires_at"`
-	Results   []ParcelsAppResultItem  `json:"results"`
-	Rejected  []ParcelsAppRejected    `json:"rejected,omitempty"`
+	RequestID string                 `json:"request_id"`
+	Status    string                 `json:"status"` // "completed" | "processing"
+	Done      bool                   `json:"done"`
+	ExpiresAt string                 `json:"expires_at"`
+	Results   []ParcelsAppResultItem `json:"results"`
+	Rejected  []ParcelsAppRejected   `json:"rejected,omitempty"`
 }
 
 type ParcelsAppResultItem struct {
@@ -178,6 +230,8 @@ type ParcelsAppShipment struct {
 	Destination      string                    `json:"destination,omitempty"`
 	OriginCode       string                    `json:"originCode,omitempty"`
 	DestinationCode  string                    `json:"destinationCode,omitempty"`
+	FromPort         string                    `json:"fromPort,omitempty"`
+	ToPort           string                    `json:"toPort,omitempty"`
 	States           []ParcelsAppStateItem     `json:"states"`
 	Services         []ParcelsAppServiceItem   `json:"services"`
 	DetectedCarrier  ParcelsAppServiceItem     `json:"detectedCarrier"`
@@ -186,7 +240,42 @@ type ParcelsAppShipment struct {
 	Attributes       []ParcelsAppAttribute     `json:"attributes,omitempty"`
 	ExternalTracking []ParcelsAppExternalTrack `json:"externalTracking,omitempty"`
 	FlightLegs       []FlightLeg               `json:"flight_legs,omitempty"`
+	SeaLegs          []SeaLeg                  `json:"sea_legs,omitempty"`
+	Container        *ContainerDetails         `json:"container,omitempty"`
 	Error            string                    `json:"error,omitempty"`
+}
+
+// AddAttribute appends or updates an attribute in the shipment attribute list.
+func (s *ParcelsAppShipment) AddAttribute(label, val, code string) {
+	for i, attr := range s.Attributes {
+		if attr.Label == label {
+			s.Attributes[i].Val = val
+			if code != "" {
+				s.Attributes[i].Code = code
+			}
+			return
+		}
+	}
+	s.Attributes = append(s.Attributes, ParcelsAppAttribute{
+		Label: label,
+		Val:   val,
+		Code:  code,
+	})
+}
+
+// FindAttribute retrieves an attribute by its label.
+func (s *ParcelsAppShipment) FindAttribute(label string) (ParcelsAppAttribute, bool) {
+	for _, attr := range s.Attributes {
+		if attr.Label == label {
+			return attr, true
+		}
+	}
+	return ParcelsAppAttribute{}, false
+}
+
+// HasOceanData returns true if the shipment includes container, sea legs, or port UN/LOCODEs.
+func (s *ParcelsAppShipment) HasOceanData() bool {
+	return s.Container != nil || len(s.SeaLegs) > 0 || s.FromPort != "" || s.ToPort != ""
 }
 
 type ParcelsAppStateItem struct {

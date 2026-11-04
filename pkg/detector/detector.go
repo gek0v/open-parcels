@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 gv-factory contributors
+
 package detector
 
 import (
@@ -91,6 +94,33 @@ func (d *Detector) Detect(rawNumber string, destCountryHint string) []models.Det
 		})
 	}
 
+	// Check BIC container prefix mapping to propose specific ocean carrier candidate
+	if len(clean) == 11 && (clean[3] == 'U' || clean[3] == 'J' || clean[3] == 'Z') {
+		if slug, ok := LookupBIC(clean); ok && !seenCarrier[slug] {
+			info, hasInfo := BICCarrierInfoMap[slug]
+			if !hasInfo {
+				info = models.CarrierInfo{
+					Slug:        slug,
+					Name:        slug,
+					Country:     "GLOBAL",
+					CountryName: "International",
+					Type:        models.CarrierTypeOcean,
+				}
+			}
+			conf := 0.95
+			if validateISO6346Checksum(clean) {
+				conf = 0.96
+			}
+			candidates = append(candidates, models.DetectResult{
+				Carrier:        info,
+				Confidence:     conf,
+				MatchedPattern: "ISO 6346 BIC prefix " + clean[:4],
+				Reason:         "Matched BIC prefix: " + clean[:4],
+			})
+			seenCarrier[slug] = true
+		}
+	}
+
 	// Sort candidates by confidence descending
 	sortCandidates(candidates)
 
@@ -148,6 +178,212 @@ func sortCandidates(arr []models.DetectResult) {
 	}
 }
 
+// ValidateISO6346Checksum calculates the ISO 6346 Modulo 11 check digit
+// (omitting multiples of 11: 11, 22, 33) and verifies if it matches the 11th digit.
+func ValidateISO6346Checksum(cleanNumber string) bool {
+	return validateISO6346Checksum(cleanNumber)
+}
+
+func validateISO6346Checksum(clean string) bool {
+	clean = strings.ToUpper(strings.TrimSpace(clean))
+	if len(clean) != 11 {
+		return false
+	}
+	// Chars 0-2: owner code (3 letters)
+	for i := 0; i < 3; i++ {
+		if clean[i] < 'A' || clean[i] > 'Z' {
+			return false
+		}
+	}
+	// Char 3: category identifier (U for freight containers, J for detachable equipment, Z for trailers)
+	if clean[3] != 'U' && clean[3] != 'J' && clean[3] != 'Z' {
+		return false
+	}
+	// Chars 4-9: serial number (6 digits)
+	for i := 4; i < 10; i++ {
+		if clean[i] < '0' || clean[i] > '9' {
+			return false
+		}
+	}
+	// Char 10: check digit (1 digit)
+	if clean[10] < '0' || clean[10] > '9' {
+		return false
+	}
+
+	sum := 0
+	weights := []int{1, 2, 4, 8, 16, 32, 64, 128, 256, 512}
+	for i := 0; i < 4; i++ {
+		sum += isoCharValue(clean[i]) * weights[i]
+	}
+	for i := 4; i < 10; i++ {
+		sum += int(clean[i]-'0') * weights[i]
+	}
+
+	// Remainder modulo 11. If 10, the check digit is 0.
+	check := (sum % 11) % 10
+	expected := int(clean[10] - '0')
+	return check == expected
+}
+
+// isoCharValue returns the ISO 6346 equivalent numerical value for letter A-Z,
+// omitting multiples of 11 (11, 22, 33).
+func isoCharValue(ch byte) int {
+	if ch < 'A' || ch > 'Z' {
+		return 0
+	}
+	val := int(ch - 'A') + 10
+	if val >= 11 {
+		val++
+	}
+	if val >= 22 {
+		val++
+	}
+	if val >= 33 {
+		val++
+	}
+	return val
+}
+
+// BICPrefixCarrierMap maps 4-letter container prefix codes to carrier slugs.
+var BICPrefixCarrierMap = map[string]string{
+	"MSKU": "maersk-line",
+	"MAEU": "maersk-line",
+	"MRKU": "maersk-line",
+	"PONU": "maersk-line",
+	"MSCU": "msc",
+	"MEDU": "msc",
+	"CMAU": "cma-cgm",
+	"CGMU": "cma-cgm",
+	"ANLU": "cma-cgm",
+	"COSU": "cosco",
+	"CBHU": "cosco",
+	"CCLU": "cosco",
+	"HLCU": "hapag-lloyd",
+	"HLXU": "hapag-lloyd",
+	"CSQU": "hapag-lloyd",
+	"EGLV": "evergreen",
+	"EMCU": "evergreen",
+	"EISU": "evergreen",
+	"EGSU": "evergreen",
+	"UGXU": "evergreen",
+	"ONEU": "one-line",
+	"NYKU": "one-line",
+	"MOLU": "one-line",
+	"KKFU": "one-line",
+	"KLXU": "one-line",
+	"YMLU": "yang-ming",
+	"HDMU": "hmm",
+	"ZIMU": "zim",
+	"DOLU": "dole-ocean-cargo",
+}
+
+// BICCarrierInfoMap provides full carrier info for ocean carriers.
+var BICCarrierInfoMap = map[string]models.CarrierInfo{
+	"maersk-line": {
+		Slug:        "maersk-line",
+		Name:        "Maersk Line",
+		Country:     "GLOBAL",
+		CountryName: "International",
+		Type:        models.CarrierTypeOcean,
+		Website:     "https://www.maersk.com",
+	},
+	"msc": {
+		Slug:        "msc",
+		Name:        "MSC",
+		Country:     "GLOBAL",
+		CountryName: "International",
+		Type:        models.CarrierTypeOcean,
+		Website:     "https://www.msc.com",
+	},
+	"cma-cgm": {
+		Slug:        "cma-cgm",
+		Name:        "CMA CGM",
+		Country:     "GLOBAL",
+		CountryName: "International",
+		Type:        models.CarrierTypeOcean,
+		Website:     "https://www.cma-cgm.com",
+	},
+	"cosco": {
+		Slug:        "cosco",
+		Name:        "COSCO Shipping",
+		Country:     "GLOBAL",
+		CountryName: "International",
+		Type:        models.CarrierTypeOcean,
+		Website:     "https://lines.coscoshipping.com",
+	},
+	"hapag-lloyd": {
+		Slug:        "hapag-lloyd",
+		Name:        "Hapag Lloyd",
+		Country:     "GLOBAL",
+		CountryName: "International",
+		Type:        models.CarrierTypeOcean,
+		Website:     "https://www.hapag-lloyd.com",
+	},
+	"evergreen": {
+		Slug:        "evergreen",
+		Name:        "Evergreen",
+		Country:     "GLOBAL",
+		CountryName: "International",
+		Type:        models.CarrierTypeOcean,
+		Website:     "https://www.evergreen-line.com",
+	},
+	"one-line": {
+		Slug:        "one-line",
+		Name:        "ONE Ocean Network Express",
+		Country:     "GLOBAL",
+		CountryName: "International",
+		Type:        models.CarrierTypeOcean,
+		Website:     "https://www.one-line.com",
+	},
+	"yang-ming": {
+		Slug:        "yang-ming",
+		Name:        "Yang Ming",
+		Country:     "GLOBAL",
+		CountryName: "International",
+		Type:        models.CarrierTypeOcean,
+		Website:     "https://www.yangming.com",
+	},
+	"hmm": {
+		Slug:        "hmm",
+		Name:        "HMM",
+		Country:     "GLOBAL",
+		CountryName: "International",
+		Type:        models.CarrierTypeOcean,
+		Website:     "https://www.hmm21.com",
+	},
+	"zim": {
+		Slug:        "zim",
+		Name:        "ZIM",
+		Country:     "GLOBAL",
+		CountryName: "International",
+		Type:        models.CarrierTypeOcean,
+		Website:     "https://www.zim.com",
+	},
+	"dole-ocean-cargo": {
+		Slug:        "dole-ocean-cargo",
+		Name:        "Dole Ocean Cargo",
+		Country:     "GLOBAL",
+		CountryName: "International",
+		Type:        models.CarrierTypeOcean,
+		Website:     "https://www.doleocean.com",
+	},
+}
+
+// LookupBICPrefix returns the ocean carrier slug for a given 4-letter BIC prefix.
+func LookupBICPrefix(prefix string) (string, bool) {
+	slug, ok := BICPrefixCarrierMap[strings.ToUpper(strings.TrimSpace(prefix))]
+	return slug, ok
+}
+
+// LookupBIC returns the ocean carrier slug for a container tracking number or prefix.
+func LookupBIC(containerOrPrefix string) (string, bool) {
+	clean := strings.ToUpper(strings.TrimSpace(containerOrPrefix))
+	if len(clean) >= 4 {
+		return LookupBICPrefix(clean[:4])
+	}
+	return "", false
+}
+
 // Checksum validation helpers
 func validateUPS(trackingNumber string) bool {
 	// Standard UPS: 1Z + 6 chars (account) + 2 chars (service code) + 7 chars (package) + 1 digit (check)
@@ -195,15 +431,7 @@ func validateAWB(raw string) bool {
 }
 
 func validateContainer(clean string) bool {
-	// ISO 6346: 4 letters + 7 digits
-	if len(clean) != 11 {
-		return false
-	}
-	lastLetter := clean[3]
-	if lastLetter != 'U' && lastLetter != 'J' && lastLetter != 'Z' {
-		return false
-	}
-	return true
+	return validateISO6346Checksum(clean)
 }
 
 func validateUPUS10(clean string) bool {

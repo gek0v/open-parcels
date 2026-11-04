@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 gv-factory contributors
+
 package engine
 
 import (
@@ -10,24 +13,34 @@ import (
 func NormalizeEventStatus(desc string) (models.Status, models.Stage) {
 	d := strings.ToLower(desc)
 
-	// Delivered
+	// Delivered / Empty return
 	if strings.Contains(d, "delivered") ||
 		strings.Contains(d, "entregado") ||
 		strings.Contains(d, "livré") ||
 		strings.Contains(d, "zugestellt") ||
 		strings.Contains(d, "in/at mailbox") ||
-		strings.Contains(d, "signed by") {
+		strings.Contains(d, "signed by") ||
+		strings.Contains(d, "empty return") ||
+		strings.Contains(d, "empty returned") ||
+		strings.Contains(d, "returned empty") ||
+		strings.Contains(d, "empty container returned") ||
+		strings.Contains(d, "devolución de vacío") ||
+		strings.Contains(d, "retorno de vacío") {
 		return models.StatusDelivered, models.StageDelivery
 	}
 
-	// Out for delivery
+	// Out for delivery / Gate-out full
 	if strings.Contains(d, "out for delivery") ||
 		strings.Contains(d, "en reparto") ||
 		strings.Contains(d, "en cours de livraison") ||
 		strings.Contains(d, "in zustellung") ||
 		strings.Contains(d, "with delivery courier") ||
 		strings.Contains(d, "loaded onto delivery vehicle") ||
-		strings.Contains(d, "repartidor") {
+		strings.Contains(d, "repartidor") ||
+		strings.Contains(d, "gate-out") ||
+		strings.Contains(d, "gate out") ||
+		strings.Contains(d, "puerta de salida") ||
+		strings.Contains(d, "salida de terminal") {
 		return models.StatusOutForDelivery, models.StageLastMile
 	}
 
@@ -68,11 +81,32 @@ func NormalizeEventStatus(desc string) (models.Status, models.Stage) {
 		return models.StatusInTransit, models.StageHandover
 	}
 
-	// Picked up / In transit
-	if strings.Contains(d, "picked up") ||
+	// Gate-in / Picked up
+	if strings.Contains(d, "gate-in") ||
+		strings.Contains(d, "gate in") ||
+		strings.Contains(d, "picked up") ||
 		strings.Contains(d, "admitido") ||
+		strings.Contains(d, "collected") ||
+		strings.Contains(d, "ingreso a terminal") ||
+		strings.Contains(d, "puerta de entrada") {
+		return models.StatusInTransit, models.StagePickedUp
+	}
+
+	// In transit / Maritime vessel movements / Transit hubs
+	if strings.Contains(d, "loaded on board") ||
+		strings.Contains(d, "laden on board") ||
+		strings.Contains(d, "loaded onto vessel") ||
+		strings.Contains(d, "on board") ||
+		strings.Contains(d, "vessel departed") ||
+		strings.Contains(d, "underway") ||
 		strings.Contains(d, "departed") ||
 		strings.Contains(d, "arrived at") ||
+		strings.Contains(d, "discharged") ||
+		strings.Contains(d, "descargado") ||
+		strings.Contains(d, "cargado a bordo") ||
+		strings.Contains(d, "zarpó") ||
+		strings.Contains(d, "transshipment") ||
+		strings.Contains(d, "transbordo") ||
 		strings.Contains(d, "in transit") ||
 		strings.Contains(d, "en tránsito") ||
 		strings.Contains(d, "sorting center") ||
@@ -126,23 +160,23 @@ func LocalizedStatusText(status models.Status, lang string) string {
 		return "Delivered"
 	case models.StatusFailedAttempt:
 		if isES {
-			return "Intento de entrega fallido / Ausente"
+			return "Intento de entrega fallido"
 		}
-		return "Failed delivery attempt / Notice left"
+		return "Delivery attempted / Failed"
 	case models.StatusException:
 		if isES {
-			return "Incidencia / Retenido"
+			return "Excepción / Incidencia"
 		}
-		return "Shipment exception / Delayed"
+		return "Shipment exception"
 	case models.StatusExpired:
 		if isES {
-			return "Expirado / Sin movimiento"
+			return "Expirado / Archivado"
 		}
-		return "Expired / Stale"
+		return "Expired"
 	default:
 		if isES {
-			return "En camino"
+			return "Estado desconocido"
 		}
-		return "In transit"
+		return "Unknown status"
 	}
 }

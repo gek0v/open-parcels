@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 gv-factory contributors
+
 package carriers
 
 import (
@@ -65,6 +68,17 @@ func registerDefaultCarriers(r *Registry) {
 	r.Register(NewColissimoCarrier())
 	r.Register(NewAirCargoCarrier())
 	r.Register(NewOceanContainerCarrier())
+	r.Register(NewMaerskLineCarrier())
+	r.Register(NewMSCCarrier())
+	r.Register(NewCMACGMCarrier())
+	r.Register(NewCOSCOCarrier())
+	r.Register(NewHapagLloydCarrier())
+	r.Register(NewEvergreenCarrier())
+	r.Register(NewONELineCarrier())
+	r.Register(NewYangMingCarrier())
+	r.Register(NewHMMCarrier())
+	r.Register(NewZIMCarrier())
+	r.Register(NewDoleOceanCargoCarrier())
 }
 
 // Register adds a carrier to the registry.
