@@ -1,0 +1,86 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Parcels API v4",
+    "version": "4.0.0",
+    "description": "Track packages, shipments, freight references, containers, and air waybills worldwide through the Parcels API v4.\n\n## Start here: tracking lifecycle and FAQ\n\n**How is quota counted?** Quota is counted by unique valid `tracking_number` within the current billing cycle. Re-submitting the same tracking number during that cycle does not consume another shipment unit. The number counts once again in a new billing cycle.\n\n**What is `request_id`?** It identifies one asynchronous lookup and its result set. Poll `GET /trackings/{request_id}` until `done` is `true`. A request ID is not a shipment identifier or a permanent monitoring subscription. It is returned even when the request completes immediately from cache.\n\n**What is `expires_at`?** It is the expected retention boundary for that request record, approximately 30 minutes after its last update. It is not a delivery deadline. After the record is removed, GET returns HTTP 404; create a new request with the same tracking number for a later carrier check.\n\n**Do webhooks monitor a shipment for days or weeks?** No. `webhook_url` receives signed completion events for one POST request and then stops. For continuous monitoring, schedule a new `POST /trackings` at your preferred interval and include `webhook_url` each time. Re-posting the same tracking number within the billing cycle does not consume another unique-shipment quota unit.\n\n**What does `from_cache` mean?** Parcels already had data considered fresh for that carrier and returned it immediately. A cache-only request still has a `request_id`, `expires_at`, and `done: true`; it also sends `batch_completed` when a webhook URL was supplied.\n\n**How are timestamps and freight fields represented?** `Z` means UTC; an explicit offset such as `+05:30` preserves carrier-local time. When supplied upstream, shipment and event objects expose structured pieces, weight, volume, station, timezone, flight, milestone, and ULD fields. See the `Shipment`, `TrackingEvent`, and `FlightLeg` schemas below.\n\n## Air waybill (AWB) tracking\n\nSubmit an AWB in `shipments[].tracking_number` as `NNN-NNNNNNNN`: the three-digit airline prefix, a hyphen, and eight digits. Preserve leading zeros, for example `074-12345675` or `072-12345675`. Unhyphenated 11-digit AWBs are not reliably matched and may select another carrier or return no services. The cargo carrier's slug in `carrier_hint` is optional but does not replace the hyphenated number format. Parcels returns ordinary milestones in `shipment.states[]` and, when the carrier provides them, structured cargo measurements and flight-leg data.\n\n### Flight legs and schedule\n\nUse `results[].shipment.flight_legs[]` for the carrier-supplied route and flight plan. A leg can include `flight_number`, `origin`, `destination`, `scheduled_departure_date`, `scheduled_departure`, `scheduled_arrival`, `actual_departure`, and `actual_arrival`.\n\n`shipment.states[].date` is always the time of that tracking event. A BKG/Booked timestamp is never treated as scheduled departure. When a carrier provides only the flight date, Parcels returns `scheduled_departure_date` and omits `scheduled_departure` rather than inventing a time. The `Air cargo flight legs` response example and the mock request using AWB `157-52471764` with `carrier_hint: qatar-airways-cargo` demonstrate the contract.\n\nThe canonical human-facing documentation URL is `https://parcelsapp.com/developers/docs`. Raw OpenAPI, text, and mock resources remain under `/api-docs/*` for compatibility.",
+    "contact": {
+      "name": "Parcels",
+      "url": "https://parcelsapp.com",
+      "email": "hello@parcelsapp.com"
+    }
+  },
+  "servers": [
+    {
+      "url": "/api-docs/mock/v4",
+      "description": "Mock API. Try requests without an API key."
+    },
+    {
+      "url": "https://parcelsapp.com/api/v4",
+      "description": "Live API"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Tracking",
+      "description": "Create tracking requests and read their short-lived result records. Each POST returns a `request_id` and `expires_at`; re-POST the same tracking number whenever you need a later carrier refresh. Use this for parcels, express packages, freight references, containers, and air waybills."
+    },
+    {
+      "name": "Delivery Estimates",
+      "description": "Estimate total or remaining delivery time from completed journeys. Start with carrier, transport mode, origin country, and destination country; add route detail only when known. This does not start tracking or consume tracking quota."
+    },
+    {
+      "name": "Webhooks",
+      "description": "Signed request-scoped callbacks sent to your `webhook_url` when the submitted tracking request completes. They do not continue monitoring the shipment after that request; include `webhook_url` in each later scheduled POST."
+    }
+  ],
+  "paths": {
+    "/trackings": {
+      "post": {
+        "operationId": "createTrackingRequest",
+        "summary": "Create tracking request",
+        "tags": ["Tracking"],
+        "security": [{"bearerAuth": []}]
+      }
+    },
+    "/trackings/{request_id}": {
+      "get": {
+        "operationId": "getTrackingRequest",
+        "summary": "Read tracking results",
+        "tags": ["Tracking"],
+        "security": [{"bearerAuth": []}]
+      }
+    },
+    "/tracking-carriers": {
+      "get": {
+        "operationId": "listTrackingCarriers",
+        "summary": "List carrier slugs accepted by carrier_hint",
+        "tags": ["Tracking"],
+        "security": [{"bearerAuth": []}]
+      }
+    },
+    "/delivery-estimates": {
+      "post": {
+        "operationId": "createDeliveryEstimates",
+        "summary": "Forecast delivery time (beta)",
+        "tags": ["Delivery Estimates"],
+        "security": [{"bearerAuth": []}]
+      }
+    },
+    "/carriers": {
+      "get": {
+        "operationId": "searchDeliveryEstimateCarriers",
+        "summary": "Find canonical carrier slugs (beta)",
+        "tags": ["Delivery Estimates"],
+        "security": [{"bearerAuth": []}]
+      }
+    },
+    "/parcels-webhook": {
+      "post": {
+        "operationId": "receiveTrackingWebhook",
+        "summary": "Receive tracking webhook",
+        "tags": ["Webhooks"]
+      }
+    }
+  }
+}

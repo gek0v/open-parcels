@@ -1,0 +1,2180 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Parcels API v4",
+    "version": "4.0.0",
+    "description": "Track packages, shipments, freight references, containers, and air waybills worldwide through the Parcels API v4.\n\n## Start here: tracking lifecycle and FAQ\n\n**How is quota counted?** Quota is counted by unique valid `tracking_number` within the current billing cycle. Re-submitting the same tracking number during that cycle does not consume another shipment unit. The number counts once again in a new billing cycle.\n\n**What is `request_id`?** It identifies one asynchronous lookup and its result set. Poll `GET /trackings/{request_id}` until `done` is `true`. A request ID is not a shipment identifier or a permanent monitoring subscription. It is returned even when the request completes immediately from cache.\n\n**What is `expires_at`?** It is the expected retention boundary for that request record, approximately 30 minutes after its last update. It is not a delivery deadline. After the record is removed, GET returns HTTP 404; create a new request with the same tracking number for a later carrier check.\n\n**Do webhooks monitor a shipment for days or weeks?** No. `webhook_url` receives signed completion events for one POST request and then stops. For continuous monitoring, schedule a new `POST /trackings` at your preferred interval and include `webhook_url` each time. Re-posting the same tracking number within the billing cycle does not consume another unique-shipment quota unit.\n\n**What does `from_cache` mean?** Parcels already had data considered fresh for that carrier and returned it immediately. A cache-only request still has a `request_id`, `expires_at`, and `done: true`; it also sends `batch_completed` when a webhook URL was supplied.\n\n**How are timestamps and freight fields represented?** `Z` means UTC; an explicit offset such as `+05:30` preserves carrier-local time. When supplied upstream, shipment and event objects expose structured pieces, weight, volume, station, timezone, flight, milestone, and ULD fields. See the `Shipment`, `TrackingEvent`, and `FlightLeg` schemas below.\n\n## Air waybill (AWB) tracking\n\nSubmit an AWB in `shipments[].tracking_number` as `NNN-NNNNNNNN`: the three-digit airline prefix, a hyphen, and eight digits. Preserve leading zeros, for example `074-12345675` or `072-12345675`. Unhyphenated 11-digit AWBs are not reliably matched and may select another carrier or return no services. The cargo carrier's slug in `carrier_hint` is optional but does not replace the hyphenated number format. Parcels returns ordinary milestones in `shipment.states[]` and, when the carrier provides them, structured cargo measurements and flight-leg data.\n\n### Flight legs and schedule\n\nUse `results[].shipment.flight_legs[]` for the carrier-supplied route and flight plan. A leg can include `flight_number`, `origin`, `destination`, `scheduled_departure_date`, `scheduled_departure`, `scheduled_arrival`, `actual_departure`, and `actual_arrival`.\n\n`shipment.states[].date` is always the time of that tracking event. A BKG/Booked timestamp is never treated as scheduled departure. When a carrier provides only the flight date, Parcels returns `scheduled_departure_date` and omits `scheduled_departure` rather than inventing a time. The `Air cargo flight legs` response example and the mock request using AWB `157-52471764` with `carrier_hint: qatar-airways-cargo` demonstrate the contract.\n\nThe canonical human-facing documentation URL is `https://parcelsapp.com/developers/docs`. Raw OpenAPI, text, and mock resources remain under `/api-docs/*` for compatibility.",
+    "contact": {
+      "name": "Parcels",
+      "url": "https://parcelsapp.com",
+      "email": "hello@parcelsapp.com"
+    }
+  },
+  "servers": [
+    {
+      "url": "/api-docs/mock/v4",
+      "description": "Mock API. Try requests without an API key."
+    },
+    {
+      "url": "https://parcelsapp.com/api/v4",
+      "description": "Live API"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Tracking",
+      "description": "Create tracking requests and read their short-lived result records. Each POST returns a `request_id` and `expires_at`; re-POST the same tracking number whenever you need a later carrier refresh. Use this for parcels, express packages, freight references, containers, and air waybills."
+    },
+    {
+      "name": "Delivery Estimates",
+      "description": "Estimate total or remaining delivery time from completed journeys. Start with carrier, transport mode, origin country, and destination country; add route detail only when known. This does not start tracking or consume tracking quota."
+    },
+    {
+      "name": "Webhooks",
+      "description": "Signed request-scoped callbacks sent to your `webhook_url` when the submitted tracking request completes. They do not continue monitoring the shipment after that request; include `webhook_url` in each later scheduled POST."
+    }
+  ],
+  "paths": {
+    "/trackings": {
+      "post": {
+        "operationId": "createTrackingRequest",
+        "summary": "Create tracking request",
+        "description": "Creates a tracking request for packages, postal parcels, express shipments, freight references, containers, or air waybills. Use the same `tracking_number` field for all of them; Parcels detects the best carrier route automatically. For reliable air waybill detection, submit `NNN-NNNNNNNN` with the hyphen after the airline prefix and preserve leading zeros.\n\nQuota is counted by unique `tracking_number` within the current billing cycle. Re-submitting the same tracking number during that cycle does not consume another shipment from the monthly quota.\n\nThe response always includes `request_id` and `expires_at`. A request is an asynchronous lookup result, not a persistent shipment subscription; it is eligible for deletion about 30 minutes after its last update. Re-POST the same tracking number whenever you need a later refresh. If Parcels already has fresh cached data, the matching result is returned immediately with `from_cache: true`. If every requested shipment is cached, `done` is `true` and polling is optional. If only part of the request is cached, cached results are returned immediately and the remaining results stay in `state: processing` until polling or webhooks complete.\n\n`destination_country` accepts an ISO-2 country code such as `US` or a full English country name such as `United States`. It is required for ordinary parcel/package numbers, but not required when `carrier_hint` is provided or when the tracking number is an air waybill, ISO container number, or recognized ocean bill of lading.\n\nFor carrier-specific recipient or shipment details, use `postal_code`, `email`, `phone`, and the documented `additional_fields` keys. `GET /tracking-carriers` publishes verified requirements using these exact request paths. Unknown or malformed `additional_fields` reject only the affected shipment. These values are used for the lookup and are not returned as interactive prompt events.\n\nPass `webhook_url` to receive callbacks for this request. A `batch_completed` webhook is also sent when the whole request is served from cache. Webhooks do not keep monitoring the shipment after that request completes; schedule a new POST with `webhook_url` for each later check. The create response returns a webhook secret once; store it and verify future `Parcels-Signature` headers.",
+        "tags": [
+          "Tracking"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTrackingRequest"
+              },
+              "examples": {
+                "uspsWithWebhook": {
+                  "summary": "USPS tracking with webhook",
+                  "value": {
+                    "language": "en",
+                    "webhook_url": "https://example.com/parcels/webhook",
+                    "shipments": [
+                      {
+                        "tracking_number": "9400111206213785678901",
+                        "destination_country": "US",
+                        "carrier_hint": "usps"
+                      }
+                    ]
+                  }
+                },
+                "transOFlexWithAddress": {
+                  "summary": "trans-o-flex with postal code and house number",
+                  "value": {
+                    "language": "en",
+                    "shipments": [{
+                      "tracking_number": "REFERENCE-12345",
+                      "destination_country": "DE",
+                      "carrier_hint": "trans-o-flex",
+                      "postal_code": "69469",
+                      "additional_fields": {"house_number": "12"}
+                    }]
+                  }
+                },
+                "seurWithRecipientDetails": {
+                  "summary": "SEUR with destination postal code and recipient email",
+                  "value": {
+                    "language": "es",
+                    "shipments": [{
+                      "tracking_number": "12345678901234",
+                      "destination_country": "ES",
+                      "carrier_hint": "seur",
+                      "postal_code": "15006",
+                      "email": "recipient@example.com"
+                    }]
+                  }
+                },
+                "airWaybill": {
+                  "summary": "Air waybill without destination country",
+                  "value": {
+                    "language": "en",
+                    "shipments": [
+                      {
+                        "tracking_number": "176-12345675",
+                        "carrier_hint": "emirates-skycargo"
+                      }
+                    ]
+                  }
+                },
+                "airCargoFlightLegs": {
+                  "summary": "Qatar Airways Cargo route, schedule, and actual-movement example",
+                  "value": {
+                    "language": "en",
+                    "shipments": [
+                      {
+                        "tracking_number": "157-52471764",
+                        "carrier_hint": "qatar-airways-cargo"
+                      }
+                    ]
+                  }
+                },
+                "container": {
+                  "summary": "Container without destination country",
+                  "value": {
+                    "language": "en",
+                    "shipments": [
+                      {
+                        "tracking_number": "MRKU4656243"
+                      }
+                    ]
+                  }
+                },
+                "billOfLading": {
+                  "summary": "Bill of lading without destination country",
+                  "value": {
+                    "language": "en",
+                    "shipments": [
+                      {
+                        "tracking_number": "EGLV147000380361"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tracking request created. Results can be completed from cache or still processing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrackingResponse"
+                },
+                "examples": {
+                  "cached": {
+                    "summary": "Completed from cache",
+                    "value": {
+                      "request_id": "66f4f2c0e16b4c13bb7e0001",
+                      "status": "completed",
+                      "done": true,
+                      "expires_at": "2026-06-25T19:13:20.000Z",
+                      "results": [
+                        {
+                          "tracking_number": "9400111206213785678901",
+                          "state": "completed",
+                          "from_cache": true,
+                          "shipment": {
+                            "trackingId": "9400111206213785678901",
+                            "status": "delivered",
+                            "origin": "United States",
+                            "destination": "United States",
+                            "originCode": "US",
+                            "destinationCode": "US",
+                            "states": [
+                              {
+                                "state": "Delivered, In/At Mailbox",
+                                "location": "Austin, TX, United States",
+                                "date": "2026-06-25T18:42:00.000Z",
+                                "carrier": 0
+                              },
+                              {
+                                "state": "Out for Delivery",
+                                "location": "Austin, TX, United States",
+                                "date": "2026-06-25T12:15:00.000Z",
+                                "carrier": 0
+                              },
+                              {
+                                "state": "Arrived at Post Office",
+                                "location": "Austin, TX, United States",
+                                "date": "2026-06-25T08:04:00.000Z",
+                                "carrier": 0
+                              },
+                              {
+                                "state": "Accepted at USPS Origin Facility",
+                                "location": "Portland, OR, United States",
+                                "date": "2026-06-22T21:30:00.000Z",
+                                "carrier": 0
+                              }
+                            ],
+                            "services": [
+                              {
+                                "slug": "usps",
+                                "name": "USPS"
+                              }
+                            ],
+                            "detectedCarrier": {
+                              "slug": "usps",
+                              "name": "USPS"
+                            },
+                            "detected": [
+                              0
+                            ],
+                            "attributes": [
+                              {
+                                "l": "origin",
+                                "val": "United States",
+                                "code": "US"
+                              },
+                              {
+                                "l": "destination",
+                                "val": "United States",
+                                "code": "US"
+                              }
+                            ],
+                            "externalTracking": [
+                              {
+                                "slug": "usps",
+                                "url": "https://tools.usps.com/go/TrackConfirmAction?tLabels=9400111206213785678901",
+                                "trackingId": "9400111206213785678901",
+                                "method": "GET"
+                              }
+                            ]
+                          }
+                        }
+                      ],
+                      "webhook": {
+                        "url": "https://example.com/parcels/webhook",
+                        "secret": "whsec_abc123",
+                        "signature_header": "Parcels-Signature"
+                      }
+                    }
+                  },
+                  "airCargoFlightLegs": {
+                    "summary": "Air cargo flight legs: booking time, schedule, and actual movement stay distinct",
+                    "value": {
+                      "request_id": "66f4f2c0e16b4c13bb7e0002",
+                      "status": "completed",
+                      "done": true,
+                      "expires_at": "2026-09-02T14:30:00.000Z",
+                      "results": [
+                        {
+                          "tracking_number": "157-52471764",
+                          "state": "completed",
+                          "from_cache": true,
+                          "shipment": {
+                            "trackingId": "157-52471764",
+                            "status": "in_transit",
+                            "origin": "Bratislava, Slovakia",
+                            "destination": "Almaty, Kazakhstan",
+                            "originCode": "BTS",
+                            "destinationCode": "ALA",
+                            "flight_legs": [
+                              {
+                                "flight_number": "QR-9052 B",
+                                "origin": "BTS",
+                                "destination": "BUD",
+                                "status": "Arrived"
+                              },
+                              {
+                                "flight_number": "QR-8242",
+                                "origin": "BUD",
+                                "destination": "DOH",
+                                "status": "Arrived"
+                              },
+                              {
+                                "flight_number": "QR-8416",
+                                "origin": "DOH",
+                                "destination": "ALA",
+                                "status": "Departed",
+                                "scheduled_departure_date": "2026-09-02",
+                                "scheduled_departure": "2026-09-02T13:37:00+03:00",
+                                "scheduled_arrival": "2026-09-02T20:11:00+05:00",
+                                "actual_departure": "2026-09-02T13:37:00+03:00"
+                              }
+                            ],
+                            "states": [
+                              {
+                                "state": "Booked",
+                                "date": "2026-09-02T12:55:00+03:00",
+                                "event_code": "BKG",
+                                "station": "DOH",
+                                "flight_number": "QR-8416",
+                                "flight_origin": "DOH",
+                                "flight_destination": "ALA",
+                                "scheduled_departure": "2026-09-02T13:37:00+03:00",
+                                "scheduled_arrival": "2026-09-02T20:11:00+05:00"
+                              },
+                              {
+                                "state": "Departed",
+                                "date": "2026-09-02T13:37:00+03:00",
+                                "event_code": "DEP",
+                                "station": "DOH",
+                                "flight_number": "QR-8416",
+                                "flight_origin": "DOH",
+                                "flight_destination": "ALA",
+                                "actual_departure": "2026-09-02T13:37:00+03:00"
+                              }
+                            ],
+                            "services": [
+                              {
+                                "slug": "qatar-airways-cargo",
+                                "name": "Qatar Airways Cargo"
+                              }
+                            ],
+                            "detectedCarrier": {
+                              "slug": "qatar-airways-cargo",
+                              "name": "Qatar Airways Cargo"
+                            },
+                            "detected": [0]
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  "processing": {
+                    "summary": "Tracking continues asynchronously",
+                    "value": {
+                      "request_id": "66f4f2c0e16b4c13bb7e0001",
+                      "status": "processing",
+                      "done": false,
+                      "expires_at": "2026-06-25T19:13:20.000Z",
+                      "results": [
+                        {
+                          "tracking_number": "9400111206213785678901",
+                          "state": "processing",
+                          "from_cache": false
+                        }
+                      ]
+                    }
+                  },
+                  "partiallyFiltered": {
+                    "summary": "Valid items continue while invalid items are rejected",
+                    "value": {
+                      "request_id": "66f4f2c0e16b4c13bb7e0002",
+                      "status": "processing",
+                      "done": false,
+                      "expires_at": "2026-06-25T19:13:25.000Z",
+                      "results": [
+                        {
+                          "tracking_number": "9400111206213785678901",
+                          "state": "processing",
+                          "from_cache": false
+                        }
+                      ],
+                      "rejected": [
+                        {
+                          "index": 1,
+                          "tracking_number": "1",
+                          "code": "INVALID_TRACKING_NUMBER",
+                          "message": "tracking_number is not valid for tracking."
+                        }
+                      ]
+                    }
+                  },
+                  "seurAdditionalFields": {
+                    "summary": "SEUR needs more recipient identification",
+                    "value": {
+                      "request_id": "66f4f2c0e16b4c13bb7e0001",
+                      "status": "completed",
+                      "done": true,
+                      "expires_at": "2026-09-24T07:00:00.000Z",
+                      "results": [{
+                        "tracking_number": "36150127630406",
+                        "state": "completed",
+                        "from_cache": false,
+                        "shipment": {
+                          "trackingId": "36150127630406",
+                          "error": "ADDITIONAL_FIELDS_REQUIRED",
+                          "accepted_fields": ["postal_code", "email", "phone"],
+                          "input_requirements": {"required": ["postal_code"], "any_of": ["email", "phone"]},
+                          "states": []
+                        }
+                      }]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request body, tracking number, destination country, or webhook URL.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "noShipments": {
+                    "summary": "Every shipment was filtered out",
+                    "value": {
+                      "error": {
+                        "code": "NO_SHIPMENTS",
+                        "message": "No valid shipments remain after validation.",
+                        "rejected": [
+                          {
+                            "index": 0,
+                            "tracking_number": "1",
+                            "code": "INVALID_TRACKING_NUMBER",
+                            "message": "tracking_number is not valid for tracking."
+                          },
+                          {
+                            "index": 1,
+                            "tracking_number": "ORDINARY123",
+                            "code": "DESTINATION_COUNTRY_REQUIRED",
+                            "message": "destination_country is required unless carrier_hint is provided or the tracking number is an air waybill, ISO container number, or recognized ocean bill of lading."
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "invalidWebhook": {
+                    "summary": "Invalid webhook URL",
+                    "value": {
+                      "error": {
+                        "code": "INVALID_WEBHOOK_URL",
+                        "message": "webhook_url must use HTTPS in production."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "missing": {
+                    "value": {
+                      "error": {
+                        "code": "MISSING_API_KEY",
+                        "message": "Use Authorization: Bearer <API_KEY>."
+                      }
+                    }
+                  },
+                  "invalid": {
+                    "value": {
+                      "error": {
+                        "code": "INVALID_API_KEY",
+                        "message": "API key is invalid."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Subscription cannot currently create new tracking requests.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "inactive": {
+                    "value": {
+                      "error": {
+                        "code": "SUBSCRIPTION_INACTIVE",
+                        "message": "Subscription is inactive."
+                      }
+                    }
+                  },
+                  "limit": {
+                    "value": {
+                      "error": {
+                        "code": "SUBSCRIPTION_LIMIT_REACHED",
+                        "message": "Subscription shipment limit has been reached.",
+                        "limit": 100,
+                        "current": 99,
+                        "requested_new": 2,
+                        "available": 1
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Account cannot create tracking requests.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "unconfirmed": {
+                    "value": {
+                      "error": {
+                        "code": "UNCONFIRMED_ACCOUNT",
+                        "message": "Account email is not confirmed.",
+                        "confirmation_url": "https://parcelsapp.com/api/v4/account/confirm/user%40example.com/token",
+                        "confirmation_expires_at": "2026-07-09T12:00:00.000Z"
+                      }
+                    }
+                  },
+                  "forbidden": {
+                    "value": {
+                      "error": {
+                        "code": "FORBIDDEN",
+                        "message": "Tracking is disabled for this account."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests from this client.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": {
+                    "code": "RATE_LIMITED",
+                    "message": "Too many requests. Please try again later."
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Tracking service is temporarily busy. The rejected request does not consume subscription quota.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "examples": {
+                  "busy": {
+                    "value": {
+                      "error": {
+                        "code": "BUSY",
+                        "message": "Tracking service is busy. Retry later."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": {
+                    "code": "SERVER_ERROR",
+                    "message": "Server error."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "curl",
+            "label": "cURL",
+            "source": "curl -X POST \"https://parcelsapp.com/api/v4/trackings\" \\\n  -H \"Authorization: Bearer <YOUR_API_KEY>\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\n  \"language\": \"en\",\n  \"webhook_url\": \"https://example.com/parcels/webhook\",\n  \"shipments\": [\n    {\n      \"tracking_number\": \"9400111206213785678901\",\n      \"destination_country\": \"US\",\n      \"carrier_hint\": \"usps\"\n    }\n  ]\n}'"
+          },
+          {
+            "lang": "JavaScript",
+            "label": "JavaScript",
+            "source": "const response = await fetch('https://parcelsapp.com/api/v4/trackings', {\n  method: 'POST',\n  headers: {\n    Authorization: 'Bearer ' + apiKey,\n    'Content-Type': 'application/json'\n  },\n  body: JSON.stringify({\n  \"language\": \"en\",\n  \"webhook_url\": \"https://example.com/parcels/webhook\",\n  \"shipments\": [\n    {\n      \"tracking_number\": \"9400111206213785678901\",\n      \"destination_country\": \"US\",\n      \"carrier_hint\": \"usps\"\n    }\n  ]\n})\n});\n\nconst tracking = await response.json();\nconsole.log(tracking.request_id, tracking.results);"
+          },
+          {
+            "lang": "Python",
+            "label": "Python",
+            "source": "import requests\n\nresponse = requests.post(\n    'https://parcelsapp.com/api/v4/trackings',\n    headers={'Authorization': f'Bearer {api_key}'},\n    json={\n    \"language\": \"en\",\n    \"webhook_url\": \"https://example.com/parcels/webhook\",\n    \"shipments\": [\n        {\n            \"tracking_number\": \"9400111206213785678901\",\n            \"destination_country\": \"US\",\n            \"carrier_hint\": \"usps\"\n        }\n    ]\n}\n)\nprint(response.json())"
+          },
+          {
+            "lang": "PHP",
+            "label": "PHP",
+            "source": "<?php\n$body = \"{\\n  \\\"language\\\": \\\"en\\\",\\n  \\\"webhook_url\\\": \\\"https://example.com/parcels/webhook\\\",\\n  \\\"shipments\\\": [\\n    {\\n      \\\"tracking_number\\\": \\\"9400111206213785678901\\\",\\n      \\\"destination_country\\\": \\\"US\\\",\\n      \\\"carrier_hint\\\": \\\"usps\\\"\\n    }\\n  ]\\n}\";\n$ch = curl_init('https://parcelsapp.com/api/v4/trackings');\ncurl_setopt_array($ch, [\n  CURLOPT_RETURNTRANSFER => true,\n  CURLOPT_POST => true,\n  CURLOPT_HTTPHEADER => [\n    'Authorization: Bearer ' . $apiKey,\n    'Content-Type: application/json'\n  ],\n  CURLOPT_POSTFIELDS => $body\n]);\nprint_r(json_decode(curl_exec($ch), true));\n?>"
+          }
+        ]
+      }
+    },
+    "/trackings/{request_id}": {
+      "get": {
+        "operationId": "getTrackingRequest",
+        "summary": "Read tracking results",
+        "description": "Reads the current state of one asynchronous tracking request. Poll this `request_id` until `done` is `true`, or use webhooks and call this endpoint only when you need to reconcile state. A request ID is not a permanent shipment subscription. Its record is eligible for deletion about 30 minutes after its last update; use `expires_at` as the expected retention boundary. HTTP 404 after that boundary is expected, and a later carrier check requires a new POST with the same tracking number.",
+        "tags": [
+          "Tracking"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "description": "The request_id returned by POST /trackings.",
+            "schema": {
+              "type": "string",
+              "example": "66f4f2c0e16b4c13bb7e0001"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current tracking state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrackingResponse"
+                },
+                "examples": {
+                  "completed": {
+                    "value": {
+                      "request_id": "66f4f2c0e16b4c13bb7e0001",
+                      "status": "completed",
+                      "done": true,
+                      "expires_at": "2026-06-25T19:13:20.000Z",
+                      "results": [
+                        {
+                          "tracking_number": "9400111206213785678901",
+                          "state": "completed",
+                          "from_cache": true,
+                          "shipment": {
+                            "trackingId": "9400111206213785678901",
+                            "status": "delivered",
+                            "origin": "United States",
+                            "destination": "United States",
+                            "originCode": "US",
+                            "destinationCode": "US",
+                            "states": [
+                              {
+                                "state": "Delivered, In/At Mailbox",
+                                "location": "Austin, TX, United States",
+                                "date": "2026-06-25T18:42:00.000Z",
+                                "carrier": 0
+                              },
+                              {
+                                "state": "Out for Delivery",
+                                "location": "Austin, TX, United States",
+                                "date": "2026-06-25T12:15:00.000Z",
+                                "carrier": 0
+                              },
+                              {
+                                "state": "Arrived at Post Office",
+                                "location": "Austin, TX, United States",
+                                "date": "2026-06-25T08:04:00.000Z",
+                                "carrier": 0
+                              },
+                              {
+                                "state": "Accepted at USPS Origin Facility",
+                                "location": "Portland, OR, United States",
+                                "date": "2026-06-22T21:30:00.000Z",
+                                "carrier": 0
+                              }
+                            ],
+                            "services": [
+                              {
+                                "slug": "usps",
+                                "name": "USPS"
+                              }
+                            ],
+                            "detectedCarrier": {
+                              "slug": "usps",
+                              "name": "USPS"
+                            },
+                            "detected": [
+                              0
+                            ],
+                            "attributes": [
+                              {
+                                "l": "origin",
+                                "val": "United States",
+                                "code": "US"
+                              },
+                              {
+                                "l": "destination",
+                                "val": "United States",
+                                "code": "US"
+                              }
+                            ],
+                            "externalTracking": [
+                              {
+                                "slug": "usps",
+                                "url": "https://tools.usps.com/go/TrackConfirmAction?tLabels=9400111206213785678901",
+                                "trackingId": "9400111206213785678901",
+                                "method": "GET"
+                              }
+                            ]
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  "processing": {
+                    "value": {
+                      "request_id": "66f4f2c0e16b4c13bb7e0001",
+                      "status": "processing",
+                      "done": false,
+                      "expires_at": "2026-06-25T19:13:20.000Z",
+                      "results": [
+                        {
+                          "tracking_number": "9400111206213785678901",
+                          "state": "processing",
+                          "from_cache": false
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing or invalid request_id.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The request does not exist, has expired, or belongs to another account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": {
+                    "code": "NO_REQUEST_FOUND",
+                    "message": "Tracking request was not found."
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests from this client.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": {
+                    "code": "RATE_LIMITED",
+                    "message": "Too many requests. Please try again later."
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "error": {
+                    "code": "SERVER_ERROR",
+                    "message": "Server error."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "curl",
+            "label": "cURL",
+            "source": "curl \"https://parcelsapp.com/api/v4/trackings/66f4f2c0e16b4c13bb7e0001\" \\\n  -H \"Authorization: Bearer <YOUR_API_KEY>\""
+          },
+          {
+            "lang": "JavaScript",
+            "label": "JavaScript",
+            "source": "const response = await fetch('https://parcelsapp.com/api/v4/trackings/' + requestId, {\n  headers: { Authorization: 'Bearer ' + apiKey }\n});\nconsole.log(await response.json());"
+          },
+          {
+            "lang": "Python",
+            "label": "Python",
+            "source": "import requests\n\nresponse = requests.get(\n    f'https://parcelsapp.com/api/v4/trackings/{request_id}',\n    headers={'Authorization': f'Bearer {api_key}'}\n)\nprint(response.json())"
+          },
+          {
+            "lang": "PHP",
+            "label": "PHP",
+            "source": "<?php\n$ch = curl_init('https://parcelsapp.com/api/v4/trackings/' . urlencode($requestId));\ncurl_setopt_array($ch, [\n  CURLOPT_RETURNTRANSFER => true,\n  CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $apiKey]\n]);\nprint_r(json_decode(curl_exec($ch), true));\n?>"
+          }
+        ]
+      }
+    },
+    "/tracking-carriers": {
+      "get": {
+        "operationId": "listTrackingCarriers",
+        "summary": "List carrier slugs accepted by carrier_hint",
+        "description": "Returns the versioned catalog of runtime carrier slugs that can be selected explicitly with `shipments[].carrier_hint` in `POST /trackings`. Verified carrier input rules appear as `input_requirements`: `required` fields are needed for every lookup, `any_of` means provide at least one listed field in addition to required fields, and `conditional` fields may be requested for some shipments. For SEUR, send destination `postal_code` plus the recipient `email` or `phone` registered with SEUR. These names are exact paths in a `POST /trackings` shipment item, such as `postal_code` or `additional_fields.house_number`. A pair of conditional fields may need to be supplied together for a particular lookup, such as Dole container tracking with vessel and voyage. When `input_requirements` is absent, no complete input rule has been published for that carrier; do not infer that it never needs additional fields. Tracking results and webhooks omit interactive required-field prompt events. This catalog is independent of delivery-estimate transport modes: a carrier can be available here without being eligible for `POST /delivery-estimates`. Results are localized, searchable, and cursor-paginated.",
+        "tags": ["Tracking"],
+        "security": [{"bearerAuth": []}],
+        "parameters": [
+          {"name": "query", "in": "query", "schema": {"type": "string"}, "description": "Optional case-insensitive carrier name or slug search.", "example": "Yinrui"},
+          {"name": "language", "in": "query", "schema": {"type": "string", "enum": ["en", "ru"], "default": "en"}},
+          {"name": "cursor", "in": "query", "schema": {"type": "string"}, "description": "Opaque `next_cursor` returned by the preceding page. A cursor is valid only for its catalog version and query."},
+          {"name": "limit", "in": "query", "schema": {"type": "integer", "minimum": 1, "maximum": 500, "default": 100}}
+        ],
+        "responses": {
+          "200": {"description": "A page of manually selectable tracking carriers.", "headers": {"ETag": {"description": "Hash of this response page for conditional requests.", "schema": {"type": "string"}}, "Cache-Control": {"description": "Client cache policy for the deployment-stable catalog.", "schema": {"type": "string"}}}, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/TrackingCarrierCatalogResponse"}, "examples": {"yinrui": {"summary": "Search for the Yinrui tracking slug", "value": {"query": "Yinrui", "language": "en", "carriers": [{"slug": "yinrui", "name": "Yinrui"}], "total_matches": 1, "next_cursor": null, "has_more": false, "catalog_version": "bf6d437845592692881e4ff4"}}}}}},
+          "304": {"description": "Catalog page has not changed for the supplied If-None-Match value."},
+          "400": {"description": "Cursor is malformed, stale, or belongs to another catalog version.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Missing or invalid API key.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "402": {"description": "Subscription is inactive.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "403": {"description": "Account or subscription cannot use the endpoint.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "429": {"description": "Too many requests.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        },
+        "x-codeSamples": [{"lang": "curl", "label": "cURL", "source": "curl \"https://parcelsapp.com/api/v4/tracking-carriers?query=Yinrui\" \\\n  -H \"Authorization: Bearer <YOUR_API_KEY>\""}]
+      }
+    },
+    "/delivery-estimates": {
+      "post": {
+        "operationId": "createDeliveryEstimates",
+        "summary": "Forecast delivery time (beta)",
+        "description": "Beta endpoint. Returns a statistical delivery-time estimate without starting carrier tracking or consuming tracking quota.\n\n**Minimum input per shipment**\n\n- `carrier_slug` (find it with `GET /carriers`)\n- `transport_mode` returned for that carrier\n- `origin.country_code`\n- `destination.country_code`\n\nAdd city/state, a real IATA airport, or an official UN/LOCODE only when known. For a shipment already in transit, supply exactly one of `accepted_at`, `shipped_at`, or `elapsed_days` to receive a remaining-time estimate. Most callers should omit `completion_scope`; the API chooses the normal boundary for the selected mode.\n\nRead `estimate.median_days`, `estimate.typical_days`, and `confidence.level` first. For progress requests also read `estimate.remaining_status`. `estimated` means the right-censored risk set supports a remaining window. `insufficient_censored_data` or `insufficient_tail_data` means the API deliberately withheld an optimistic remaining ETA; the total-duration estimate remains available. If route history itself is insufficient, the item returns `INSUFFICIENT_DATA`. Exact ocean port requests never degrade to a country/global estimate.",
+        "x-beta": true,
+        "tags": ["Delivery Estimates"],
+        "security": [{"bearerAuth": []}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {"$ref": "#/components/schemas/DeliveryEstimateRequest"},
+              "examples": {
+                "parcel": {
+                  "summary": "OnTrac parcel within the United States",
+                  "value": {"shipments": [{"client_reference": "parcel-456", "carrier_slug": "ontrac", "transport_mode": "parcel", "origin": {"country_code": "US", "admin1_code": "US-CA", "city": "Los Angeles"}, "destination": {"country_code": "US", "admin1_code": "US-WA", "city": "Seattle"}}]}
+                },
+                "expressParcel": {
+                  "summary": "DHL Express from Germany to the United States",
+                  "value": {"shipments": [{"client_reference": "order-123", "carrier_slug": "dhl-express", "transport_mode": "express", "origin": {"country_code": "DE", "admin1_code": "DE-BE", "city": "Berlin"}, "destination": {"country_code": "US", "admin1_code": "US-NY", "city": "New York"}, "shipped_at": "2026-07-18T10:00:00Z"}]}
+                },
+                "postalUPU": {
+                  "summary": "UPU postal item handled by Emirates Post",
+                  "value": {"shipments": [{"carrier_slug": "emirates-post-group", "transport_mode": "postal", "origin": {"country_code": "AE"}, "destination": {"country_code": "US"}}]}
+                },
+                "roadFreight": {
+                  "summary": "Sutton road freight between US states and cities",
+                  "value": {"shipments": [{"carrier_slug": "sutton-transport", "transport_mode": "road_freight", "origin": {"country_code": "US", "admin1_code": "US-MN", "city": "Duluth"}, "destination": {"country_code": "US", "admin1_code": "US-IL", "city": "Chicago"}}]}
+                },
+                "airCargo": {
+                  "summary": "Saudia AWB airport-to-airport",
+                  "value": {"shipments": [{"carrier_slug": "saudia-airlines-cargo", "transport_mode": "air_cargo", "origin": {"country_code": "SA", "iata": "JED"}, "destination": {"country_code": "GB", "iata": "LHR"}}]}
+                },
+                "oceanContainer": {
+                  "summary": "MSC container port-to-port",
+                  "value": {"shipments": [{"carrier_slug": "msc", "transport_mode": "ocean_container", "origin": {"country_code": "SG", "unlocode": "SGSIN"}, "destination": {"country_code": "NL", "unlocode": "NLRTM"}}]}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "One result per input item. Most integrations only need median_days, typical_days, and confidence.level. Insufficient data is a per-item result, so mixed batches remain HTTP 200.",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/DeliveryEstimateResponse"},
+                "examples": {
+                  "exactRoute": {
+                    "summary": "Carrier route has enough history",
+                    "value": {"results": [{"client_reference": "order-123", "carrier_slug": "dhl-express", "transport_mode": "express", "completion_scope": "carrier_acceptance_to_delivery", "route_scope_used": "carrier_country_pair", "route": {"origin_dimension": "country", "origin_key": "DE", "destination_dimension": "country", "destination_key": "US", "carrier_specific": true}, "estimate": {"mean_days": 3.4, "median_days": 3.13, "typical_days": {"min": 2.13, "max": 5.13}, "remaining_status": "estimated", "remaining_days": {"mean": null, "median": 1.88, "min": 0.88, "max": 3.88}, "estimated_delivery_at": {"from": "2026-07-21T09:00:00Z", "to": "2026-07-24T09:00:00Z"}}, "confidence": {"level": "medium", "score": 0.72, "sample_count": 184, "effective_sample_count": 126.4, "remaining_effective_sample_count": 42, "minimum_remaining_effective_sample_count": 22, "survival_subject_count": 211, "survival_completed_count": 169, "survival_censored_count": 42, "survival_risk_set": 42, "survival_minimum_subject_count": 100, "survival_minimum_completed_count": 30, "survival_cohort_age_days": 150, "survival_minimum_maturation_days": 120, "lookback_days": 365, "last_observation_at": "2026-07-17T09:20:00Z", "freshness_days": 2.1, "fallback_level": 4}, "model": {"version": "delivery-forecast-v1.2", "unit": "calendar_days", "histogram_bucket_hours": 6, "remaining_method": "kaplan_meier_right_censored_v1"}}], "generated_at": "2026-07-20T12:00:00Z", "model_version": "delivery-forecast-v1.2"}
+                  },
+                  "fallbackRoute": {
+                    "summary": "Explicit cross-carrier mode fallback",
+                    "value": {"results": [{"carrier_slug": "msc", "transport_mode": "ocean_container", "completion_scope": "port_to_port", "route_scope_used": "mode_country_pair", "route": {"origin_dimension": "country", "origin_key": "SG", "destination_dimension": "country", "destination_key": "NL", "carrier_specific": false}, "estimate": {"mean_days": 25.8, "median_days": 24.13, "typical_days": {"min": 19.13, "max": 35.13}, "remaining_status": "not_requested", "remaining_days": null, "estimated_delivery_at": null}, "confidence": {"level": "low", "score": 0.48, "sample_count": 31, "effective_sample_count": 24.7, "lookback_days": 1095, "last_observation_at": "2026-07-03T12:00:00Z", "freshness_days": 16, "fallback_level": 5}, "model": {"version": "delivery-forecast-v1.2", "unit": "calendar_days", "histogram_bucket_hours": 6, "remaining_method": "completed_tail_guard_v1"}}], "generated_at": "2026-07-20T12:00:00Z", "model_version": "delivery-forecast-v1.2"}
+                  },
+                  "insufficientRemainingTail": {
+                    "summary": "Total history exists, but an overdue remaining ETA is withheld",
+                    "value": {"results": [{"carrier_slug": "sutton-transport", "transport_mode": "road_freight", "completion_scope": "carrier_acceptance_to_delivery", "route_scope_used": "mode_country_pair", "route": {"origin_dimension": "country", "origin_key": "US", "destination_dimension": "country", "destination_key": "US", "carrier_specific": false}, "estimate": {"mean_days": 4.8, "median_days": 4.13, "typical_days": {"min": 1.63, "max": 7.88}, "remaining_status": "insufficient_censored_data", "remaining_days": null, "estimated_delivery_at": null}, "confidence": {"level": "medium", "score": 0.61, "sample_count": 373, "effective_sample_count": 241.2, "remaining_effective_sample_count": 4, "minimum_remaining_effective_sample_count": 41, "survival_subject_count": 410, "survival_completed_count": 330, "survival_censored_count": 80, "survival_risk_set": 4, "survival_minimum_subject_count": 100, "survival_minimum_completed_count": 30, "survival_cohort_age_days": 40, "survival_minimum_maturation_days": 120, "lookback_days": 540, "last_observation_at": "2026-07-18T08:00:00Z", "freshness_days": 1.2, "fallback_level": 5}, "model": {"version": "delivery-forecast-v1.2", "unit": "calendar_days", "histogram_bucket_hours": 6, "remaining_method": "kaplan_meier_right_censored_v1"}}], "generated_at": "2026-07-20T12:00:00Z", "model_version": "delivery-forecast-v1.2"}
+                  },
+                  "insufficientData": {
+                    "summary": "No bucket reaches the safety floor",
+                    "value": {"results": [{"carrier_slug": "sutton-transport", "transport_mode": "road_freight", "completion_scope": "carrier_acceptance_to_delivery", "error": {"code": "INSUFFICIENT_DATA", "message": "Not enough completed journeys are available for this carrier, mode, scope, and route.", "available_sample_count": 3, "minimum_sample_count": 8}}], "generated_at": "2026-07-20T12:00:00Z", "model_version": "delivery-forecast-v1.2"}
+                  }
+                }
+              }
+            }
+          },
+          "400": {"description": "Invalid carrier, mode, scope, location code, date, or batch.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Missing or invalid API key.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "402": {"description": "Subscription is inactive.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "403": {"description": "Account or subscription cannot use the endpoint.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "404": {"description": "Beta endpoint is disabled by the production feature flag.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "429": {"description": "Too many requests.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "500": {"description": "Unexpected server error.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        },
+        "x-codeSamples": [
+          {"lang": "curl", "label": "cURL", "source": "curl -X POST \"https://parcelsapp.com/api/v4/delivery-estimates\" \\\n  -H \"Authorization: Bearer <YOUR_API_KEY>\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"shipments\":[{\"carrier_slug\":\"sutton-transport\",\"transport_mode\":\"road_freight\",\"origin\":{\"country_code\":\"US\",\"admin1_code\":\"US-MN\",\"city\":\"Duluth\"},\"destination\":{\"country_code\":\"US\",\"admin1_code\":\"US-IL\",\"city\":\"Chicago\"}}]}'"},
+          {"lang": "JavaScript", "label": "JavaScript", "source": "const response = await fetch('https://parcelsapp.com/api/v4/delivery-estimates', {\n  method: 'POST',\n  headers: {Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json'},\n  body: JSON.stringify({shipments: [{carrier_slug: 'saudia-airlines-cargo', transport_mode: 'air_cargo', origin: {country_code: 'SA', iata: 'JED'}, destination: {country_code: 'GB', iata: 'LHR'}}]})\n});\nconsole.log(await response.json());"},
+          {"lang": "Python", "label": "Python", "source": "import requests\n\nresponse = requests.post(\n    'https://parcelsapp.com/api/v4/delivery-estimates',\n    headers={'Authorization': f'Bearer {api_key}'},\n    json={'shipments': [{'carrier_slug': 'emirates-post-group', 'transport_mode': 'postal', 'origin': {'country_code': 'AE'}, 'destination': {'country_code': 'US'}}]}\n)\nprint(response.json())"},
+          {"lang": "PHP", "label": "PHP", "source": "<?php\n$body = json_encode(['shipments' => [['carrier_slug' => 'msc', 'transport_mode' => 'ocean_container', 'origin' => ['country_code' => 'SG', 'unlocode' => 'SGSIN'], 'destination' => ['country_code' => 'NL', 'unlocode' => 'NLRTM']]]]);\n$ch = curl_init('https://parcelsapp.com/api/v4/delivery-estimates');\ncurl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_POST => true, CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $apiKey, 'Content-Type: application/json'], CURLOPT_POSTFIELDS => $body]);\nprint_r(json_decode(curl_exec($ch), true));\n?>"}
+        ]
+      }
+    },
+    "/carriers": {
+      "get": {
+        "operationId": "searchDeliveryEstimateCarriers",
+        "summary": "Find canonical carrier slugs (beta)",
+        "description": "Beta companion to delivery estimates. Searches carrier names and aliases for use in delivery-estimate requests. `transport_modes` lists only the modes supported by that canonical carrier; callers must use one of those values. Ambiguous names such as a global network with several country branches are returned as separate canonical slugs.",
+        "x-beta": true,
+        "tags": ["Delivery Estimates"],
+        "security": [{"bearerAuth": []}],
+        "parameters": [
+          {"name": "query", "in": "query", "schema": {"type": "string"}, "example": "Rhenus"},
+          {"name": "transport_mode", "in": "query", "schema": {"$ref": "#/components/schemas/TransportMode"}},
+          {"name": "limit", "in": "query", "schema": {"type": "integer", "minimum": 1, "maximum": 50, "default": 20}}
+        ],
+        "responses": {
+          "200": {"description": "Matching carriers.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/DeliveryEstimateCarrierSearchResponse"}, "examples": {"roadFreight": {"summary": "Sutton Transport is road freight, not parcel", "value": {"query": "Sutton Transport", "transport_mode": "road_freight", "carriers": [{"slug": "sutton-transport", "name": "Sutton Transport", "aliases": ["Sutton Transport"], "transport_modes": ["road_freight"]}], "total_matches": 1, "has_more": false}}}}}},
+          "400": {"description": "Invalid transport mode or a mode not supported by the selected carrier.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "401": {"description": "Missing or invalid API key.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "404": {"description": "Beta endpoint is disabled by the production feature flag.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+          "429": {"description": "Too many requests.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+        },
+        "x-codeSamples": [{"lang": "curl", "label": "cURL", "source": "curl \"https://parcelsapp.com/api/v4/carriers?query=Rhenus&transport_mode=road_freight\" \\\n  -H \"Authorization: Bearer <YOUR_API_KEY>\""}]
+      }
+    },
+    "/parcels-webhook": {
+      "post": {
+        "operationId": "receiveTrackingWebhook",
+        "summary": "Receive tracking webhook",
+        "description": "Parcels sends this JSON payload to the `webhook_url` supplied in `POST /trackings` when an individual shipment finishes or when the full request is complete. Delivery is scoped to that request; it is not a persistent shipment subscription. To check for carrier updates later, create another tracking request with the same tracking number and `webhook_url`.\n\nThe `Parcels-Signature` header has format `t=<unix>,v1=<hex>`. Verify it by computing `HMAC_SHA256(secret, t + \".\" + raw_body)` and comparing it to `v1` with a timing-safe comparison. Reject signatures with an old timestamp, for example older than 5 minutes.\n\nWebhook delivery is retried on network errors or HTTP 4xx/5xx responses. Return any 2xx status after you persist the payload.",
+        "tags": [
+          "Webhooks"
+        ],
+        "servers": [
+          {
+            "url": "https://your-domain.example",
+            "description": "Your application server"
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Parcels-Signature",
+            "in": "header",
+            "required": true,
+            "description": "Timestamped HMAC signature: `t=<unix>,v1=<hex>`.",
+            "schema": {
+              "type": "string",
+              "example": "t=1782941000,v1=4a9c9b..."
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WebhookPayload"
+              },
+              "examples": {
+                "batchCompleted": {
+                  "summary": "Batch completed",
+                  "value": {
+                    "event": "batch_completed",
+                    "request_id": "66f4f2c0e16b4c13bb7e0001",
+                    "timestamp": "2026-06-25T18:43:20.000Z",
+                    "done": true,
+                    "results": [
+                      {
+                        "tracking_number": "9400111206213785678901",
+                        "state": "completed",
+                        "from_cache": true,
+                        "shipment": {
+                          "trackingId": "9400111206213785678901",
+                          "status": "delivered",
+                          "origin": "United States",
+                          "destination": "United States",
+                          "originCode": "US",
+                          "destinationCode": "US",
+                          "states": [
+                            {
+                              "state": "Delivered, In/At Mailbox",
+                              "location": "Austin, TX, United States",
+                              "date": "2026-06-25T18:42:00.000Z",
+                              "carrier": 0
+                            },
+                            {
+                              "state": "Out for Delivery",
+                              "location": "Austin, TX, United States",
+                              "date": "2026-06-25T12:15:00.000Z",
+                              "carrier": 0
+                            },
+                            {
+                              "state": "Arrived at Post Office",
+                              "location": "Austin, TX, United States",
+                              "date": "2026-06-25T08:04:00.000Z",
+                              "carrier": 0
+                            },
+                            {
+                              "state": "Accepted at USPS Origin Facility",
+                              "location": "Portland, OR, United States",
+                              "date": "2026-06-22T21:30:00.000Z",
+                              "carrier": 0
+                            }
+                          ],
+                          "services": [
+                            {
+                              "slug": "usps",
+                              "name": "USPS"
+                            }
+                          ],
+                          "detectedCarrier": {
+                            "slug": "usps",
+                            "name": "USPS"
+                          },
+                          "detected": [
+                            0
+                          ],
+                          "attributes": [
+                            {
+                              "l": "origin",
+                              "val": "United States",
+                              "code": "US"
+                            },
+                            {
+                              "l": "destination",
+                              "val": "United States",
+                              "code": "US"
+                            }
+                          ],
+                          "externalTracking": [
+                            {
+                              "slug": "usps",
+                              "url": "https://tools.usps.com/go/TrackConfirmAction?tLabels=9400111206213785678901",
+                              "trackingId": "9400111206213785678901",
+                              "method": "GET"
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                },
+                "shipmentCompleted": {
+                  "summary": "Single shipment completed",
+                  "value": {
+                    "event": "shipment_completed",
+                    "request_id": "66f4f2c0e16b4c13bb7e0001",
+                    "timestamp": "2026-06-25T18:42:30.000Z",
+                    "done": false,
+                    "result": {
+                      "tracking_number": "9400111206213785678901",
+                      "state": "completed",
+                      "from_cache": false,
+                      "shipment": {
+                        "trackingId": "9400111206213785678901",
+                        "status": "delivered",
+                        "origin": "United States",
+                        "destination": "United States",
+                        "originCode": "US",
+                        "destinationCode": "US",
+                        "states": [
+                          {
+                            "state": "Delivered, In/At Mailbox",
+                            "location": "Austin, TX, United States",
+                            "date": "2026-06-25T18:42:00.000Z",
+                            "carrier": 0
+                          },
+                          {
+                            "state": "Out for Delivery",
+                            "location": "Austin, TX, United States",
+                            "date": "2026-06-25T12:15:00.000Z",
+                            "carrier": 0
+                          },
+                          {
+                            "state": "Arrived at Post Office",
+                            "location": "Austin, TX, United States",
+                            "date": "2026-06-25T08:04:00.000Z",
+                            "carrier": 0
+                          },
+                          {
+                            "state": "Accepted at USPS Origin Facility",
+                            "location": "Portland, OR, United States",
+                            "date": "2026-06-22T21:30:00.000Z",
+                            "carrier": 0
+                          }
+                        ],
+                        "services": [
+                          {
+                            "slug": "usps",
+                            "name": "USPS"
+                          }
+                        ],
+                        "detectedCarrier": {
+                          "slug": "usps",
+                          "name": "USPS"
+                        },
+                        "detected": [
+                          0
+                        ],
+                        "attributes": [
+                          {
+                            "l": "origin",
+                            "val": "United States",
+                            "code": "US"
+                          },
+                          {
+                            "l": "destination",
+                            "val": "United States",
+                            "code": "US"
+                          }
+                        ],
+                        "externalTracking": [
+                          {
+                            "slug": "usps",
+                            "url": "https://tools.usps.com/go/TrackConfirmAction?tLabels=9400111206213785678901",
+                            "trackingId": "9400111206213785678901",
+                            "method": "GET"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Return any 2xx status after persisting the webhook."
+          }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "JavaScript",
+            "label": "Node.js signature verification",
+            "source": "import crypto from 'crypto';\n\nfunction verifyParcelsSignature(rawBody, header, secret) {\n  const parts = Object.fromEntries(header.split(',').map(part => part.split('=')));\n  const signedPayload = parts.t + '.' + rawBody;\n  const expected = crypto.createHmac('sha256', secret).update(signedPayload).digest('hex');\n  return crypto.timingSafeEqual(Buffer.from(parts.v1), Buffer.from(expected));\n}"
+          },
+          {
+            "lang": "Python",
+            "label": "Python signature verification",
+            "source": "import hmac\nimport hashlib\n\ndef verify_parcels_signature(raw_body, header, secret):\n    parts = dict(part.split('=') for part in header.split(','))\n    signed_payload = f\"{parts['t']}.{raw_body}\".encode()\n    expected = hmac.new(secret.encode(), signed_payload, hashlib.sha256).hexdigest()\n    return hmac.compare_digest(parts['v1'], expected)"
+          },
+          {
+            "lang": "PHP",
+            "label": "PHP signature verification",
+            "source": "<?php\nfunction verifyParcelsSignature($rawBody, $header, $secret) {\n  $parts = [];\n  foreach (explode(',', $header) as $part) {\n    [$key, $value] = explode('=', $part, 2);\n    $parts[$key] = $value;\n  }\n  $expected = hash_hmac('sha256', $parts['t'] . '.' . $rawBody, $secret);\n  return hash_equals($expected, $parts['v1']);\n}\n?>"
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "API key"
+      }
+    },
+    "schemas": {
+      "TransportMode": {
+        "type": "string",
+        "description": "Concrete transport mode. Forecast fallback never crosses this boundary.",
+        "enum": ["parcel", "postal", "express", "road_freight", "air_cargo", "ocean_container"]
+      },
+      "TrackingInputFieldName": {
+        "type": "string",
+        "description": "Exact field path in one POST /trackings shipment item.",
+        "enum": [
+          "destination_country", "postal_code", "email", "phone",
+          "additional_fields.house_number", "additional_fields.bc_code",
+          "additional_fields.address_key", "additional_fields.consignee_info",
+          "additional_fields.customer_token", "additional_fields.vessel",
+          "additional_fields.voyage"
+        ]
+      },
+      "TrackingInputRequirements": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Published input rule for a carrier. Absent when a complete rule has not been verified; absence does not promise that no recipient fields are needed. Required fields must be supplied together with at least one any_of field when both lists are present.",
+        "properties": {
+          "required": {"type": "array", "items": {"$ref": "#/components/schemas/TrackingInputFieldName"}, "description": "Fields to provide for every lookup."},
+          "any_of": {"type": "array", "items": {"$ref": "#/components/schemas/TrackingInputFieldName"}, "description": "Provide at least one of these fields in addition to required fields."},
+          "conditional": {"type": "array", "items": {"$ref": "#/components/schemas/TrackingInputFieldName"}, "description": "The carrier may require these fields for some shipments. Check the carrier-specific instructions for fields that must be supplied together."}
+        }
+      },
+      "TrackingCarrier": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["slug", "name"],
+        "properties": {
+          "slug": {"type": "string", "description": "Canonical runtime slug accepted by `shipments[].carrier_hint`.", "example": "yinrui"},
+          "name": {"type": "string", "description": "Localized carrier display name.", "example": "Yinrui"},
+          "input_requirements": {"$ref": "#/components/schemas/TrackingInputRequirements"}
+        }
+      },
+      "TrackingCarrierCatalogResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["query", "language", "carriers", "total_matches", "next_cursor", "has_more", "catalog_version"],
+        "properties": {
+          "query": {"type": "string"},
+          "language": {"type": "string", "enum": ["en", "ru"]},
+          "carriers": {"type": "array", "items": {"$ref": "#/components/schemas/TrackingCarrier"}},
+          "total_matches": {"type": "integer", "minimum": 0},
+          "next_cursor": {"type": "string", "nullable": true, "description": "Opaque cursor for the next page, or null on the final page."},
+          "has_more": {"type": "boolean"},
+          "catalog_version": {"type": "string", "description": "Content-derived version of the complete selectable tracking-carrier catalog."}
+        }
+      },
+      "DeliveryCompletionScope": {
+        "type": "string",
+        "description": "Defines what event counts as completion, and therefore which historical durations are compared. It is not a transport phase or route precision setting. Most callers should omit it and use the mode default.\n\nIn v1 the start is the earliest confirmed physical carrier event, such as acceptance, pickup, RCS, or origin-terminal gate-in. The `airport_*` and `port_*` names describe the route family and completion boundary; they do not guarantee that the first timestamp is a flight departure or vessel departure.\n\n| Value | Measured journey |\n| --- | --- |\n| `carrier_acceptance_to_delivery` | Physical carrier acceptance or pickup to delivered/POD. Default for `parcel`, `postal`, `express`, and `road_freight`. |\n| `airport_to_airport` | First confirmed physical air-cargo event (often pickup or RCS) to arrival received at the destination airport (usually RCF). Default for `air_cargo`. |\n| `airport_to_availability` | First confirmed physical air-cargo event to ready-for-collection/available at the destination airport. |\n| `port_to_port` | First confirmed physical ocean event, such as origin-terminal gate-in, to arrival/discharge at the destination port. Default for `ocean_container`. |\n| `port_to_availability` | First confirmed physical ocean event to available/released for pickup at the destination port. |\n| `port_to_gate_out` | First confirmed physical ocean event to gate-out or terminal handoff at destination; this is not delivery to a final street address. |\n\nFallback never crosses a completion-scope boundary. If the selected scope lacks enough observations, the API returns `INSUFFICIENT_DATA` rather than using a different endpoint meaning.",
+        "enum": ["carrier_acceptance_to_delivery", "airport_to_airport", "airport_to_availability", "port_to_port", "port_to_availability", "port_to_gate_out"]
+      },
+      "DeliveryEstimateLocation": {
+        "type": "object",
+        "description": "A route endpoint. Only country_code is required. Add city/admin1 for parcel or road freight, a real IATA code for air cargo, or UN/LOCODE/port_name for ocean cargo when known.",
+        "additionalProperties": false,
+        "required": ["country_code"],
+        "properties": {
+          "country_code": {"type": "string", "pattern": "^[A-Z]{2}$", "description": "ISO 3166-1 alpha-2.", "example": "US"},
+          "admin1_code": {"type": "string", "pattern": "^[A-Z]{2}-[A-Z0-9]{1,3}$", "description": "ISO 3166-2 state or region code.", "example": "US-MN"},
+          "city": {"type": "string", "maxLength": 100, "example": "Duluth"},
+          "iata": {"type": "string", "pattern": "^[A-Z]{3}$", "description": "Real IATA airport code for air cargo. It must match country_code.", "example": "JED"},
+          "unlocode": {"type": "string", "pattern": "^[A-Z]{2}[A-Z0-9]{3}$", "description": "Official UNECE UN/LOCODE 2025-1 port code. It must match country_code.", "example": "SGSIN"},
+          "port_name": {"type": "string", "maxLength": 100, "description": "Ocean port name when the UN/LOCODE is unavailable. Official unambiguous names are normalized to UN/LOCODE; other names use a country-qualified internal key.", "example": "Singapore"}
+        }
+      },
+      "DeliveryEstimateInput": {
+        "type": "object",
+        "description": "One shipment to estimate. The normal request needs only a carrier, transport mode, and origin/destination countries. Matching route precision, progress time, client_reference, and completion_scope are optional.",
+        "additionalProperties": false,
+        "required": ["transport_mode", "origin", "destination"],
+        "anyOf": [{"required": ["carrier_slug"]}, {"required": ["carrier_name"]}],
+        "properties": {
+          "client_reference": {"type": "string", "maxLength": 100, "description": "Optional caller reference echoed in the result.", "example": "order-123"},
+          "carrier_slug": {"type": "string", "description": "Canonical carrier slug from GET /carriers.", "example": "sutton-transport"},
+          "carrier_name": {"type": "string", "description": "Human carrier name or alias. Prefer carrier_slug; ambiguous names are rejected.", "example": "Sutton Transport"},
+          "transport_mode": {"$ref": "#/components/schemas/TransportMode"},
+          "completion_scope": {"description": "Optional advanced override for what counts as completed. Omit it to use carrier_acceptance_to_delivery for parcel/postal/express/road, airport_to_airport for air, or port_to_port for ocean.", "allOf": [{"$ref": "#/components/schemas/DeliveryCompletionScope"}]},
+          "origin": {"$ref": "#/components/schemas/DeliveryEstimateLocation"},
+          "destination": {"$ref": "#/components/schemas/DeliveryEstimateLocation"},
+          "accepted_at": {"type": "string", "format": "date-time", "description": "Optional progress input: physical carrier acceptance/start time. Use at most one progress input. It must match the selected completion scope's start boundary and cannot be in the future."},
+          "shipped_at": {"type": "string", "format": "date-time", "description": "Optional progress input when accepted_at is unavailable. Use at most one of shipped_at, accepted_at, or elapsed_days; future values are rejected."},
+          "elapsed_days": {"type": "number", "minimum": 0, "maximum": 3650, "description": "Optional progress input when no start timestamp is known. Number of calendar days already elapsed; do not combine it with a timestamp."}
+        }
+      },
+      "DeliveryEstimateRequest": {
+        "type": "object",
+        "description": "Batch request containing 1-100 independent shipments. Use a one-item array for a single estimate.",
+        "additionalProperties": false,
+        "required": ["shipments"],
+        "properties": {
+          "shipments": {"type": "array", "minItems": 1, "maxItems": 100, "items": {"$ref": "#/components/schemas/DeliveryEstimateInput"}}
+        }
+      },
+      "DeliveryEstimateRoute": {
+        "type": "object",
+        "description": "Route-selection diagnostics. Most integrations can ignore this object.",
+        "properties": {
+          "origin_dimension": {"type": "string", "nullable": true, "enum": ["city", "admin1", "country", "airport", "port"]},
+          "origin_key": {"type": "string", "nullable": true},
+          "destination_dimension": {"type": "string", "nullable": true, "enum": ["city", "admin1", "country", "airport", "port"]},
+          "destination_key": {"type": "string", "nullable": true},
+          "carrier_specific": {"type": "boolean"}
+        }
+      },
+      "DeliveryEstimateRange": {
+        "type": "object",
+        "description": "Typical P10-P90 range in calendar days.",
+        "properties": {
+          "min": {"type": "number", "minimum": 0},
+          "max": {"type": "number", "minimum": 0}
+        }
+      },
+      "DeliveryEstimateRemaining": {
+        "type": "object",
+        "description": "Estimated days still remaining. The censored model requires at least 100 subjects, 30 completed events, cohort age of 120 days (300 for ocean), at least five journeys and 10% of subjects in the current risk set, and identifiable P10, P50, and P90. Otherwise remaining_status explains why the API withheld it.",
+        "nullable": true,
+        "properties": {
+          "mean": {"type": "number", "minimum": 0, "nullable": true, "description": "Null for Kaplan-Meier output; use median, min, and max."},
+          "median": {"type": "number", "minimum": 0},
+          "min": {"type": "number", "minimum": 0},
+          "max": {"type": "number", "minimum": 0}
+        }
+      },
+      "DeliveryEstimateWindow": {
+        "type": "object",
+        "description": "Estimated UTC delivery window. Present only when the request supplied a start timestamp or usable elapsed duration.",
+        "nullable": true,
+        "properties": {
+          "from": {"type": "string", "format": "date-time"},
+          "to": {"type": "string", "format": "date-time"}
+        }
+      },
+      "DeliveryEstimateValues": {
+        "type": "object",
+        "required": ["mean_days", "median_days", "typical_days", "remaining_status"],
+        "properties": {
+          "mean_days": {"type": "number", "minimum": 0, "description": "Arithmetic mean for analytics. Use median_days as the normal point estimate."},
+          "median_days": {"type": "number", "minimum": 0, "description": "Primary point estimate."},
+          "typical_days": {"description": "Typical P10-P90 duration range.", "allOf": [{"$ref": "#/components/schemas/DeliveryEstimateRange"}]},
+          "remaining_status": {"type": "string", "description": "Whether remaining_days was not requested, safely estimated, or withheld. insufficient_censored_data means the right-censored risk set or identifiable tail is too small; insufficient_tail_data is the fail-closed completed-tail fallback used before a survival generation exists.", "enum": ["not_requested", "estimated", "insufficient_censored_data", "insufficient_tail_data"]},
+          "remaining_days": {"$ref": "#/components/schemas/DeliveryEstimateRemaining"},
+          "estimated_delivery_at": {"$ref": "#/components/schemas/DeliveryEstimateWindow"}
+        }
+      },
+      "DeliveryEstimateConfidence": {
+        "type": "object",
+        "description": "Quality of statistical support, not the probability of delivery on one promised date.",
+        "required": ["level", "score", "sample_count", "effective_sample_count", "lookback_days", "fallback_level"],
+        "properties": {
+          "level": {"type": "string", "description": "Simple evidence-quality label for normal integrations.", "enum": ["low", "medium", "high"]},
+          "score": {"type": "number", "minimum": 0, "maximum": 1, "description": "Diagnostic evidence-quality score, not an on-time-delivery probability."},
+          "sample_count": {"type": "integer", "minimum": 8},
+          "effective_sample_count": {"type": "number", "minimum": 0},
+          "remaining_effective_sample_count": {"type": "number", "minimum": 0, "description": "For Kaplan-Meier, the right-censored risk-set size at elapsed time; for the completed-tail fallback, time-decayed completed-tail support. Present only for a progress request."},
+          "minimum_remaining_effective_sample_count": {"type": "number", "minimum": 1, "description": "Safety floor applied by the active remaining-time method. Kaplan-Meier requires at least five journeys and 10% of subjects in the risk set, in addition to the per-mode subject floor and identifiable P10-P90 tail."},
+          "survival_subject_count": {"type": "integer", "minimum": 0},
+          "survival_completed_count": {"type": "integer", "minimum": 0},
+          "survival_censored_count": {"type": "integer", "minimum": 0},
+          "survival_risk_set": {"type": "integer", "minimum": 0},
+          "survival_minimum_subject_count": {"type": "integer", "minimum": 1},
+          "survival_minimum_completed_count": {"type": "integer", "minimum": 1},
+          "survival_cohort_age_days": {"type": "number", "minimum": 0},
+          "survival_minimum_maturation_days": {"type": "integer", "minimum": 1},
+          "lookback_days": {"type": "integer", "minimum": 1},
+          "last_observation_at": {"type": "string", "format": "date-time", "nullable": true},
+          "freshness_days": {"type": "number", "minimum": 0},
+          "fallback_level": {"type": "integer", "minimum": 0}
+        }
+      },
+      "DeliveryEstimateInsufficientData": {
+        "type": "object",
+        "required": ["code", "message", "available_sample_count", "minimum_sample_count"],
+        "properties": {
+          "code": {"type": "string", "enum": ["INSUFFICIENT_DATA"]},
+          "message": {"type": "string"},
+          "available_sample_count": {"type": "integer", "minimum": 0},
+          "minimum_sample_count": {"type": "integer", "minimum": 1, "example": 8}
+        }
+      },
+      "DeliveryEstimateResult": {
+        "type": "object",
+        "required": ["carrier_slug", "transport_mode", "completion_scope"],
+        "properties": {
+          "client_reference": {"type": "string"},
+          "carrier_slug": {"type": "string"},
+          "transport_mode": {"$ref": "#/components/schemas/TransportMode"},
+          "completion_scope": {"description": "The completion boundary actually used for this estimate. It is always returned, including when the request omitted it.", "allOf": [{"$ref": "#/components/schemas/DeliveryCompletionScope"}]},
+          "route_scope_used": {"type": "string", "description": "Diagnostic name of the selected statistics bucket, including whether it is carrier specific or a mode fallback. Most integrations can ignore it."},
+          "route": {"$ref": "#/components/schemas/DeliveryEstimateRoute"},
+          "estimate": {"$ref": "#/components/schemas/DeliveryEstimateValues"},
+          "confidence": {"$ref": "#/components/schemas/DeliveryEstimateConfidence"},
+          "model": {
+            "type": "object",
+            "description": "Model diagnostics for reproducibility. Most integrations can ignore this object.",
+            "properties": {
+              "version": {"type": "string", "example": "delivery-forecast-v1.2"},
+              "unit": {"type": "string", "enum": ["calendar_days"]},
+              "histogram_bucket_hours": {"type": "integer", "example": 6},
+              "remaining_method": {"type": "string", "enum": ["kaplan_meier_right_censored_v1", "completed_tail_guard_v1"], "description": "Kaplan-Meier uses active right-censored journeys and delayed entry. The completed-tail guard remains a fail-closed fallback when no survival generation is published."}
+            }
+          },
+          "error": {"$ref": "#/components/schemas/DeliveryEstimateInsufficientData"}
+        }
+      },
+      "DeliveryEstimateResponse": {
+        "type": "object",
+        "required": ["results", "generated_at", "model_version"],
+        "properties": {
+          "results": {"type": "array", "items": {"$ref": "#/components/schemas/DeliveryEstimateResult"}},
+          "generated_at": {"type": "string", "format": "date-time"},
+          "model_version": {"type": "string", "example": "delivery-forecast-v1.2"}
+        }
+      },
+      "DeliveryEstimateCarrierSearchResponse": {
+        "type": "object",
+        "required": ["query", "carriers", "total_matches", "has_more"],
+        "properties": {
+          "query": {"type": "string", "example": "Sutton Transport"},
+          "transport_mode": {"allOf": [{"$ref": "#/components/schemas/TransportMode"}], "nullable": true, "example": "road_freight"},
+          "carriers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["slug", "name", "aliases", "transport_modes"],
+              "properties": {
+                "slug": {"type": "string", "example": "sutton-transport"},
+                "name": {"type": "string", "example": "Sutton Transport"},
+                "aliases": {"type": "array", "items": {"type": "string", "example": "Sutton Transport"}, "example": ["Sutton Transport"]},
+                "transport_modes": {"type": "array", "items": {"$ref": "#/components/schemas/TransportMode"}, "example": ["road_freight"]}
+              }
+            }
+          },
+          "total_matches": {"type": "integer", "minimum": 0, "example": 1},
+          "has_more": {"type": "boolean", "example": false}
+        }
+      },
+      "CreateTrackingRequest": {
+        "type": "object",
+        "description": "Starts one asynchronous lookup. For continuous monitoring, create another request on your schedule; repeating a tracking number within the same billing cycle does not consume another unique-shipment quota unit.",
+        "required": [
+          "shipments"
+        ],
+        "properties": {
+          "language": {
+            "type": "string",
+            "description": "Response language. Defaults to `en`.",
+            "example": "en"
+          },
+          "webhook_url": {
+            "type": "string",
+            "format": "uri",
+            "description": "Optional HTTPS endpoint for signed completion callbacks for this request only. This does not create a persistent shipment subscription; include the URL again in each later POST.",
+            "example": "https://example.com/parcels/webhook"
+          },
+          "shipments": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/components/schemas/TrackingItem"
+            }
+          }
+        }
+      },
+      "TrackingItem": {
+        "type": "object",
+        "required": [
+          "tracking_number"
+        ],
+        "properties": {
+          "tracking_number": {
+            "type": "string",
+            "description": "Any parcel, package, freight, container, or air waybill tracking number. For air waybills, use `NNN-NNNNNNNN` with a hyphen after the three-digit airline prefix and preserve leading zeros; unhyphenated 11-digit numbers may not match the intended cargo carrier.",
+            "example": "9400111206213785678901"
+          },
+          "destination_country": {
+            "type": "string",
+            "description": "ISO-2 country code or full English country name. Required for ordinary parcel/package numbers. Not required when `carrier_hint` is provided or when `tracking_number` is an air waybill, ISO container number, or recognized ocean bill of lading.",
+            "example": "US"
+          },
+          "carrier_hint": {
+            "type": "string",
+            "description": "Optional carrier slug when you already know the carrier and want to skip broad auto-detection. Discover supported tracking slugs with `GET /tracking-carriers`; `GET /carriers` is reserved for delivery-estimate carrier/mode discovery.",
+            "example": "usps"
+          },
+          "postal_code": {
+            "type": "string",
+            "description": "Recipient postal code. For SEUR, provide this together with the recipient email or phone registered with SEUR. Check the carrier's `input_requirements` in `GET /tracking-carriers` when one has been published.",
+            "example": "78701"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "Recipient email address, used only when the selected carrier needs recipient identification. For SEUR, supply this or the recipient phone together with destination postal_code. Use the address registered with SEUR, not the API account address.",
+            "example": "recipient@example.com"
+          },
+          "phone": {
+            "type": "string",
+            "description": "Recipient phone number when accepted by the selected carrier as an alternative identifier. For SEUR, supply this or recipient email together with destination postal_code.",
+            "example": "+34600123456"
+          },
+          "additional_fields": {
+            "$ref": "#/components/schemas/TrackingAdditionalFields"
+          }
+        }
+      },
+      "TrackingAdditionalFields": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Carrier-specific lookup input. Supply carrier_hint with the matching slug and only its fields published in GET /tracking-carriers. Values are non-empty strings of at most 256 characters; unsupported keys, mismatched carriers, or invalid values reject that shipment with INVALID_ADDITIONAL_FIELDS. Dole vessel and voyage must be supplied together. These values are used for the carrier lookup; interactive input prompts are omitted from API tracking events.",
+        "properties": {
+          "house_number": {"type": "string", "minLength": 1, "maxLength": 256, "description": "Recipient house or street number for trans-o-flex, together with postal_code.", "example": "12A"},
+          "bc_code": {"type": "string", "minLength": 3, "maxLength": 4, "pattern": "^\\d{3,4}$", "description": "JRS Express 3 or 4 digit BC verification code for a separate airbill number.", "example": "5593"},
+          "address_key": {"type": "string", "minLength": 1, "maxLength": 256, "description": "Gebrüder Weiss shipper or consignee address key. postal_code can be used instead when it is the carrier's address key.", "example": "55-080"},
+          "consignee_info": {"type": "string", "minLength": 1, "maxLength": 256, "description": "Additional consignee input requested by Gebrüder Weiss when the address key alone does not resolve the order."},
+          "customer_token": {"type": "string", "minLength": 1, "maxLength": 256, "description": "Noerpel customer login token, supplied with postal_code."},
+          "vessel": {"type": "string", "minLength": 1, "maxLength": 256, "description": "Dole Ocean Cargo vessel name for container lookups; send together with voyage."},
+          "voyage": {"type": "string", "minLength": 1, "maxLength": 256, "description": "Dole Ocean Cargo voyage number for container lookups; send together with vessel."}
+        }
+      },
+      "TrackingResponse": {
+        "type": "object",
+        "description": "One asynchronous lookup result. `request_id` can be polled until completion and remains readable only until approximately `expires_at`; create a new request for later monitoring.",
+        "required": [
+          "request_id",
+          "status",
+          "done",
+          "expires_at",
+          "results"
+        ],
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "description": "Identifier for this asynchronous lookup result, not a shipment identifier or persistent monitoring subscription.",
+            "example": "66f4f2c0e16b4c13bb7e0001"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "processing",
+              "completed"
+            ],
+            "example": "completed"
+          },
+          "done": {
+            "type": "boolean",
+            "example": true
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Expected retention boundary for this `request_id`, about 30 minutes after the request's last update. It is not a delivery deadline. GET may return 404 after this time; re-POST the tracking number for a later carrier check.",
+            "example": "2026-06-25T19:13:20.000Z"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TrackingResult"
+            }
+          },
+          "rejected": {
+            "type": "array",
+            "description": "Input items rejected during per-shipment validation. Other valid items in the same batch continue normally.",
+            "items": {
+              "$ref": "#/components/schemas/RejectedShipment"
+            }
+          },
+          "webhook": {
+            "$ref": "#/components/schemas/WebhookRegistration"
+          }
+        }
+      },
+      "RejectedShipment": {
+        "type": "object",
+        "required": [
+          "index",
+          "code",
+          "message"
+        ],
+        "properties": {
+          "index": {
+            "type": "integer",
+            "description": "Zero-based index in the submitted shipments array.",
+            "example": 1
+          },
+          "tracking_number": {
+            "type": "string",
+            "description": "Trimmed tracking number from the submitted item, when it was a non-empty string.",
+            "example": "1"
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "INVALID_TRACKING_NUMBER",
+              "DESTINATION_COUNTRY_REQUIRED",
+              "INVALID_ADDITIONAL_FIELDS"
+            ],
+            "example": "INVALID_TRACKING_NUMBER"
+          },
+          "message": {
+            "type": "string",
+            "example": "tracking_number is not valid for tracking."
+          }
+        }
+      },
+      "TrackingResult": {
+        "type": "object",
+        "required": [
+          "tracking_number",
+          "state",
+          "from_cache"
+        ],
+        "properties": {
+          "tracking_number": {
+            "type": "string",
+            "example": "9400111206213785678901"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "processing",
+              "completed"
+            ],
+            "example": "completed"
+          },
+          "from_cache": {
+            "type": "boolean",
+            "description": "True when Parcels returned fresh cached data immediately instead of starting a new carrier request.",
+            "example": true
+          },
+          "shipment": {
+            "$ref": "#/components/schemas/Shipment"
+          },
+          "delivery_estimate": {
+            "description": "Beta additive forecast enrichment. Present only when the production tracking-integration flag is enabled and the completed tracking result has a reliable carrier, transport mode, and route. Tracking still succeeds if forecasting is unavailable.",
+            "allOf": [{"$ref": "#/components/schemas/DeliveryEstimateResult"}]
+          }
+        }
+      },
+      "WebhookRegistration": {
+        "type": "object",
+        "description": "Returned only in the create response when `webhook_url` is provided. The registration belongs to this request and ends when it completes; it does not monitor the shipment afterward. Store `secret`; it is not returned again.",
+        "properties": {
+          "url": {
+            "type": "string",
+            "example": "https://example.com/parcels/webhook"
+          },
+          "secret": {
+            "type": "string",
+            "example": "whsec_abc123"
+          },
+          "signature_header": {
+            "type": "string",
+            "example": "Parcels-Signature"
+          }
+        }
+      },
+      "Shipment": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "trackingId": {
+            "type": "string",
+            "example": "9400111206213785678901"
+          },
+          "error": {
+            "type": "string",
+            "description": "Terminal shipment-level tracking error. `ADDITIONAL_FIELDS_REQUIRED` means a carrier such as SEUR needs more recipient identification to complete the lookup; this does not confirm that the tracking number exists. Inspect `input_requirements` to see required fields and alternatives, then retry with valid recipient details. `TIMEDOUT` means Parcels stopped waiting for a stale in-progress request and returned a final result instead of leaving the request processing forever.",
+            "example": "TIMEDOUT"
+          },
+          "accepted_fields": {
+            "type": "array",
+            "description": "For `ADDITIONAL_FIELDS_REQUIRED`, API v4 shipment item fields accepted for a retry. Consult `input_requirements` for which fields are required and which are alternatives.",
+            "items": {"type": "string", "enum": ["postal_code", "email", "phone"]},
+            "example": ["postal_code", "email", "phone"]
+          },
+          "input_requirements": {"$ref": "#/components/schemas/TrackingInputRequirements"},
+          "status": {
+            "type": "string",
+            "example": "delivered"
+          },
+          "origin": {
+            "type": "string",
+            "example": "United States"
+          },
+          "destination": {
+            "type": "string",
+            "example": "United States"
+          },
+          "originCode": {
+            "type": "string",
+            "example": "US"
+          },
+          "destinationCode": {
+            "type": "string",
+            "example": "US"
+          },
+          "transportMode": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TransportMode"
+              }
+            ],
+            "description": "Canonical shipment-level transport mode derived from explicit carrier source data. Omitted when the carrier source is missing, unknown, or contradictory.",
+            "example": "air_cargo"
+          },
+          "fromAirport": {
+            "type": "string",
+            "description": "Origin IATA airport code when explicitly provided for an air-cargo shipment.",
+            "pattern": "^[A-Z]{3}$",
+            "example": "BRU"
+          },
+          "toAirport": {
+            "type": "string",
+            "description": "Destination IATA airport code when explicitly provided for an air-cargo shipment.",
+            "pattern": "^[A-Z]{3}$",
+            "example": "DAR"
+          },
+          "fromPort": {
+            "type": "string",
+            "description": "Origin UN/LOCODE when explicitly provided for an ocean shipment.",
+            "pattern": "^[A-Z]{2}[A-Z0-9]{3}$",
+            "example": "HKHKG"
+          },
+          "toPort": {
+            "type": "string",
+            "description": "Destination UN/LOCODE when explicitly provided for an ocean shipment.",
+            "pattern": "^[A-Z]{2}[A-Z0-9]{3}$",
+            "example": "JPTYO"
+          },
+          "pieces": {
+            "type": "number",
+            "description": "Shipment piece count when supplied by the carrier.",
+            "example": 13
+          },
+          "weight": {
+            "type": "number",
+            "description": "Shipment weight when supplied by the carrier.",
+            "example": 385
+          },
+          "weight_unit": {
+            "type": "string",
+            "description": "Unit for `weight`.",
+            "example": "kg"
+          },
+          "volume": {
+            "type": "number",
+            "description": "Shipment volume when supplied by the carrier.",
+            "example": 1.67
+          },
+          "volume_unit": {
+            "type": "string",
+            "description": "Unit for `volume`.",
+            "example": "m3"
+          },
+          "flight_legs": {
+            "type": "array",
+            "description": "Carrier-supplied air-cargo routing legs. Schedule fields are kept separate from booking/milestone event timestamps and omitted when the carrier does not supply them.",
+            "items": {
+              "$ref": "#/components/schemas/FlightLeg"
+            }
+          },
+          "states": {
+            "type": "array",
+            "description": "Carrier tracking events. Interactive prompts asking for recipient fields are omitted from API responses and webhooks; when no real events are available this array can be empty.",
+            "items": {
+              "$ref": "#/components/schemas/TrackingEvent"
+            }
+          },
+          "services": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Carrier"
+            }
+          },
+          "detectedCarrier": {
+            "$ref": "#/components/schemas/Carrier"
+          },
+          "detected": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "example": [
+              0
+            ]
+          },
+          "attributes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ShipmentAttribute"
+            }
+          },
+          "externalTracking": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExternalTracking"
+            }
+          }
+        }
+      },
+      "TrackingEvent": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "example": "Delivered, In/At Mailbox"
+          },
+          "location": {
+            "type": "string",
+            "example": "Austin, TX, United States"
+          },
+          "date": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Carrier event time with its airport-local UTC offset when the carrier provides only local wall time.",
+            "example": "2026-06-25T18:42:00.000Z"
+          },
+          "event_code": {
+            "type": "string",
+            "description": "Carrier milestone code when supplied by the source.",
+            "example": "DEP"
+          },
+          "station": {
+            "type": "string",
+            "description": "IATA station or airport code associated with the event.",
+            "example": "DEL"
+          },
+          "timezone": {
+            "type": "string",
+            "description": "IANA time zone used to interpret the carrier-local event time.",
+            "example": "Asia/Kolkata"
+          },
+          "pieces": {
+            "type": "number",
+            "description": "Pieces covered by this event, useful for partial movements.",
+            "example": 13
+          },
+          "weight": {
+            "type": "number",
+            "description": "Weight covered by this event when supplied by the carrier.",
+            "example": 385
+          },
+          "weight_unit": {
+            "type": "string",
+            "example": "kg"
+          },
+          "volume": {
+            "type": "number",
+            "description": "Volume covered by this event when supplied by the carrier.",
+            "example": 0.71
+          },
+          "volume_unit": {
+            "type": "string",
+            "example": "m3"
+          },
+          "flight_number": {
+            "type": "string",
+            "description": "Flight number associated with the event.",
+            "example": "AI-2243"
+          },
+          "flight_origin": {
+            "type": "string",
+            "description": "IATA origin of the associated flight leg.",
+            "example": "DOH"
+          },
+          "flight_destination": {
+            "type": "string",
+            "description": "IATA destination of the associated flight leg.",
+            "example": "ALA"
+          },
+          "scheduled_departure_date": {
+            "type": "string",
+            "format": "date",
+            "description": "Carrier-supplied scheduled flight date when no reliable scheduled departure time is available.",
+            "example": "2026-09-02"
+          },
+          "scheduled_departure": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Carrier-supplied scheduled departure, distinct from this event's `date`.",
+            "example": "2026-09-02T13:37:00+03:00"
+          },
+          "scheduled_arrival": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Carrier-supplied scheduled arrival for the flight leg.",
+            "example": "2026-09-02T20:11:00+05:00"
+          },
+          "actual_departure": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Confirmed actual departure for the associated flight leg when available.",
+            "example": "2026-09-02T13:37:00+03:00"
+          },
+          "actual_arrival": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Confirmed actual arrival for the associated flight leg when available.",
+            "example": "2026-09-02T20:25:00+05:00"
+          },
+          "uld_number": {
+            "type": "string",
+            "description": "Unit load device number associated with the event when supplied by the carrier.",
+            "example": "BT005AI"
+          },
+          "carrier": {
+            "type": "integer",
+            "example": 0
+          }
+        }
+      },
+      "FlightLeg": {
+        "type": "object",
+        "description": "One carrier-supplied air-cargo movement leg. Booking and milestone event timestamps remain in `states[].date`; they are never promoted into schedule fields.",
+        "properties": {
+          "flight_number": {
+            "type": "string",
+            "example": "QR-8416"
+          },
+          "origin": {
+            "type": "string",
+            "description": "Flight-leg origin IATA code.",
+            "example": "DOH"
+          },
+          "destination": {
+            "type": "string",
+            "description": "Flight-leg destination IATA code.",
+            "example": "ALA"
+          },
+          "status": {
+            "type": "string",
+            "description": "Carrier-reported status of this leg.",
+            "example": "Booked"
+          },
+          "scheduled_departure_date": {
+            "type": "string",
+            "format": "date",
+            "description": "Scheduled departure date when the carrier supplies a date but no reliable time.",
+            "example": "2026-09-02"
+          },
+          "scheduled_departure": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Scheduled departure with the carrier station's offset.",
+            "example": "2026-09-02T13:37:00+03:00"
+          },
+          "scheduled_arrival": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Scheduled arrival with the destination station's offset.",
+            "example": "2026-09-02T20:11:00+05:00"
+          },
+          "actual_departure": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Actual departure confirmed by the carrier.",
+            "example": "2026-09-02T13:37:00+03:00"
+          },
+          "actual_arrival": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Actual arrival confirmed by the carrier.",
+            "example": "2026-09-02T20:25:00+05:00"
+          },
+          "pieces": {
+            "type": "number",
+            "example": 34
+          },
+          "weight": {
+            "type": "number",
+            "example": 2608
+          },
+          "weight_unit": {
+            "type": "string",
+            "example": "kg"
+          },
+          "volume": {
+            "type": "number",
+            "example": 32.07
+          },
+          "volume_unit": {
+            "type": "string",
+            "example": "m3"
+          }
+        }
+      },
+      "Carrier": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string",
+            "example": "usps"
+          },
+          "name": {
+            "type": "string",
+            "example": "USPS"
+          }
+        }
+      },
+      "ShipmentAttribute": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "l": {
+            "type": "string",
+            "example": "origin"
+          },
+          "val": {
+            "type": "string",
+            "example": "United States"
+          },
+          "code": {
+            "type": "string",
+            "example": "US"
+          }
+        }
+      },
+      "ExternalTracking": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string",
+            "example": "usps"
+          },
+          "url": {
+            "type": "string",
+            "example": "https://tools.usps.com/go/TrackConfirmAction?tLabels=9400111206213785678901"
+          },
+          "trackingId": {
+            "type": "string",
+            "example": "9400111206213785678901"
+          },
+          "method": {
+            "type": "string",
+            "example": "GET"
+          }
+        }
+      },
+      "WebhookPayload": {
+        "type": "object",
+        "required": [
+          "event",
+          "request_id",
+          "timestamp",
+          "done"
+        ],
+        "properties": {
+          "event": {
+            "type": "string",
+            "enum": [
+              "shipment_completed",
+              "batch_completed",
+              "tracking_error"
+            ],
+            "example": "batch_completed"
+          },
+          "request_id": {
+            "type": "string",
+            "example": "66f4f2c0e16b4c13bb7e0001"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-06-25T18:43:20.000Z"
+          },
+          "done": {
+            "type": "boolean",
+            "example": true
+          },
+          "result": {
+            "$ref": "#/components/schemas/TrackingResult"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TrackingResult"
+            }
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorObject"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorObject"
+          }
+        }
+      },
+      "ErrorObject": {
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Public error code.\n\n- `MISSING_API_KEY`: Authorization header is absent. Use `Authorization: Bearer <API_KEY>`.\n- `INVALID_API_KEY`: Bearer token is invalid.\n- `INVALID_PARAMS`: Request body is malformed.\n- `INVALID_TRACKING_NUMBER`: A shipment item failed validation and was placed in `rejected`; valid batch items continue.\n- `DESTINATION_COUNTRY_REQUIRED`: A shipment item was rejected because an ordinary tracking number needs `destination_country` or `carrier_hint`.\n- `INVALID_WEBHOOK_URL`: Webhook URL is invalid or not allowed.\n- `INVALID_CURSOR`: Tracking-carrier pagination cursor is malformed, stale, or belongs to another query/catalog version.\n- `UNCONFIRMED_ACCOUNT`: Account email is not confirmed. Response includes `confirmation_url` when available.\n- `SUBSCRIPTION_NOT_FOUND`: API key does not map to a subscription.\n- `SUBSCRIPTION_INACTIVE`: Subscription is inactive.\n- `SUBSCRIPTION_LIMIT_REACHED`: The valid batch contains more new unique tracking numbers than the remaining monthly quota; the whole valid batch is rejected without partial charging.\n- `INVALID_SUBSCRIPTION_STATE`: Subscription state does not allow tracking.\n- `FORBIDDEN`: Tracking is disabled for this account.\n- `NO_SHIPMENTS`: Every submitted shipment was filtered out by per-item validation.\n- `NO_REQUEST_FOUND`: Tracking request does not exist, has expired after `expires_at`, or belongs to another account.\n- `MISSING_REQUEST_ID`: Polling URL is missing `request_id`.\n- `INVALID_REQUEST_ID`: `request_id` is not valid.\n- `RATE_LIMITED`: Too many requests from this client.\n- `BUSY`: Tracking service is temporarily busy; retry later.\n- `SERVER_ERROR`: Unexpected server error.",
+            "enum": [
+              "MISSING_API_KEY",
+              "INVALID_API_KEY",
+              "INVALID_PARAMS",
+              "INVALID_TRACKING_NUMBER",
+              "DESTINATION_COUNTRY_REQUIRED",
+              "INVALID_WEBHOOK_URL",
+              "INVALID_CURSOR",
+              "UNCONFIRMED_ACCOUNT",
+              "SUBSCRIPTION_NOT_FOUND",
+              "SUBSCRIPTION_INACTIVE",
+              "SUBSCRIPTION_LIMIT_REACHED",
+              "INVALID_SUBSCRIPTION_STATE",
+              "FORBIDDEN",
+              "NO_SHIPMENTS",
+              "NO_REQUEST_FOUND",
+              "MISSING_REQUEST_ID",
+              "INVALID_REQUEST_ID",
+              "INVALID_DELIVERY_ESTIMATE_REQUEST",
+              "BATCH_TOO_LARGE",
+              "INVALID_TRANSPORT_MODE",
+              "RATE_LIMITED",
+              "BUSY",
+              "SERVER_ERROR"
+            ],
+            "example": "DESTINATION_COUNTRY_REQUIRED"
+          },
+          "message": {
+            "type": "string",
+            "example": "destination_country is required unless carrier_hint is provided or the tracking number is an air waybill, ISO container number, or recognized ocean bill of lading."
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Subscription shipment limit. Returned with SUBSCRIPTION_LIMIT_REACHED.",
+            "example": 100
+          },
+          "current": {
+            "type": "integer",
+            "description": "Unique tracking numbers already charged in the current period.",
+            "example": 99
+          },
+          "requested_new": {
+            "type": "integer",
+            "description": "New unique valid tracking numbers in this request.",
+            "example": 2
+          },
+          "available": {
+            "type": "integer",
+            "description": "Remaining new unique tracking numbers available in the current period.",
+            "example": 1
+          },
+          "confirmation_url": {
+            "type": "string",
+            "description": "Returned with UNCONFIRMED_ACCOUNT. Open this URL to confirm the account.",
+            "example": "https://parcelsapp.com/api/v4/account/confirm/user%40example.com/token"
+          },
+          "confirmation_expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-07-09T12:00:00.000Z"
+          },
+          "rejected": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RejectedShipment"
+            }
+          }
+        }
+      }
+    }
+  }
+}
