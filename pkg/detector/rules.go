@@ -804,6 +804,72 @@ func (d *Detector) initRules() {
 			Description:    "UPU S10 Standard International Postal barcode",
 		},
 
+		// UK and Ireland carriers (Issue #11)
+		{
+			CarrierSlug:    "anpost",
+			CarrierName:    "An Post",
+			Country:        "IE",
+			CountryName:    "Ireland",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       86,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^[A-Z]{2}\d{9}IE$`),
+			Validator:      validateUPUS10,
+			Description:    "An Post Ireland UPU S10 tracking format",
+		},
+
+		// 68. Parcelforce UK
+		{
+			CarrierSlug:    "parcel-force",
+			CarrierName:    "Parcelforce",
+			Country:        "GB",
+			CountryName:    "United Kingdom",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       86,
+			ConfidenceBase: 0.95,
+			Regex:          regexp.MustCompile(`^([A-Z]{2}\d{7}|[A-Z]{4}\d{10})$`),
+			Description:    "Parcelforce UK domestic shipment barcode",
+		},
+
+		// 69. Evri (Hermes UK)
+		{
+			CarrierSlug:    "myhermes-uk",
+			CarrierName:    "Evri",
+			Country:        "GB",
+			CountryName:    "United Kingdom",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       85,
+			ConfidenceBase: 0.94,
+			Regex:          regexp.MustCompile(`^16\d{14}$`),
+			Description:    "Evri 16-digit tracking barcode format",
+		},
+
+		// 70. Yodel
+		{
+			CarrierSlug:    "yodel",
+			CarrierName:    "Yodel",
+			Country:        "GB",
+			CountryName:    "United Kingdom",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       85,
+			ConfidenceBase: 0.94,
+			Regex:          regexp.MustCompile(`^(JD\d{16,18}|1\d{17})$`),
+			Description:    "Yodel parcel barcode format",
+		},
+
+		// 71. DPD UK
+		{
+			CarrierSlug:    "dpd-uk",
+			CarrierName:    "DPD UK",
+			Country:        "GB",
+			CountryName:    "United Kingdom",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       85,
+			ConfidenceBase: 0.94,
+			Regex:          regexp.MustCompile(`^1550\d{10}$`),
+			Description:    "DPD UK 14-digit consignment number",
+		},
+
 		// France and Monaco carriers (Issue #10)
 		{
 			CarrierSlug:    "chronopost-france",
