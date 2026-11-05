@@ -19,6 +19,14 @@ func TestRegistry(t *testing.T) {
 		t.Fatalf("expected cainiao carrier to be found")
 	}
 
+	// Verify MENA & Africa carriers from Issue #12
+	for _, slug := range []string{"emirates-post-group", "saudi-post", "turkey-post", "israel-post", "south-africa-post", "egypt-post", "morocco-post", "kazpost", "naqel-express", "yurtici-kargo"} {
+		c, ok := reg.Get(slug)
+		if !ok || c == nil {
+			t.Errorf("expected MENA carrier %s to be registered", slug)
+		}
+	}
+
 	shipment, err := cainiao.Track(context.Background(), "LP00561234567890", models.TrackOptions{Language: "en"})
 	if err != nil {
 		t.Fatalf("unexpected error tracking cainiao: %v", err)
