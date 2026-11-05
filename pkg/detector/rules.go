@@ -326,5 +326,128 @@ func (d *Detector) initRules() {
 			Validator:      validateUPUS10,
 			Description:    "UPU S10 Standard International Postal barcode",
 		},
+
+		// 39. Poland Post (Poczta Polska) UPU S10
+		{
+			CarrierSlug:    "poland-post",
+			CarrierName:    "Poland Post",
+			Country:        "PL",
+			CountryName:    "Poland",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       86,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^[A-Z]{2}\d{9}PL$`),
+			Validator:      validateUPUS10,
+			Description:    "Poland Post (Poczta Polska) UPU S10 format",
+		},
+
+		// 40. InPost Poland 24-digit barcode
+		{
+			CarrierSlug:    "inpost-poland",
+			CarrierName:    "InPost Poland",
+			Country:        "PL",
+			CountryName:    "Poland",
+			CarrierType:    models.CarrierTypeLogistics,
+			Priority:       87,
+			ConfidenceBase: 0.97,
+			Regex:          regexp.MustCompile(`^6\d{23}$`),
+			Description:    "InPost Poland 24-digit locker parcel number",
+		},
+
+		// 41. Czech Republic Post UPU S10
+		{
+			CarrierSlug:    "czech-republic-post",
+			CarrierName:    "Czech Post",
+			Country:        "CZ",
+			CountryName:    "Czech Republic",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       86,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^[A-Z]{2}\d{9}CZ$`),
+			Validator:      validateUPUS10,
+			Description:    "Czech Post UPU S10 tracking format",
+		},
+
+		// 42. Romania Post UPU S10
+		{
+			CarrierSlug:    "romania-post",
+			CarrierName:    "Romania Post",
+			Country:        "RO",
+			CountryName:    "Romania",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       86,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^[A-Z]{2}\d{9}RO$`),
+			Validator:      validateUPUS10,
+			Description:    "Romania Post UPU S10 tracking format",
+		},
+
+		// 43. Greece Post (ELTA) UPU S10
+		{
+			CarrierSlug:    "elta-hellenic-post",
+			CarrierName:    "Greece Post (ELTA)",
+			Country:        "GR",
+			CountryName:    "Greece",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       86,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^[A-Z]{2}\d{9}GR$`),
+			Validator:      validateUPUS10,
+			Description:    "Greece Post (ELTA) UPU S10 format",
+		},
+
+		// 44. Bulgaria Post UPU S10
+		{
+			CarrierSlug:    "bulgaria-post",
+			CarrierName:    "Bulgaria Post",
+			Country:        "BG",
+			CountryName:    "Bulgaria",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       86,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^[A-Z]{2}\d{9}BG$`),
+			Validator:      validateUPUS10,
+			Description:    "Bulgaria Post UPU S10 tracking format",
+		},
+
+		// 45. Slovakia Post UPU S10
+		{
+			CarrierSlug:    "slovakia-post",
+			CarrierName:    "Slovakia Post",
+			Country:        "SK",
+			CountryName:    "Slovakia",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       86,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^[A-Z]{2}\d{9}SK$`),
+			Validator:      validateUPUS10,
+			Description:    "Slovakia Post UPU S10 tracking format",
+		},
+
+		// 46. Sameday Romania
+		{
+			CarrierSlug:    "sameday-ro",
+			CarrierName:    "Sameday",
+			Country:        "RO",
+			CountryName:    "Romania",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       85,
+			ConfidenceBase: 0.94,
+			Regex:          regexp.MustCompile(`^(00|10)\d{12,16}$`),
+			Description:    "Sameday courier parcel barcode",
+		},
+
+		// 47. Fan Courier
+		{
+			CarrierSlug:    "fan-courier",
+			CarrierName:    "Fan Courier",
+			Country:        "RO",
+			CountryName:    "Romania",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       85,
+			ConfidenceBase: 0.94,
+			Regex:          regexp.MustCompile(`^(00|01|02)\d{10,14}$`),
+			Description:    "Fan Courier Romania waybill number",
+		},
 	}
 }

@@ -30,6 +30,15 @@ func TestDetector(t *testing.T) {
 		{"Correos Spain UPU S10", "PQ4F6P07000000000000000", "ES", "correos-spain"},
 		{"Royal Mail UPU", "RN123456789GB", "GB", "royal-mail"},
 		{"Colissimo", "6A12345678901", "FR", "colissimo"},
+		{"Poland Post UPU S10", "RR123456785PL", "", "poland-post"},
+		{"InPost Poland 24 digits", "612345678901234567890123", "", "inpost-poland"},
+		{"Czech Post UPU S10", "RR123456785CZ", "", "czech-republic-post"},
+		{"Romania Post UPU S10", "RR123456785RO", "", "romania-post"},
+		{"Greece Post UPU S10", "RR123456785GR", "", "elta-hellenic-post"},
+		{"Bulgaria Post UPU S10", "RR123456785BG", "", "bulgaria-post"},
+		{"Slovakia Post UPU S10", "RR123456785SK", "", "slovakia-post"},
+		{"Sameday Romania", "1012345678901234", "", "sameday-ro"},
+		{"Fan Courier", "001234567890", "", "fan-courier"},
 	}
 
 	for _, tt := range tests {
