@@ -34,6 +34,14 @@ func TestRegistry(t *testing.T) {
 		t.Fatalf("expected cainiao carrier to be found")
 	}
 
+	// Verify Benelux carriers from Issue #16
+	for _, slug := range []string{"postnl", "bpost-local", "luxembourg-post", "dhl-nl-private", "budbee", "dynalogic"} {
+		c, ok := reg.Get(slug)
+		if !ok || c == nil {
+			t.Errorf("expected Benelux carrier %s to be registered", slug)
+		}
+	}
+
 	// Verify Ocean shipping lines from Issue #15
 	for _, slug := range []string{"msc", "maersk-line", "cma-cgm", "evergreen", "cosco", "hapag-lloyd", "one-line", "zim", "yang-ming", "wan-hai"} {
 		c, ok := reg.Get(slug)
