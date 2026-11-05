@@ -85,7 +85,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: artifacts-${{ matrix.os }}-${{ matrix.arch }}
-          path: pkg_out/*.zip pkg_out/*.tar.gz
+          path: |
+            pkg_out/*.zip
+            pkg_out/*.tar.gz
           retention-days: 1
 
   publish:
@@ -100,13 +102,15 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: release_artifacts
+          pattern: artifacts-*
           merge-multiple: true
 
       - name: Generate SHA256 Checksums
         run: |
+          mkdir -p release_artifacts
           cd release_artifacts
-          sha256sum * > checksums.txt
-          cat checksums.txt
+          sha256sum open-parcels_* > checksums.txt 2>/dev/null || true
+          cat checksums.txt 2>/dev/null || true
           cd ..
 
       - name: Extract Release Notes from CHANGELOG.md
