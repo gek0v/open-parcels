@@ -33,3 +33,117 @@ func TestRegistry(t *testing.T) {
 		t.Errorf("expected cainiao to provide last-mile carrier information")
 	}
 }
+
+func TestPortugalCarriers(t *testing.T) {
+	reg := GetRegistry()
+
+	carriers := []struct {
+		slug            string
+		name            string
+		country         string
+		expectedType    models.CarrierType
+		testTrackNumber string
+	}{
+		{
+			slug:            "delnext",
+			name:            "Delnext",
+			country:         "PT",
+			expectedType:    models.CarrierTypeExpress,
+			testTrackNumber: "DLN123456789PT",
+		},
+		{
+			slug:            "dpd-portugal",
+			name:            "DPD Portugal",
+			country:         "PT",
+			expectedType:    models.CarrierTypeExpress,
+			testTrackNumber: "09801234567890",
+		},
+		{
+			slug:            "portugal-post",
+			name:            "Portugal Post - CTT",
+			country:         "PT",
+			expectedType:    models.CarrierTypePostal,
+			testTrackNumber: "DA123456785PT",
+		},
+		{
+			slug:            "wepickup-pt",
+			name:            "WePickUp",
+			country:         "PT",
+			expectedType:    models.CarrierTypeLogistics,
+			testTrackNumber: "WPU123456789",
+		},
+	}
+
+	for _, tc := range carriers {
+		t.Run(tc.slug, func(t *testing.T) {
+			carrier, ok := reg.Get(tc.slug)
+			if !ok || carrier == nil {
+				t.Fatalf("carrier %s not found in registry", tc.slug)
+			}
+
+			if carrier.Slug() != tc.slug {
+				t.Errorf("expected slug %s, got %s", tc.slug, carrier.Slug())
+			}
+			if carrier.Name() != tc.name {
+				t.Errorf("expected name %s, got %s", tc.name, carrier.Name())
+			}
+			if carrier.Country() != tc.country {
+				t.Errorf("expected country %s, got %s", tc.country, carrier.Country())
+			}
+			if carrier.CountryName() != "Portugal" {
+				t.Errorf("expected country name Portugal, got %s", carrier.CountryName())
+			}
+			if carrier.Type() != tc.expectedType {
+				t.Errorf("expected type %s, got %s", tc.expectedType, carrier.Type())
+			}
+			if carrier.Website() == "" {
+				t.Errorf("expected non-empty website for %s", tc.slug)
+			}
+			trackingURL := carrier.TrackingURL(tc.testTrackNumber)
+			if trackingURL == "" {
+				t.Errorf("expected non-empty tracking URL for %s", tc.slug)
+			}
+
+			info := carrier.Info()
+			if info.Slug != tc.slug {
+				t.Errorf("expected info slug %s, got %s", tc.slug, info.Slug)
+			}
+
+			ctx := context.Background()
+			shipment, err := carrier.Track(ctx, tc.testTrackNumber, models.TrackOptions{Language: "pt"})
+			if err != nil {
+				t.Fatalf("unexpected error tracking %s: %v", tc.slug, err)
+			}
+
+			if shipment.TrackingNumber != tc.testTrackNumber {
+				t.Errorf("expected tracking number %s, got %s", tc.testTrackNumber, shipment.TrackingNumber)
+			}
+			if shipment.Origin.Code != "PT" {
+				t.Errorf("expected origin code PT, got %s", shipment.Origin.Code)
+			}
+			if shipment.Destination.Code != "PT" {
+				t.Errorf("expected destination code PT, got %s", shipment.Destination.Code)
+			}
+			if shipment.Carrier.Slug != tc.slug {
+				t.Errorf("expected shipment carrier slug %s, got %s", tc.slug, shipment.Carrier.Slug)
+			}
+			if len(shipment.Events) == 0 {
+				t.Errorf("expected events for %s", tc.slug)
+			}
+
+			// Validate events chronological ordering (oldest to newest)
+			for i := 1; i < len(shipment.Events); i++ {
+				if shipment.Events[i].Date.Before(shipment.Events[i-1].Date) {
+					t.Errorf("events not in chronological order for %s at index %d", tc.slug, i)
+				}
+			}
+
+			if shipment.Status == "" {
+				t.Errorf("expected non-empty status for %s", tc.slug)
+			}
+			if shipment.Progress <= 0 {
+				t.Errorf("expected positive progress for %s, got %d", tc.slug, shipment.Progress)
+			}
+		})
+	}
+}

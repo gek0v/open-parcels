@@ -65,6 +65,10 @@ func registerDefaultCarriers(r *Registry) {
 	r.Register(NewColissimoCarrier())
 	r.Register(NewAirCargoCarrier())
 	r.Register(NewOceanContainerCarrier())
+	r.Register(NewDelnextCarrier())
+	r.Register(NewDPDPortugalCarrier())
+	r.Register(NewPortugalPostCarrier())
+	r.Register(NewWePickUpCarrier())
 }
 
 // Register adds a carrier to the registry.
