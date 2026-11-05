@@ -14,7 +14,7 @@ type MRWCarrier struct {
 func NewMRWCarrier() *MRWCarrier {
 	return &MRWCarrier{
 		BaseCarrier: NewBaseCarrier(
-			"mrw",
+			"mrw-spain",
 			"MRW",
 			"ES",
 			"Spain",
@@ -60,6 +60,14 @@ func (c *MRWCarrier) Track(ctx context.Context, trackingNumber string, opts mode
 	return &models.Shipment{
 		TrackingNumber: trackingNumber,
 		Carrier:        c.Info(),
+		Origin: models.CountryInfo{
+			Name: "Spain",
+			Code: "ES",
+		},
+		Destination: models.CountryInfo{
+			Name: "Spain",
+			Code: "ES",
+		},
 		Status:        models.StatusOutForDelivery,
 		StatusText:    "En reparto / Out for delivery",
 		Progress:      85,
