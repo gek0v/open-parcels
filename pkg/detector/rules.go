@@ -326,5 +326,128 @@ func (d *Detector) initRules() {
 			Validator:      validateUPUS10,
 			Description:    "UPU S10 Standard International Postal barcode",
 		},
+
+		// 55. Sweden Post (PostNord) UPU S10
+		{
+			CarrierSlug:    "sweden-post",
+			CarrierName:    "PostNord Sweden",
+			Country:        "SE",
+			CountryName:    "Sweden",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       86,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^[A-Z]{2}\d{9}SE$`),
+			Validator:      validateUPUS10,
+			Description:    "PostNord Sweden UPU S10 tracking format",
+		},
+
+		// 56. Norway Post (Posten Norge) UPU S10
+		{
+			CarrierSlug:    "posten-norway",
+			CarrierName:    "Posten Norge",
+			Country:        "NO",
+			CountryName:    "Norway",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       86,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^[A-Z]{2}\d{9}NO$`),
+			Validator:      validateUPUS10,
+			Description:    "Posten Norge UPU S10 tracking format",
+		},
+
+		// 57. Finland Post (Posti) UPU S10 & JJFI
+		{
+			CarrierSlug:    "posti-finland",
+			CarrierName:    "Posti Finland",
+			Country:        "FI",
+			CountryName:    "Finland",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       86,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^[A-Z]{2}\d{9}FI$|^JJFI\d{16}$`),
+			Description:    "Posti Finland tracking format (UPU S10 / JJFI barcode)",
+		},
+
+		// 58. Estonia Post (Omniva) UPU S10
+		{
+			CarrierSlug:    "omniva",
+			CarrierName:    "Omniva Estonia",
+			Country:        "EE",
+			CountryName:    "Estonia",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       86,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^[A-Z]{2}\d{9}EE$`),
+			Validator:      validateUPUS10,
+			Description:    "Omniva Estonia UPU S10 tracking format",
+		},
+
+		// 59. Latvia Post UPU S10
+		{
+			CarrierSlug:    "latvia-post",
+			CarrierName:    "Latvia Post",
+			Country:        "LV",
+			CountryName:    "Latvia",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       86,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^[A-Z]{2}\d{9}LV$`),
+			Validator:      validateUPUS10,
+			Description:    "Latvia Post UPU S10 tracking format",
+		},
+
+		// 60. Lithuania Post UPU S10
+		{
+			CarrierSlug:    "post-litva",
+			CarrierName:    "Lithuania Post",
+			Country:        "LT",
+			CountryName:    "Lithuania",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       86,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^[A-Z]{2}\d{9}LT$`),
+			Validator:      validateUPUS10,
+			Description:    "Lithuania Post UPU S10 tracking format",
+		},
+
+		// 61. Iceland Post UPU S10
+		{
+			CarrierSlug:    "iceland-post",
+			CarrierName:    "Iceland Post",
+			Country:        "IS",
+			CountryName:    "Iceland",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       86,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^[A-Z]{2}\d{9}IS$`),
+			Validator:      validateUPUS10,
+			Description:    "Iceland Post UPU S10 tracking format",
+		},
+
+		// 62. Bring Nordic
+		{
+			CarrierSlug:    "bring",
+			CarrierName:    "Bring",
+			Country:        "NO",
+			CountryName:    "Norway",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       85,
+			ConfidenceBase: 0.94,
+			Regex:          regexp.MustCompile(`^70\d{16}$`),
+			Description:    "Bring Nordic parcel shipment format",
+		},
+
+		// 63. DAO Denmark
+		{
+			CarrierSlug:    "dao",
+			CarrierName:    "DAO",
+			Country:        "DK",
+			CountryName:    "Denmark",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       85,
+			ConfidenceBase: 0.94,
+			Regex:          regexp.MustCompile(`^DAO\d{8,12}$`),
+			Description:    "DAO Denmark express parcel format",
+		},
 	}
 }
