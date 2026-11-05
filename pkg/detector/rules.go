@@ -326,5 +326,58 @@ func (d *Detector) initRules() {
 			Validator:      validateUPUS10,
 			Description:    "UPU S10 Standard International Postal barcode",
 		},
+
+		// 92. PostNL UPU S10 & 3S Barcode
+		{
+			CarrierSlug:    "postnl",
+			CarrierName:    "PostNL",
+			Country:        "NL",
+			CountryName:    "Netherlands",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       87,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^[A-Z]{2}\d{9}NL$|^3S[0-9A-Z]{10,20}$`),
+			Description:    "PostNL 3S barcode / UPU S10 tracking format",
+		},
+
+		// 93. Bpost Belgium UPU S10 & Barcode
+		{
+			CarrierSlug:    "bpost-local",
+			CarrierName:    "Bpost Belgium",
+			Country:        "BE",
+			CountryName:    "Belgium",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       86,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^[A-Z]{2}\d{9}BE$|^3232\d{20}$`),
+			Description:    "Bpost Belgium tracking barcode format",
+		},
+
+		// 94. Luxembourg Post UPU S10
+		{
+			CarrierSlug:    "luxembourg-post",
+			CarrierName:    "Luxembourg Post",
+			Country:        "LU",
+			CountryName:    "Luxembourg",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       86,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^[A-Z]{2}\d{9}LU$`),
+			Validator:      validateUPUS10,
+			Description:    "Luxembourg Post UPU S10 tracking format",
+		},
+
+		// 95. DHL Parcel Netherlands JVGL
+		{
+			CarrierSlug:    "dhl-nl-private",
+			CarrierName:    "DHL Parcel Netherlands",
+			Country:        "NL",
+			CountryName:    "Netherlands",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       85,
+			ConfidenceBase: 0.94,
+			Regex:          regexp.MustCompile(`^JVGL\d{14,18}$`),
+			Description:    "DHL Parcel Netherlands JVGL barcode",
+		},
 	}
 }
