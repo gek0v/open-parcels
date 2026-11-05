@@ -63,7 +63,7 @@ func (d *Detector) Detect(rawNumber string, destCountryHint string) []models.Det
 
 		// Boost confidence if country matches destination hint
 		if destUpper != "" && rule.Country != "" {
-			if strings.EqualFold(rule.Country, destUpper) {
+			if strings.EqualFold(rule.Country, destUpper) || (destUpper == "SM" && rule.Country == "IT") || (destUpper == "IT" && rule.Country == "SM") {
 				conf = minFloat(1.0, conf+0.15)
 			} else if rule.Country != "GLOBAL" && rule.Country != "CN" {
 				// Slight penalty if carrier is country-specific and doesn't match hint

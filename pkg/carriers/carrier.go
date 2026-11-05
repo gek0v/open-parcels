@@ -65,6 +65,27 @@ func registerDefaultCarriers(r *Registry) {
 	r.Register(NewColissimoCarrier())
 	r.Register(NewAirCargoCarrier())
 	r.Register(NewOceanContainerCarrier())
+
+	// Italy & San Marino carriers
+	r.Register(NewBRTBartoliniCarrier())
+	r.Register(NewBRTItalyParcelIDCarrier())
+	r.Register(NewMyBRTCarrier())
+	r.Register(NewPosteItalianeCarrier())
+	r.Register(NewGLSItalyCarrier())
+	r.Register(NewInPostItalyCarrier())
+	r.Register(NewTNTItalyCarrier())
+	r.Register(NewAmazonItalyCarrier())
+	r.Register(NewSailpostCarrier())
+	r.Register(NewAlfredITCarrier())
+	r.Register(NewArcoSpedizioniCarrier())
+	r.Register(NewCEVAITCarrier())
+	r.Register(NewBDMITCarrier())
+	r.Register(NewDeliverITCarrier())
+	r.Register(NewLiccardiITCarrier())
+	r.Register(NewMBEITCarrier())
+	r.Register(NewRhenusITCarrier())
+	r.Register(NewSpediamoITCarrier())
+	r.Register(NewUnieuroITCarrier())
 }
 
 // Register adds a carrier to the registry.

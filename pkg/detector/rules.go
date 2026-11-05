@@ -313,7 +313,268 @@ func (d *Detector) initRules() {
 			Description:    "InPost Locker / Mondial Relay parcel number",
 		},
 
-		// 24. General UPU S10 International Postal
+		// 24. Poste Italiane / San Marino UPU S10
+		{
+			CarrierSlug:    "poste-italiane",
+			CarrierName:    "Poste Italiane",
+			Country:        "IT",
+			CountryName:    "Italy",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       86,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^[A-Z]{2}\d{9}(IT|SM)$`),
+			Validator:      validateUPUS10,
+			Description:    "Poste Italiane / San Marino UPU S10 postal code (XX123456789IT/SM)",
+		},
+
+		// 25. Poste Italiane Crono and domestic parcel barcode
+		{
+			CarrierSlug:    "poste-italiane",
+			CarrierName:    "Poste Italiane",
+			Country:        "IT",
+			CountryName:    "Italy",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       84,
+			ConfidenceBase: 0.93,
+			Regex:          regexp.MustCompile(`^(CRONO\d{8,14}|(38|05|20)\d{10})$`),
+			Description:    "Poste Italiane domestic Crono or raccomandata parcel barcode",
+		},
+
+		// 26. BRT Bartolini 12-digit shipment number
+		{
+			CarrierSlug:    "brt-bartolini",
+			CarrierName:    "BRT Bartolini",
+			Country:        "IT",
+			CountryName:    "Italy",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       80,
+			ConfidenceBase: 0.88,
+			Regex:          regexp.MustCompile(`^(BRT\d{9,12}|01\d{10}|\d{12})$`),
+			Description:    "BRT Bartolini 12-digit shipment code",
+		},
+
+		// 27. BRT Bartolini Parcel ID (14 or 18 digits)
+		{
+			CarrierSlug:    "brt-italy-parcelid",
+			CarrierName:    "BRT Bartolini (Parcel ID)",
+			Country:        "IT",
+			CountryName:    "Italy",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       83,
+			ConfidenceBase: 0.93,
+			Regex:          regexp.MustCompile(`^(055\d{11}|055\d{15}|\d{14}|\d{18})$`),
+			Description:    "BRT Bartolini 14 or 18-digit Parcel ID (ID Collo)",
+		},
+
+		// 28. myBRT.it online tracking code
+		{
+			CarrierSlug:    "mybrt-it",
+			CarrierName:    "myBRT.it",
+			Country:        "IT",
+			CountryName:    "Italy",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       83,
+			ConfidenceBase: 0.93,
+			Regex:          regexp.MustCompile(`^(MYBRT[0-9A-Z]{8,14}|074\d{11})$`),
+			Description:    "myBRT.it tracking code (MYBRT... or 074...)",
+		},
+
+		// 29. GLS Italy
+		{
+			CarrierSlug:    "gls-italy",
+			CarrierName:    "GLS Italy",
+			Country:        "IT",
+			CountryName:    "Italy",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       82,
+			ConfidenceBase: 0.91,
+			Regex:          regexp.MustCompile(`^(GLSIT[0-9A-Z]+|[A-Z]\d{8,9}|\d{9})$`),
+			Description:    "GLS Italy parcel tracking number (GLSIT prefix, branch code or 9 digits)",
+		},
+
+		// 30. InPost Italy
+		{
+			CarrierSlug:    "inpost-it",
+			CarrierName:    "InPost.it",
+			Country:        "IT",
+			CountryName:    "Italy",
+			CarrierType:    models.CarrierTypeLogistics,
+			Priority:       80,
+			ConfidenceBase: 0.91,
+			Regex:          regexp.MustCompile(`^(IT\d{22}|6\d{23})$`),
+			Description:    "InPost.it Locker parcel tracking number",
+		},
+
+		// 31. TNT Italy
+		{
+			CarrierSlug:    "tnt-italy",
+			CarrierName:    "TNT Italy",
+			Country:        "IT",
+			CountryName:    "Italy",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       82,
+			ConfidenceBase: 0.92,
+			Regex:          regexp.MustCompile(`^(TNTIT\d+|(MY|GE|VV|BA|NA)\d{7,9})$`),
+			Description:    "TNT Italy consignment tracking number",
+		},
+
+		// 32. Amazon Italy
+		{
+			CarrierSlug:    "amazon-it",
+			CarrierName:    "Amazon Italy",
+			Country:        "IT",
+			CountryName:    "Italy",
+			CarrierType:    models.CarrierTypeLogistics,
+			Priority:       83,
+			ConfidenceBase: 0.93,
+			Regex:          regexp.MustCompile(`^(IT\d{10,12}|TB[A-Z0-9]{10,16})$`),
+			Description:    "Amazon Italy tracking barcode",
+		},
+
+		// 33. Sailpost (Italy & San Marino)
+		{
+			CarrierSlug:    "sailpost",
+			CarrierName:    "Sailpost",
+			Country:        "IT",
+			CountryName:    "Italy & San Marino",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       83,
+			ConfidenceBase: 0.92,
+			Regex:          regexp.MustCompile(`^(SP\d{9,12}|SLP\d{9,12})$`),
+			Description:    "Sailpost Italy & San Marino postal barcode",
+		},
+
+		// 34. Alfred 24 Italy
+		{
+			CarrierSlug:    "alfred-it",
+			CarrierName:    "Alfred 24",
+			Country:        "IT",
+			CountryName:    "Italy",
+			CarrierType:    models.CarrierTypeLogistics,
+			Priority:       83,
+			ConfidenceBase: 0.92,
+			Regex:          regexp.MustCompile(`^ALF[0-9A-Z]{8,14}$`),
+			Description:    "Alfred 24 smart locker parcel identifier",
+		},
+
+		// 35. Arco Spedizioni
+		{
+			CarrierSlug:    "arco-spedizioni",
+			CarrierName:    "Arco Spedizioni",
+			Country:        "IT",
+			CountryName:    "Italy",
+			CarrierType:    models.CarrierTypeFreight,
+			Priority:       82,
+			ConfidenceBase: 0.91,
+			Regex:          regexp.MustCompile(`^(ARC|ARCO)\d{6,10}$`),
+			Description:    "Arco Spedizioni freight tracking number",
+		},
+
+		// 36. CEVA Logistics Italy
+		{
+			CarrierSlug:    "ceva-it",
+			CarrierName:    "CEVA Logistics Italy",
+			Country:        "IT",
+			CountryName:    "Italy",
+			CarrierType:    models.CarrierTypeFreight,
+			Priority:       82,
+			ConfidenceBase: 0.91,
+			Regex:          regexp.MustCompile(`^(CEVA|ITCEVA)\d{6,12}$`),
+			Description:    "CEVA Logistics Italy consignment number",
+		},
+
+		// 37. CST Italia (BDM)
+		{
+			CarrierSlug:    "bdm-it",
+			CarrierName:    "CST Italia",
+			Country:        "IT",
+			CountryName:    "Italy",
+			CarrierType:    models.CarrierTypeLogistics,
+			Priority:       82,
+			ConfidenceBase: 0.91,
+			Regex:          regexp.MustCompile(`^(BDM|CST)\d{6,10}$`),
+			Description:    "CST Italia / BDM shipment tracking code",
+		},
+
+		// 38. Deliver It
+		{
+			CarrierSlug:    "deliver-it",
+			CarrierName:    "Deliver It",
+			Country:        "IT",
+			CountryName:    "Italy",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       82,
+			ConfidenceBase: 0.91,
+			Regex:          regexp.MustCompile(`^(DIT|DLV)[0-9A-Z]{7,12}$`),
+			Description:    "Deliver It courier tracking code",
+		},
+
+		// 39. Liccardi Trasporti
+		{
+			CarrierSlug:    "liccardi-it",
+			CarrierName:    "Liccardi Trasporti",
+			Country:        "IT",
+			CountryName:    "Italy",
+			CarrierType:    models.CarrierTypeFreight,
+			Priority:       82,
+			ConfidenceBase: 0.91,
+			Regex:          regexp.MustCompile(`^(LIC|LCC)\d{6,10}$`),
+			Description:    "Liccardi Trasporti freight tracking code",
+		},
+
+		// 40. Mail Boxes Etc. Italy
+		{
+			CarrierSlug:    "mbe-it",
+			CarrierName:    "Mail Boxes Etc. Italy",
+			Country:        "IT",
+			CountryName:    "Italy",
+			CarrierType:    models.CarrierTypeLogistics,
+			Priority:       82,
+			ConfidenceBase: 0.91,
+			Regex:          regexp.MustCompile(`^(MBE|MBEIT)\d{7,12}$`),
+			Description:    "Mail Boxes Etc. Italy parcel tracking code",
+		},
+
+		// 41. Rhenus Italia
+		{
+			CarrierSlug:    "rhenus-it",
+			CarrierName:    "Rhenus Italia",
+			Country:        "IT",
+			CountryName:    "Italy",
+			CarrierType:    models.CarrierTypeFreight,
+			Priority:       82,
+			ConfidenceBase: 0.91,
+			Regex:          regexp.MustCompile(`^(RH|RHIT)\d{7,12}$`),
+			Description:    "Rhenus Italia logistics tracking code",
+		},
+
+		// 42. Spediamo
+		{
+			CarrierSlug:    "spediamo-it",
+			CarrierName:    "Spediamo",
+			Country:        "IT",
+			CountryName:    "Italy",
+			CarrierType:    models.CarrierTypeLogistics,
+			Priority:       82,
+			ConfidenceBase: 0.91,
+			Regex:          regexp.MustCompile(`^(SPD|SPED)\d{6,10}$`),
+			Description:    "Spediamo.it online parcel tracking code",
+		},
+
+		// 43. Unieuro
+		{
+			CarrierSlug:    "unieuro-it",
+			CarrierName:    "Unieuro",
+			Country:        "IT",
+			CountryName:    "Italy",
+			CarrierType:    models.CarrierTypeLogistics,
+			Priority:       82,
+			ConfidenceBase: 0.91,
+			Regex:          regexp.MustCompile(`^(UNI|UNIEURO)\d{6,10}$`),
+			Description:    "Unieuro order and delivery tracking code",
+		},
+
+		// 44. General UPU S10 International Postal
 		{
 			CarrierSlug:    "upu-s10",
 			CarrierName:    "Universal Postal Union (UPU S10)",

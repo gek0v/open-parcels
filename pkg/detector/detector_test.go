@@ -30,6 +30,28 @@ func TestDetector(t *testing.T) {
 		{"Correos Spain UPU S10", "PQ4F6P07000000000000000", "ES", "correos-spain"},
 		{"Royal Mail UPU", "RN123456789GB", "GB", "royal-mail"},
 		{"Colissimo", "6A12345678901", "FR", "colissimo"},
+		// Italy and San Marino formats
+		{"Poste Italiane UPU IT", "RA123456785IT", "IT", "poste-italiane"},
+		{"Poste Italiane UPU SM", "RR123456785SM", "SM", "poste-italiane"},
+		{"Poste Italiane Crono", "CRONO123456789", "IT", "poste-italiane"},
+		{"BRT Bartolini 12 digits", "012345678901", "IT", "brt-bartolini"},
+		{"BRT Parcel ID", "05512345678901", "IT", "brt-italy-parcelid"},
+		{"myBRT.it", "MYBRT123456789", "IT", "mybrt-it"},
+		{"GLS Italy", "GLSIT123456789", "IT", "gls-italy"},
+		{"InPost Italy", "623456789012345678901234", "IT", "inpost-it"},
+		{"TNT Italy", "TNTIT123456789", "IT", "tnt-italy"},
+		{"Amazon Italy", "IT1234567890", "IT", "amazon-it"},
+		{"Sailpost Italy San Marino", "SP1234567890", "SM", "sailpost"},
+		{"Alfred 24 Italy", "ALF123456789", "IT", "alfred-it"},
+		{"Arco Spedizioni", "ARC12345678", "IT", "arco-spedizioni"},
+		{"CEVA Italy", "CEVA123456789", "IT", "ceva-it"},
+		{"CST Italia", "BDM12345678", "IT", "bdm-it"},
+		{"Deliver It", "DIT123456789", "IT", "deliver-it"},
+		{"Liccardi Trasporti", "LIC12345678", "IT", "liccardi-it"},
+		{"Mail Boxes Etc Italy", "MBE123456789", "IT", "mbe-it"},
+		{"Rhenus Italia", "RH123456789", "IT", "rhenus-it"},
+		{"Spediamo", "SPD12345678", "IT", "spediamo-it"},
+		{"Unieuro", "UNI123456789", "IT", "unieuro-it"},
 	}
 
 	for _, tt := range tests {
@@ -62,5 +84,23 @@ func TestDetectorCandidates(t *testing.T) {
 	}
 	if !foundMRW {
 		t.Errorf("expected mrw in candidates for 12 digits with ES hint")
+	}
+
+	// For IT hint, brt-bartolini should be prioritized
+	itCandidates := d.Detect("012345678901", "IT")
+	if len(itCandidates) == 0 {
+		t.Fatalf("expected candidates for 12 digits with IT hint")
+	}
+	if itCandidates[0].Carrier.Slug != "brt-bartolini" {
+		t.Errorf("expected top candidate to be brt-bartolini with IT hint, got %s", itCandidates[0].Carrier.Slug)
+	}
+
+	// For SM hint, Poste Italiane / San Marino should be boosted
+	smCandidates := d.Detect("RR123456785SM", "SM")
+	if len(smCandidates) == 0 {
+		t.Fatalf("expected candidates for UPU SM with SM hint")
+	}
+	if smCandidates[0].Carrier.Slug != "poste-italiane" {
+		t.Errorf("expected top candidate to be poste-italiane for SM UPU, got %s", smCandidates[0].Carrier.Slug)
 	}
 }
