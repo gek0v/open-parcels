@@ -1,0 +1,104 @@
+[
+  {
+    "key": "china_hk",
+    "title": "Implementación de Transportistas: China continental y Hong Kong 🇨🇳 🇭🇰",
+    "url": "https://github.com/gek0v/open-parcels/issues/1",
+    "count": 271
+  },
+  {
+    "key": "global_logistics",
+    "title": "Implementación de Transportistas: Redes Globales de Logística y Couriers Cross-Border 🌐",
+    "url": "https://github.com/gek0v/open-parcels/issues/2",
+    "count": 595
+  },
+  {
+    "key": "asia_oceania",
+    "title": "Implementación de Transportistas: Asia y Oceanía (APAC) 🇯🇵 🇰🇷 🇮🇳 🇦🇺 🇳🇿 🇸🇬",
+    "url": "https://github.com/gek0v/open-parcels/issues/3",
+    "count": 123
+  },
+  {
+    "key": "europa_este",
+    "title": "Implementación de Transportistas: Europa Central, Oriental y Balcanes 🇵🇱 🇨🇿 🇷🇴 🇬🇷 🇺🇦 🇷🇺",
+    "url": "https://github.com/gek0v/open-parcels/issues/4",
+    "count": 81
+  },
+  {
+    "key": "norteamerica",
+    "title": "Implementación de Transportistas: Norteamérica (Estados Unidos y Canadá) 🇺🇸 🇨🇦",
+    "url": "https://github.com/gek0v/open-parcels/issues/5",
+    "count": 42
+  },
+  {
+    "key": "nordicos_balticos",
+    "title": "Implementación de Transportistas: Países Nórdicos y Bálticos 🇸🇪 🇳🇴 🇩🇰 🇫🇮 🇮🇸 🇪🇪 🇱🇻 🇱🇹",
+    "url": "https://github.com/gek0v/open-parcels/issues/6",
+    "count": 23
+  },
+  {
+    "key": "espana",
+    "title": "Implementación de Transportistas: España 🇪🇸",
+    "url": "https://github.com/gek0v/open-parcels/issues/7",
+    "count": 24
+  },
+  {
+    "key": "air_cargo",
+    "title": "Implementación de Transportistas: Carga Aérea Global (IATA Air Cargo / AWB) ✈️",
+    "url": "https://github.com/gek0v/open-parcels/issues/8",
+    "count": 136
+  },
+  {
+    "key": "italia",
+    "title": "Implementación de Transportistas: Italia y San Marino 🇮🇹 🇸🇲",
+    "url": "https://github.com/gek0v/open-parcels/issues/9",
+    "count": 19
+  },
+  {
+    "key": "francia",
+    "title": "Implementación de Transportistas: Francia y Mónaco 🇫🇷 🇲🇨",
+    "url": "https://github.com/gek0v/open-parcels/issues/10",
+    "count": 22
+  },
+  {
+    "key": "uk_irlanda",
+    "title": "Implementación de Transportistas: Reino Unido e Irlanda 🇬🇧 🇮🇪",
+    "url": "https://github.com/gek0v/open-parcels/issues/11",
+    "count": 38
+  },
+  {
+    "key": "mideast_africa",
+    "title": "Implementación de Transportistas: Oriente Medio, Asia Central y África 🇦🇪 🇸🇦 🇮🇱 🇹🇷 🇿🇦 🇪🇬",
+    "url": "https://github.com/gek0v/open-parcels/issues/12",
+    "count": 57
+  },
+  {
+    "key": "alemania",
+    "title": "Implementación de Transportistas: Alemania y Región DACH 🇩🇪 🇦🇹 🇨🇭",
+    "url": "https://github.com/gek0v/open-parcels/issues/13",
+    "count": 26
+  },
+  {
+    "key": "latam",
+    "title": "Implementación de Transportistas: Latinoamérica y Caribe (LATAM) 🇲🇽 🇧🇷 🇦🇷 🇨🇱 🇨🇴 🇵🇪",
+    "url": "https://github.com/gek0v/open-parcels/issues/14",
+    "count": 25
+  },
+  {
+    "key": "ocean_freight",
+    "title": "Implementación de Transportistas: Transporte Marítimo y Contenedores (Ocean Freight) 🚢",
+    "url": "https://github.com/gek0v/open-parcels/issues/15",
+    "count": 49
+  },
+  {
+    "key": "benelux",
+    "title": "Implementación de Transportistas: Benelux (Países Bajos, Bélgica, Luxemburgo) 🇳🇱 🇧🇪 🇱🇺",
+    "url": "https://github.com/gek0v/open-parcels/issues/16",
+    "count": 18
+  },
+  {
+    "key": "portugal",
+    "title": "Implementación de Transportistas: Portugal 🇵🇹",
+    "url": "https://github.com/gek0v/open-parcels/issues/17",
+    "count": 4
+  }
+]
