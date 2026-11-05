@@ -14,7 +14,7 @@ type FourPXCarrier struct {
 func NewFourPXCarrier() *FourPXCarrier {
 	return &FourPXCarrier{
 		BaseCarrier: NewBaseCarrier(
-			"four-px",
+			"4px",
 			"4PX Express",
 			"CN",
 			"China",
