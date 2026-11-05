@@ -44,6 +44,14 @@ func GetRegistry() *Registry {
 	return defaultRegistry
 }
 
+// AliasCarrier wraps a Carrier under an alternative slug.
+type AliasCarrier struct {
+	Carrier
+	slug string
+}
+
+func (a *AliasCarrier) Slug() string { return a.slug }
+
 func registerDefaultCarriers(r *Registry) {
 	r.Register(NewCainiaoCarrier())
 	r.Register(NewCorreosSpainCarrier())
@@ -52,7 +60,9 @@ func registerDefaultCarriers(r *Registry) {
 	r.Register(NewDHLExpressCarrier())
 	r.Register(NewDHLParcelCarrier())
 	r.Register(NewFedExCarrier())
-	r.Register(NewFourPXCarrier())
+	fpx := NewFourPXCarrier()
+	r.Register(fpx)
+	r.Register(&AliasCarrier{Carrier: fpx, slug: "four-px"})
 	r.Register(NewGLSCarrier())
 	r.Register(NewInPostCarrier())
 	r.Register(NewMRWCarrier())
@@ -65,6 +75,17 @@ func registerDefaultCarriers(r *Registry) {
 	r.Register(NewColissimoCarrier())
 	r.Register(NewAirCargoCarrier())
 	r.Register(NewOceanContainerCarrier())
+	// China & Hong Kong flagship carriers (Issue #1)
+	r.Register(NewChinaPostCarrier())
+	r.Register(NewSFExpressCarrier())
+	r.Register(NewHongKongPostCarrier())
+	r.Register(NewYanwenCarrier())
+	r.Register(NewSunYouCarrier())
+	r.Register(NewCNECarrier())
+	r.Register(NewDepponCarrier())
+	r.Register(NewYTOExpressCarrier())
+	// Register the full China & Hong Kong regional catalog (271 carriers)
+	registerChinaHongKongCatalog(r)
 }
 
 // Register adds a carrier to the registry.

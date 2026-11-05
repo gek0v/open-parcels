@@ -10,8 +10,23 @@ import (
 func TestRegistry(t *testing.T) {
 	reg := GetRegistry()
 	list := reg.List("")
-	if len(list) < 15 {
-		t.Fatalf("expected at least 15 registered carriers, got %d", len(list))
+	if len(list) < 280 {
+		t.Fatalf("expected at least 280 registered carriers (including 271 from China/HK), got %d", len(list))
+	}
+
+	for _, slug := range []string{"china-post", "sf-express", "hongkong-post", "yanwen", "4px", "four-px", "139-express", "sytrack", "cne-express"} {
+		c, ok := reg.Get(slug)
+		if !ok || c == nil {
+			t.Errorf("expected carrier %s to be registered", slug)
+			continue
+		}
+		shp, err := c.Track(context.Background(), "TEST123456", models.TrackOptions{DestinationCountry: "ES"})
+		if err != nil {
+			t.Errorf("unexpected error tracking %s: %v", slug, err)
+		}
+		if shp == nil || len(shp.Events) == 0 {
+			t.Errorf("expected events for %s", slug)
+		}
 	}
 
 	cainiao, ok := reg.Get("cainiao")
