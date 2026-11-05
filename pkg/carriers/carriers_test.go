@@ -19,6 +19,14 @@ func TestRegistry(t *testing.T) {
 		t.Fatalf("expected cainiao carrier to be found")
 	}
 
+	// Verify LATAM carriers from Issue #14
+	for _, slug := range []string{"correios-brazil", "mexico-post", "correo-argentino", "peru-post", "uruguay-post", "estafeta", "chilexpress-cl", "andreani", "starken"} {
+		c, ok := reg.Get(slug)
+		if !ok || c == nil {
+			t.Errorf("expected LATAM carrier %s to be registered", slug)
+		}
+	}
+
 	shipment, err := cainiao.Track(context.Background(), "LP00561234567890", models.TrackOptions{Language: "en"})
 	if err != nil {
 		t.Fatalf("unexpected error tracking cainiao: %v", err)
