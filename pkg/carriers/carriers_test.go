@@ -19,6 +19,14 @@ func TestRegistry(t *testing.T) {
 		t.Fatalf("expected cainiao carrier to be found")
 	}
 
+	// Verify Ocean shipping lines from Issue #15
+	for _, slug := range []string{"msc", "maersk-line", "cma-cgm", "evergreen", "cosco", "hapag-lloyd", "one-line", "zim", "yang-ming", "wan-hai"} {
+		c, ok := reg.Get(slug)
+		if !ok || c == nil {
+			t.Errorf("expected Ocean shipping line %s to be registered", slug)
+		}
+	}
+
 	shipment, err := cainiao.Track(context.Background(), "LP00561234567890", models.TrackOptions{Language: "en"})
 	if err != nil {
 		t.Fatalf("unexpected error tracking cainiao: %v", err)

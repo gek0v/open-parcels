@@ -22,6 +22,117 @@ func (d *Detector) initRules() {
 			Description:    "IATA Air Waybill standard with Mod 7 checksum",
 		},
 
+		// 2a. MSC Container
+		{
+			CarrierSlug:    "msc",
+			CarrierName:    "MSC",
+			Country:        "GLOBAL",
+			CountryName:    "International",
+			CarrierType:    models.CarrierTypeFreight,
+			Priority:       99,
+			ConfidenceBase: 0.99,
+			Regex:          regexp.MustCompile(`^MSCU\d{7}$`),
+			Validator:      validateContainer,
+			Description:    "MSC Mediterranean Shipping Company container code",
+		},
+
+		// 2b. Maersk Container
+		{
+			CarrierSlug:    "maersk-line",
+			CarrierName:    "Maersk Line",
+			Country:        "GLOBAL",
+			CountryName:    "International",
+			CarrierType:    models.CarrierTypeFreight,
+			Priority:       99,
+			ConfidenceBase: 0.99,
+			Regex:          regexp.MustCompile(`^(MAEU|MSKU)\d{7}$`),
+			Validator:      validateContainer,
+			Description:    "Maersk Line ISO container code",
+		},
+
+		// 2c. CMA CGM Container
+		{
+			CarrierSlug:    "cma-cgm",
+			CarrierName:    "CMA CGM",
+			Country:        "GLOBAL",
+			CountryName:    "International",
+			CarrierType:    models.CarrierTypeFreight,
+			Priority:       99,
+			ConfidenceBase: 0.99,
+			Regex:          regexp.MustCompile(`^CMAU\d{7}$`),
+			Validator:      validateContainer,
+			Description:    "CMA CGM container code",
+		},
+
+		// 2d. Evergreen Container / BOL
+		{
+			CarrierSlug:    "evergreen",
+			CarrierName:    "Evergreen",
+			Country:        "GLOBAL",
+			CountryName:    "International",
+			CarrierType:    models.CarrierTypeFreight,
+			Priority:       99,
+			ConfidenceBase: 0.99,
+			Regex:          regexp.MustCompile(`^(EGLV|EGHU)[0-9A-Z]{7,12}$`),
+			Description:    "Evergreen Marine container / B/L code",
+		},
+
+		// 2e. COSCO Shipping
+		{
+			CarrierSlug:    "cosco",
+			CarrierName:    "COSCO Shipping",
+			Country:        "GLOBAL",
+			CountryName:    "International",
+			CarrierType:    models.CarrierTypeFreight,
+			Priority:       99,
+			ConfidenceBase: 0.99,
+			Regex:          regexp.MustCompile(`^(COSU|CBHU)\d{7}$`),
+			Validator:      validateContainer,
+			Description:    "COSCO Shipping container code",
+		},
+
+		// 2f. Hapag-Lloyd
+		{
+			CarrierSlug:    "hapag-lloyd",
+			CarrierName:    "Hapag-Lloyd",
+			Country:        "GLOBAL",
+			CountryName:    "International",
+			CarrierType:    models.CarrierTypeFreight,
+			Priority:       99,
+			ConfidenceBase: 0.99,
+			Regex:          regexp.MustCompile(`^HLCU\d{7}$`),
+			Validator:      validateContainer,
+			Description:    "Hapag-Lloyd container code",
+		},
+
+		// 2g. ONE (Ocean Network Express)
+		{
+			CarrierSlug:    "one-line",
+			CarrierName:    "ONE Ocean Network Express",
+			Country:        "GLOBAL",
+			CountryName:    "International",
+			CarrierType:    models.CarrierTypeFreight,
+			Priority:       99,
+			ConfidenceBase: 0.99,
+			Regex:          regexp.MustCompile(`^ONEU\d{7}$`),
+			Validator:      validateContainer,
+			Description:    "ONE Ocean Network Express container code",
+		},
+
+		// 2h. ZIM
+		{
+			CarrierSlug:    "zim",
+			CarrierName:    "ZIM",
+			Country:        "GLOBAL",
+			CountryName:    "International",
+			CarrierType:    models.CarrierTypeFreight,
+			Priority:       99,
+			ConfidenceBase: 0.99,
+			Regex:          regexp.MustCompile(`^ZIMU\d{7}$`),
+			Validator:      validateContainer,
+			Description:    "ZIM Integrated Shipping container code",
+		},
+
 		// 2. ISO 6346 Shipping Container
 		{
 			CarrierSlug:    "ocean-container",
