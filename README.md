@@ -8,18 +8,46 @@
 
 1. **Detección Automática de Transportistas (Carrier Auto-Detection Engine)**:
    - Identificación inteligente basada en expresiones regulares, longitudes fijas, prefijos y validadores de suma de comprobación (Luhn, Modulo 7, Modulo 10, UPU S10, ISO 6346).
-   - Soporte para más de 20 operadores globales y locales: **Cainiao / AliExpress**, **Correos España**, **Correos Express**, **GLS**, **CTT Express**, **SEUR**, **Paack**, **MRW**, **InPost / Mondial Relay**, **DHL (Express & Parcel)**, **UPS**, **FedEx**, **USPS**, **YunExpress**, **4PX**, **Royal Mail**, **Colissimo**, **IATA Air Cargo (AWB)** y **Contenedores Marítimos (ISO 6346)**.
-   - Puntuación de confianza (0.0 a 1.0) y refuerzo heurístico mediante pista de país de destino.
+   - Soporte para más de 40 operadores globales y regionales (España, Italia, San Marino, etc.): **Cainiao / AliExpress**, **Correos España**, **Correos Express**, **GLS (Global & Italy)**, **CTT Express**, **SEUR**, **Paack**, **MRW**, **InPost (Global & Italy)**, **DHL (Express & Parcel)**, **UPS**, **FedEx**, **USPS**, **YunExpress**, **4PX**, **Royal Mail**, **Colissimo**, **Poste Italiane / Crono**, **BRT Bartolini / myBRT**, **TNT Italy**, **Amazon Shipping IT**, **Sailpost**, **CEVA**, **Arco Spedizioni**, **IATA Air Cargo (AWB)** y **Contenedores Marítimos (ISO 6346)**.
+   - Puntuación de confianza (0.0 a 1.0) y refuerzo heurístico mediante pista de país de destino (`IT`, `SM`, `ES`, etc.).
 
 2. **Encadenamiento y Fusión Multitransportista (Multi-Carrier Journey & Event Merging)**:
-   - Rastreabilidad del ciclo de vida completo: tramo internacional (origen Asia / Europa / América) + transferencia aduanera + última milla local (ej. *Cainiao ➔ Correos Express*, *YunExpress ➔ Correos España*).
+   - Rastreabilidad del ciclo de vida completo: tramo internacional (origen Asia / Europa / América) + transferencia aduanera + última milla local (ej. *Cainiao ➔ Correos Express*, *YunExpress ➔ Correos España*, *AliExpress ➔ Poste Italiane / BRT*).
    - Fusión cronológica descendente de hitos de ambos operadores en una única línea de tiempo continua.
    - Deduplicación automática de hitos equivalentes dentro de ventanas temporales concurrentes.
 
 3. **Máquina de Estados y Normalización Universal**:
    - Estados canónicos: `pending`, `info_received`, `in_transit`, `out_for_delivery`, `delivered`, `failed_attempt`, `exception`, `expired`.
    - Estimación y cálculo de progreso porcentual del envío (0% a 100%).
-   - Soporte bilingüe en descripciones de estado (`es` y `en`).
+   - Normalización semántica de eventos con soporte multilingüe en descripciones de estado y eventos (`es`, `en`, `it`).
+
+---
+
+### 🇮🇹 🇸🇲 Transportistas de Italia y San Marino Soportados
+
+El motor incluye cobertura exhaustiva para el mercado italiano y de San Marino (19 operadores), con reconocimiento de patrones específicos y normalizador semántico de eventos en italiano (`it`):
+
+| Slug | Transportista | País | Patrones y Formatos |
+|---|---|---|---|
+| `poste-italiane` | Poste Italiane & Crono | IT, SM | UPU S10 (`[A-Z]{2}\d{9}(IT\|SM)`), Crono (`\d{14}`, `\d{12}`) |
+| `brt-bartolini` | BRT Bartolini | IT | 12 dígitos numéricos (`^\d{12}$`) |
+| `brt-italy-parcelid` | BRT Italy Parcel ID | IT | Formato alfanumérico BRT (`^[A-Z0-9]{12,18}$`) |
+| `mybrt-it` | myBRT Italy | IT | Códigos de seguimiento myBRT / DPDgroup |
+| `gls-italy` | GLS Italy | IT | 9 u 11 dígitos numéricos, códigos alfanuméricos |
+| `inpost-it` | InPost Italy | IT, SM | 24 dígitos numéricos Locker / Punto Poste |
+| `tnt-italy` | TNT Italy | IT | 7 u 8 dígitos o prefijo `MY...` |
+| `amazon-it` | Amazon Shipping IT | IT | Prefijos `TBA`, `TBC`, `TBM` o `IT...` |
+| `sailpost` | Sailpost | IT, SM | Red postal privada de Italia y San Marino |
+| `alfred-it` | Alfred 24 Italy | IT | Red inteligente de taquillas y taquillas automáticas |
+| `arco-spedizioni` | Arco Spedizioni | IT | Logística industrial y distribución B2B |
+| `ceva-it` | CEVA Logistics Italy | IT | Servicios de logística global y de carga aérea/terrestre |
+| `bdm-it` | CST / BDM Italia | IT | Logística express y distribución capilar |
+| `deliver-it` | Deliver It | IT | Envíos exprés y última milla urbana |
+| `liccardi-it` | Liccardi Trasporti | IT | Transporte nacional y logística de carga |
+| `mbe-it` | Mail Boxes Etc. Italy | IT | Envíos de centros de servicios MBE |
+| `rhenus-it` | Rhenus Logistics Italy | IT | Logística integral de carga y transporte terrestre |
+| `spediamo-it` | Spediamo.it | IT | Agregador y plataforma web de paquetería |
+| `unieuro-it` | Unieuro Italy | IT | Logística retail y entregas a domicilio |
 
 4. **Múltiples Interfaces de Consumo**:
    - **CLI en Go**: Salida formateada en terminal con tarjetas ANSI, barras de progreso y línea de tiempo enriquecida, además de modo `--json`.
