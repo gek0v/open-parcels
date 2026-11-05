@@ -97,6 +97,9 @@ func registerDefaultCarriers(r *Registry) {
 	r.Register(NewColissimoCarrier())
 	r.Register(NewAirCargoCarrier())
 	r.Register(NewOceanContainerCarrier())
+	// Register LATAM regional catalog (25 carriers - Issue #14)
+	registerLATAMCatalog(r)
+
 	// Register DACH region catalog (26 carriers - Issue #13)
 	registerDACHCatalog(r)
 

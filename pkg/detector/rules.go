@@ -804,6 +804,89 @@ func (d *Detector) initRules() {
 			Description:    "UPU S10 Standard International Postal barcode",
 		},
 
+		// LATAM carriers (Issue #14)
+		{
+			CarrierSlug:    "correios-brazil",
+			CarrierName:    "Correios Brazil",
+			Country:        "BR",
+			CountryName:    "Brazil",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       86,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^[A-Z]{2}\d{9}BR$`),
+			Validator:      validateUPUS10,
+			Description:    "Correios Brazil UPU S10 tracking format",
+		},
+
+		// 87. Mexico Post (Correos de México) UPU S10
+		{
+			CarrierSlug:    "mexico-post",
+			CarrierName:    "Correos de México",
+			Country:        "MX",
+			CountryName:    "Mexico",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       86,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^[A-Z]{2}\d{9}MX$`),
+			Validator:      validateUPUS10,
+			Description:    "Correos de México UPU S10 format",
+		},
+
+		// 88. Correo Argentino UPU S10
+		{
+			CarrierSlug:    "correo-argentino",
+			CarrierName:    "Correo Argentino",
+			Country:        "AR",
+			CountryName:    "Argentina",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       86,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^[A-Z]{2}\d{9}AR$`),
+			Validator:      validateUPUS10,
+			Description:    "Correo Argentino UPU S10 format",
+		},
+
+		// 89. Peru Post (Serpost) UPU S10
+		{
+			CarrierSlug:    "peru-post",
+			CarrierName:    "Serpost Peru",
+			Country:        "PE",
+			CountryName:    "Peru",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       86,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^[A-Z]{2}\d{9}PE$`),
+			Validator:      validateUPUS10,
+			Description:    "Serpost Peru UPU S10 format",
+		},
+
+		// 90. Uruguay Post UPU S10
+		{
+			CarrierSlug:    "uruguay-post",
+			CarrierName:    "Correo Uruguayo",
+			Country:        "UY",
+			CountryName:    "Uruguay",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       86,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^[A-Z]{2}\d{9}UY$`),
+			Validator:      validateUPUS10,
+			Description:    "Correo Uruguayo UPU S10 format",
+		},
+
+		// 91. Estafeta Mexico
+		{
+			CarrierSlug:    "estafeta",
+			CarrierName:    "Estafeta",
+			Country:        "MX",
+			CountryName:    "Mexico",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       85,
+			ConfidenceBase: 0.94,
+			Regex:          regexp.MustCompile(`^22\d{20}$`),
+			Description:    "Estafeta 22-digit waybill barcode",
+		},
+
 		// DACH carriers (Issue #13)
 		{
 			CarrierSlug:    "swiss-post",
