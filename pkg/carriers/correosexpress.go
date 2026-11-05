@@ -14,7 +14,7 @@ type CorreosExpressCarrier struct {
 func NewCorreosExpressCarrier() *CorreosExpressCarrier {
 	return &CorreosExpressCarrier{
 		BaseCarrier: NewBaseCarrier(
-			"correos-express",
+			"correosexpress",
 			"Correos Express",
 			"ES",
 			"Spain",
