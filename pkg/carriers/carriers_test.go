@@ -19,6 +19,14 @@ func TestRegistry(t *testing.T) {
 		t.Fatalf("expected cainiao carrier to be found")
 	}
 
+	// Verify APAC carriers from Issue #3
+	for _, slug := range []string{"australia-post", "japan-post", "korea-post", "india-post", "singapore-post", "new-zealand-post", "ninja-van", "delhivery", "bluedart", "yamato-japan", "sagawa-jp"} {
+		c, ok := reg.Get(slug)
+		if !ok || c == nil {
+			t.Errorf("expected APAC carrier %s to be registered", slug)
+		}
+	}
+
 	shipment, err := cainiao.Track(context.Background(), "LP00561234567890", models.TrackOptions{Language: "en"})
 	if err != nil {
 		t.Fatalf("unexpected error tracking cainiao: %v", err)

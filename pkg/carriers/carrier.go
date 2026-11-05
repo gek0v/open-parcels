@@ -65,6 +65,8 @@ func registerDefaultCarriers(r *Registry) {
 	r.Register(NewColissimoCarrier())
 	r.Register(NewAirCargoCarrier())
 	r.Register(NewOceanContainerCarrier())
+	// Register the Asia-Pacific regional catalog (123 carriers)
+	registerAPACCatalog(r)
 }
 
 // Register adds a carrier to the registry.
