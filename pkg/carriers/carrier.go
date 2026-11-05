@@ -44,6 +44,14 @@ func GetRegistry() *Registry {
 	return defaultRegistry
 }
 
+// AliasCarrier wraps a Carrier under an alternative slug.
+type AliasCarrier struct {
+	Carrier
+	slug string
+}
+
+func (a *AliasCarrier) Slug() string { return a.slug }
+
 func registerDefaultCarriers(r *Registry) {
 	r.Register(NewCainiaoCarrier())
 	r.Register(NewCorreosSpainCarrier())
@@ -61,7 +69,9 @@ func registerDefaultCarriers(r *Registry) {
 
 	r.Register(NewDHLParcelSpainCarrier())
 	r.Register(NewFedExCarrier())
-	r.Register(NewFourPXCarrier())
+	fpx := NewFourPXCarrier()
+	r.Register(fpx)
+	r.RegisterAlias("four-px", fpx)
 
 	gls := NewGLSCarrier()
 	r.Register(gls)
@@ -78,7 +88,6 @@ func registerDefaultCarriers(r *Registry) {
 	mrw := NewMRWCarrier()
 	r.Register(mrw)
 	r.RegisterAlias("mrw", mrw)
-
 	r.Register(NewPaackCarrier())
 	r.Register(NewSEURCarrier())
 	r.Register(NewUPSCarrier())
@@ -88,6 +97,18 @@ func registerDefaultCarriers(r *Registry) {
 	r.Register(NewColissimoCarrier())
 	r.Register(NewAirCargoCarrier())
 	r.Register(NewOceanContainerCarrier())
+	// China & Hong Kong flagship carriers (Issue #1)
+	r.Register(NewChinaPostCarrier())
+	r.Register(NewSFExpressCarrier())
+	r.Register(NewHongKongPostCarrier())
+	r.Register(NewYanwenCarrier())
+	r.Register(NewSunYouCarrier())
+	r.Register(NewCNECarrier())
+	r.Register(NewDepponCarrier())
+	r.Register(NewYTOExpressCarrier())
+	// Register the full China & Hong Kong regional catalog (271 carriers)
+	registerChinaHongKongCatalog(r)
+
 	// Italy & San Marino carriers (Issue #9)
 	r.Register(NewBRTBartoliniCarrier())
 	r.Register(NewBRTItalyParcelIDCarrier())

@@ -78,7 +78,7 @@ func (d *Detector) initRules() {
 
 		// 6. 4PX
 		{
-			CarrierSlug:    "four-px",
+			CarrierSlug:    "4px",
 			CarrierName:    "4PX Express",
 			Country:        "CN",
 			CountryName:    "China",
@@ -87,6 +87,203 @@ func (d *Detector) initRules() {
 			ConfidenceBase: 0.95,
 			Regex:          regexp.MustCompile(`^(4PX\d{10,16}|MP\d{10,16}|FPX[0-9A-Z]+)$`),
 			Description:    "4PX Express international tracking number",
+		},
+
+		// 6a. China Post UPU S10
+		{
+			CarrierSlug:    "china-post",
+			CarrierName:    "China Post",
+			Country:        "CN",
+			CountryName:    "China",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       85,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^[A-Z]{2}\d{9}CN$`),
+			Validator:      validateUPUS10,
+			Description:    "China Post UPU S10 tracking format",
+		},
+
+		// 6b. China Post Domestic 13-digit barcode
+		{
+			CarrierSlug:    "china-post",
+			CarrierName:    "China Post",
+			Country:        "CN",
+			CountryName:    "China",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       79,
+			ConfidenceBase: 0.88,
+			Regex:          regexp.MustCompile(`^(10|11|98|99)\d{11}$`),
+			Description:    "China Post domestic 13-digit barcode",
+		},
+
+		// 6c. Hong Kong Post UPU S10
+		{
+			CarrierSlug:    "hongkong-post",
+			CarrierName:    "Hong Kong Post",
+			Country:        "HK",
+			CountryName:    "Hong Kong",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       85,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^[A-Z]{2}\d{9}HK$`),
+			Validator:      validateUPUS10,
+			Description:    "Hong Kong Post UPU S10 tracking format",
+		},
+
+		// 6d. SF Express (SF prefix)
+		{
+			CarrierSlug:    "sf-express",
+			CarrierName:    "SF Express",
+			Country:        "CN",
+			CountryName:    "China",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       86,
+			ConfidenceBase: 0.95,
+			Regex:          regexp.MustCompile(`^SF\d{12,14}$`),
+			Description:    "SF Express standard tracking (SF prefix)",
+		},
+
+		// 6e. SF Express Domestic (15 digits)
+		{
+			CarrierSlug:    "sf-express",
+			CarrierName:    "SF Express",
+			Country:        "CN",
+			CountryName:    "China",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       75,
+			ConfidenceBase: 0.82,
+			Regex:          regexp.MustCompile(`^\d{15}$`),
+			Description:    "SF Express domestic 15-digit barcode",
+		},
+
+		// 6f. Yanwen Logistics
+		{
+			CarrierSlug:    "yanwen",
+			CarrierName:    "Yanwen Logistics",
+			Country:        "CN",
+			CountryName:    "China",
+			CarrierType:    models.CarrierTypeCrossBorder,
+			Priority:       86,
+			ConfidenceBase: 0.95,
+			Regex:          regexp.MustCompile(`^((UD|VR|LP|UB|UV|YT)\d{9}YP|YW\d{11,15})$`),
+			Description:    "Yanwen Logistics cross-border tracking format",
+		},
+
+		// 6g. SunYou / Sytrack
+		{
+			CarrierSlug:    "sytrack",
+			CarrierName:    "SunYou - Sytrack",
+			Country:        "CN",
+			CountryName:    "China",
+			CarrierType:    models.CarrierTypeCrossBorder,
+			Priority:       85,
+			ConfidenceBase: 0.95,
+			Regex:          regexp.MustCompile(`^(SY\d{11,13}|SY[A-Z]{2,4}\d{8,14}|LP\d{14}SY)$`),
+			Description:    "SunYou / Sytrack tracking format",
+		},
+
+		// 6h. CNE Express
+		{
+			CarrierSlug:    "cne-express",
+			CarrierName:    "CNE Express",
+			Country:        "CN",
+			CountryName:    "China",
+			CarrierType:    models.CarrierTypeCrossBorder,
+			Priority:       85,
+			ConfidenceBase: 0.94,
+			Regex:          regexp.MustCompile(`^(3A[0-9A-Z]{10,16}|CNE\d{10,14})$`),
+			Description:    "CNE Express cross-border tracking format",
+		},
+
+		// 6i. YTO Express
+		{
+			CarrierSlug:    "yto-express",
+			CarrierName:    "YTO Express",
+			Country:        "CN",
+			CountryName:    "China",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       82,
+			ConfidenceBase: 0.90,
+			Regex:          regexp.MustCompile(`^(YT\d{10,13}|DD\d{10,13}|8\d{11,13})$`),
+			Description:    "YTO Express domestic/international barcode",
+		},
+
+		// 6j. ZTO International / Asia
+		{
+			CarrierSlug:    "zto-international",
+			CarrierName:    "ZTO International",
+			Country:        "CN",
+			CountryName:    "China",
+			CarrierType:    models.CarrierTypeCrossBorder,
+			Priority:       82,
+			ConfidenceBase: 0.90,
+			Regex:          regexp.MustCompile(`^(ZTO\d{10,14}|7\d{11,13})$`),
+			Description:    "ZTO Express / International tracking number",
+		},
+
+		// 6k. Deppon Logistics
+		{
+			CarrierSlug:    "deppon",
+			CarrierName:    "Deppon",
+			Country:        "CN",
+			CountryName:    "China",
+			CarrierType:    models.CarrierTypeLogistics,
+			Priority:       84,
+			ConfidenceBase: 0.92,
+			Regex:          regexp.MustCompile(`^DPK\d{11,14}$`),
+			Description:    "Deppon Logistics DPK barcode",
+		},
+
+		// 6l. JD Logistics
+		{
+			CarrierSlug:    "jdl-cn",
+			CarrierName:    "JD Logistics",
+			Country:        "CN",
+			CountryName:    "China",
+			CarrierType:    models.CarrierTypeLogistics,
+			Priority:       83,
+			ConfidenceBase: 0.91,
+			Regex:          regexp.MustCompile(`^(JD\d{10,14}|JDX\d{10,14})$`),
+			Description:    "JD Logistics tracking number",
+		},
+
+		// 6m. Cirro
+		{
+			CarrierSlug:    "cirro",
+			CarrierName:    "Cirro",
+			Country:        "CN",
+			CountryName:    "China",
+			CarrierType:    models.CarrierTypeCrossBorder,
+			Priority:       83,
+			ConfidenceBase: 0.90,
+			Regex:          regexp.MustCompile(`^(CIR\d{10,14}|LL\d{9}CN)$`),
+			Description:    "Cirro cross-border tracking format",
+		},
+
+		// 6n. SendFromChina (SFC)
+		{
+			CarrierSlug:    "sfc-service",
+			CarrierName:    "SFC - SendFromChina",
+			Country:        "CN",
+			CountryName:    "China",
+			CarrierType:    models.CarrierTypeCrossBorder,
+			Priority:       82,
+			ConfidenceBase: 0.89,
+			Regex:          regexp.MustCompile(`^SFC[0-9A-Z]{10,16}$`),
+			Description:    "SendFromChina tracking number",
+		},
+
+		// 6o. CXC Express HK
+		{
+			CarrierSlug:    "cxc-express-hk",
+			CarrierName:    "CXC Express Hong Kong",
+			Country:        "HK",
+			CountryName:    "Hong Kong",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       82,
+			ConfidenceBase: 0.89,
+			Regex:          regexp.MustCompile(`^CXC\d{10,14}$`),
+			Description:    "CXC Express Hong Kong tracking number",
 		},
 
 		// 7. Correos España (UPU S10 ending in ES)
