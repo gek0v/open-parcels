@@ -34,11 +34,21 @@ func TestRegistry(t *testing.T) {
 		t.Fatalf("expected cainiao carrier to be found")
 	}
 
+	// Verify APAC carriers from Issue #3
+	for _, slug := range []string{"australia-post", "japan-post", "korea-post", "india-post", "singapore-post", "new-zealand-post", "ninja-van", "delhivery", "bluedart", "yamato-japan", "sagawa-jp"} {
+		c, ok := reg.Get(slug)
+		if !ok || c == nil {
+			t.Errorf("expected APAC carrier %s to be registered", slug)
+		}
+	}
+
 	// Verify global carriers from Issue #2
 	for _, slug := range []string{"speedpak", "pitney-bowes", "aramex", "landmark-global", "wanbexpress", "winit", "ceva-logistics", "dsv"} {
 		c, ok := reg.Get(slug)
 		if !ok || c == nil {
 			t.Errorf("expected global carrier %s to be registered", slug)
+		}
+	}
 		}
 	}
 

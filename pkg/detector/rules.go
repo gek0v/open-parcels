@@ -804,6 +804,116 @@ func (d *Detector) initRules() {
 			Description:    "UPU S10 Standard International Postal barcode",
 		},
 
+		// 31. Australia Post UPU S10
+		{
+			CarrierSlug:    "australia-post",
+			CarrierName:    "Australia Post",
+			Country:        "AU",
+			CountryName:    "Australia",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       86,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^[A-Z]{2}\d{9}AU$`),
+			Validator:      validateUPUS10,
+			Description:    "Australia Post UPU S10 tracking format",
+		},
+
+		// 32. Japan Post UPU S10
+		{
+			CarrierSlug:    "japan-post",
+			CarrierName:    "Japan Post",
+			Country:        "JP",
+			CountryName:    "Japan",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       86,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^[A-Z]{2}\d{9}JP$`),
+			Validator:      validateUPUS10,
+			Description:    "Japan Post UPU S10 tracking format",
+		},
+
+		// 33. Korea Post UPU S10
+		{
+			CarrierSlug:    "korea-post",
+			CarrierName:    "Korea Post",
+			Country:        "KR",
+			CountryName:    "South Korea",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       86,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^[A-Z]{2}\d{9}KR$`),
+			Validator:      validateUPUS10,
+			Description:    "Korea Post UPU S10 tracking format",
+		},
+
+		// 34. India Post UPU S10
+		{
+			CarrierSlug:    "india-post",
+			CarrierName:    "India Post",
+			Country:        "IN",
+			CountryName:    "India",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       86,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^[A-Z]{2}\d{9}IN$`),
+			Validator:      validateUPUS10,
+			Description:    "India Post UPU S10 tracking format",
+		},
+
+		// 35. Singapore Post UPU S10
+		{
+			CarrierSlug:    "singapore-post",
+			CarrierName:    "Singapore Post",
+			Country:        "SG",
+			CountryName:    "Singapore",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       86,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^[A-Z]{2}\d{9}SG$`),
+			Validator:      validateUPUS10,
+			Description:    "Singapore Post UPU S10 tracking format",
+		},
+
+		// 36. New Zealand Post UPU S10
+		{
+			CarrierSlug:    "new-zealand-post",
+			CarrierName:    "New Zealand Post",
+			Country:        "NZ",
+			CountryName:    "New Zealand",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       86,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^[A-Z]{2}\d{9}NZ$`),
+			Validator:      validateUPUS10,
+			Description:    "New Zealand Post UPU S10 tracking format",
+		},
+
+		// 37. Ninja Van
+		{
+			CarrierSlug:    "ninja-van",
+			CarrierName:    "Ninja Van",
+			Country:        "SG",
+			CountryName:    "Singapore",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       85,
+			ConfidenceBase: 0.94,
+			Regex:          regexp.MustCompile(`^(NIN|NINJA|NVAU|NVSG|NVPH|NVMY)[0-9A-Z]{8,16}$`),
+			Description:    "Ninja Van southeast asia parcel format",
+		},
+
+		// 38. Delhivery
+		{
+			CarrierSlug:    "delhivery",
+			CarrierName:    "Delhivery",
+			Country:        "IN",
+			CountryName:    "India",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       84,
+			ConfidenceBase: 0.93,
+			Regex:          regexp.MustCompile(`^(DEL|DLV)\d{10,14}$`),
+			Description:    "Delhivery express barcode",
+		},
+
 		// Global Cross-Border carriers (Issue #2)
 		{
 			CarrierSlug:    "speedpak",
@@ -1118,7 +1228,6 @@ func (d *Detector) initRules() {
 			ConfidenceBase: 0.94,
 			Regex:          regexp.MustCompile(`^(JJD\d{16,18}|JJ\d{16}|0034043\d{11})$`),
 			Description:    "DHL Parcel Spain barcode format",
-		},
 		},
 	}
 }
