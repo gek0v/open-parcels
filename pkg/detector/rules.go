@@ -804,6 +804,46 @@ func (d *Detector) initRules() {
 			Description:    "UPU S10 Standard International Postal barcode",
 		},
 
+		// France and Monaco carriers (Issue #10)
+		{
+			CarrierSlug:    "chronopost-france",
+			CarrierName:    "Chronopost France",
+			Country:        "FR",
+			CountryName:    "France",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       87,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^(XY|EE|EW|DB|DT)\d{9}FR$`),
+			Validator:      validateUPUS10,
+			Description:    "Chronopost France express barcode",
+		},
+
+		// 65. Colis Privé
+		{
+			CarrierSlug:    "colis-prive",
+			CarrierName:    "Colis Privé",
+			Country:        "FR",
+			CountryName:    "France",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       85,
+			ConfidenceBase: 0.94,
+			Regex:          regexp.MustCompile(`^(CP[0-9A-Z]{10,14}|\d{16})$`),
+			Description:    "Colis Privé delivery barcode",
+		},
+
+		// 66. Relais Colis
+		{
+			CarrierSlug:    "relais-colis",
+			CarrierName:    "Relais Colis",
+			Country:        "FR",
+			CountryName:    "France",
+			CarrierType:    models.CarrierTypeLogistics,
+			Priority:       85,
+			ConfidenceBase: 0.94,
+			Regex:          regexp.MustCompile(`^RC[0-9A-Z]{10,14}$`),
+			Description:    "Relais Colis parcel barcode",
+		},
+
 		// 55. Sweden Post (PostNord) UPU S10
 		{
 			CarrierSlug:    "sweden-post",

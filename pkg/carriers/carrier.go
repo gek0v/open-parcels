@@ -97,6 +97,9 @@ func registerDefaultCarriers(r *Registry) {
 	r.Register(NewColissimoCarrier())
 	r.Register(NewAirCargoCarrier())
 	r.Register(NewOceanContainerCarrier())
+	// Register France and Monaco regional catalog (22 carriers - Issue #10)
+	registerFranceCatalog(r)
+
 	// Register global air cargo catalog (136 airlines - Issue #8)
 	registerAirCargoCatalog(r)
 
