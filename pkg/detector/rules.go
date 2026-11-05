@@ -1119,6 +1119,5 @@ func (d *Detector) initRules() {
 			Regex:          regexp.MustCompile(`^(JJD\d{16,18}|JJ\d{16}|0034043\d{11})$`),
 			Description:    "DHL Parcel Spain barcode format",
 		},
-		},
 	}
 }
