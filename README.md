@@ -8,7 +8,8 @@
 
 1. **Detección Automática de Transportistas (Carrier Auto-Detection Engine)**:
    - Identificación inteligente basada en expresiones regulares, longitudes fijas, prefijos y validadores de suma de comprobación (Luhn, Modulo 7, Modulo 10, UPU S10, ISO 6346).
-   - Soporte para más de 20 operadores globales y locales: **Cainiao / AliExpress**, **Correos España**, **Correos Express**, **GLS**, **CTT Express**, **SEUR**, **Paack**, **MRW**, **InPost / Mondial Relay**, **DHL (Express & Parcel)**, **UPS**, **FedEx**, **USPS**, **YunExpress**, **4PX**, **Royal Mail**, **Colissimo**, **IATA Air Cargo (AWB)** y **Contenedores Marítimos (ISO 6346)**.
+   - Catálogo completo para España 🇪🇸 (24 operadores): **Correos España**, **Correos Express**, **SEUR**, **MRW**, **Nacex**, **GLS Spain (ASM)**, **TIPSA**, **Zeleris**, **Envialia**, **Ontime**, **Paack**, **Celeritas**, **Sending**, **Packlink**, **Redur (Spain, Ref, Tracking)**, **InPost Spain**, **DHL Parcel Spain**, **Asendia Spain**, **Asigna**, **Activos24**, **Instapack**, **Mail Boxes Etc. Spain**.
+   - Soporte para operadores globales y transfronterizos: **Cainiao / AliExpress**, **GLS Global**, **CTT Express**, **InPost / Mondial Relay**, **DHL (Express & Parcel)**, **UPS**, **FedEx**, **USPS**, **YunExpress**, **4PX**, **Royal Mail**, **Colissimo**, **IATA Air Cargo (AWB)** y **Contenedores Marítimos (ISO 6346)**.
    - Puntuación de confianza (0.0 a 1.0) y refuerzo heurístico mediante pista de país de destino.
 
 2. **Encadenamiento y Fusión Multitransportista (Multi-Carrier Journey & Event Merging)**:

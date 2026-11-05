@@ -17,19 +17,39 @@ func TestDetector(t *testing.T) {
 		{"YunExpress YT", "YT2401234567890123", "", "yunexpress"},
 		{"Cainiao LP", "LP00561234567890", "ES", "cainiao"},
 		{"Cainiao CNESP", "CNESP0012345678", "ES", "cainiao"},
-		{"Correos Express 16 digits", "6900123456789012", "ES", "correos-express"},
+		{"Correos Express 16 digits", "6900123456789012", "ES", "correosexpress"},
 		{"CTT Express", "0001234567890123456789", "ES", "ctt-express"},
 		{"SEUR 14 digits", "36150127630406", "ES", "seur"},
 		{"USPS 22 digits", "9400111206213785678901", "US", "usps"},
 		{"FedEx 12 digits", "123456789012", "US", "fedex"},
 		{"DHL Express 10 digits", "1234567890", "", "dhl-express"},
 		{"DHL Parcel GM", "GM5551234567890123", "DE", "dhl-parcel"},
+		{"DHL Parcel Spain", "JJD0000123456789012", "ES", "dhl-parcel-es"},
 		{"Air Cargo AWB", "157-52471764", "", "air-cargo"},
 		{"Ocean Container", "MRKU4656243", "", "ocean-container"},
 		{"Paack", "PCK98765432101", "ES", "paack"},
-		{"Correos Spain UPU S10", "PQ4F6P07000000000000000", "ES", "correos-spain"},
+		{"Correos Spain Domestic", "PQ4F6P07000000000000000", "ES", "correos-spain"},
 		{"Royal Mail UPU", "RN123456789GB", "GB", "royal-mail"},
 		{"Colissimo", "6A12345678901", "FR", "colissimo"},
+		{"Nacex Spain", "NCX123456789", "ES", "nacex-spain"},
+		{"TIPSA", "TIP123456789", "ES", "tipsa"},
+		{"Zeleris", "ZEL123456789", "ES", "zeleris"},
+		{"Sending", "SND123456789", "ES", "sending-es"},
+		{"Celeritas", "CEL123456789", "ES", "celeritas"},
+		{"Envialia", "ENV123456789", "ES", "envialia"},
+		{"GLS Spain (ASM)", "ASM123456789", "ES", "asm-gls-spain"},
+		{"Ontime", "ONT123456789", "ES", "ontime"},
+		{"Packlink", "PL123456789", "ES", "packlink"},
+		{"Asendia Spain", "AE123456789", "ES", "asendia-es"},
+		{"Asigna", "ASG123456789", "ES", "asigna-es"},
+		{"Activos24", "ACT123456789", "ES", "activos24"},
+		{"Instapack", "IPK123456789", "ES", "instapack-es"},
+		{"Mail Boxes Etc.", "MBE123456789", "ES", "mbe-es"},
+		{"Redur Spain", "RDR123456789", "ES", "redur-spain"},
+		{"Redur Spain Ref", "REF123456789", "ES", "redur-spain-ref"},
+		{"Redur Tracking", "RD1234567890", "ES", "redur-tracking"},
+		{"InPost Spain", "612345678901234567890123", "ES", "inpost-es"},
+		{"MRW Spain 12 digits", "123456789012", "ES", "mrw-spain"},
 	}
 
 	for _, tt := range tests {
@@ -55,12 +75,12 @@ func TestDetectorCandidates(t *testing.T) {
 	// For ES hint, MRW or Spanish carriers should be prioritized or present
 	foundMRW := false
 	for _, c := range candidates {
-		if c.Carrier.Slug == "mrw" {
+		if c.Carrier.Slug == "mrw-spain" || c.Carrier.Slug == "mrw" {
 			foundMRW = true
 			break
 		}
 	}
 	if !foundMRW {
-		t.Errorf("expected mrw in candidates for 12 digits with ES hint")
+		t.Errorf("expected mrw-spain in candidates for 12 digits with ES hint")
 	}
 }
