@@ -804,6 +804,98 @@ func (d *Detector) initRules() {
 			Description:    "UPU S10 Standard International Postal barcode",
 		},
 
+		// 48. Canada Post UPU S10
+		{
+			CarrierSlug:    "canada-post",
+			CarrierName:    "Canada Post",
+			Country:        "CA",
+			CountryName:    "Canada",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       86,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^[A-Z]{2}\d{9}CA$`),
+			Validator:      validateUPUS10,
+			Description:    "Canada Post UPU S10 tracking format",
+		},
+
+		// 49. Canada Post 16-digit barcode
+		{
+			CarrierSlug:    "canada-post",
+			CarrierName:    "Canada Post",
+			Country:        "CA",
+			CountryName:    "Canada",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       81,
+			ConfidenceBase: 0.90,
+			Regex:          regexp.MustCompile(`^\d{16}$`),
+			Description:    "Canada Post domestic 16-digit barcode",
+		},
+
+		// 50. Purolator
+		{
+			CarrierSlug:    "purolator",
+			CarrierName:    "Purolator",
+			Country:        "CA",
+			CountryName:    "Canada",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       84,
+			ConfidenceBase: 0.92,
+			Regex:          regexp.MustCompile(`^(PIN\d{9,12}|[0-9A-Z]{12})$`),
+			Description:    "Purolator PIN parcel tracking number",
+		},
+
+		// 51. Canpar
+		{
+			CarrierSlug:    "canpar",
+			CarrierName:    "Canpar",
+			Country:        "CA",
+			CountryName:    "Canada",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       84,
+			ConfidenceBase: 0.92,
+			Regex:          regexp.MustCompile(`^(D\d{10}|[A-Z]\d{10}|\d{11})$`),
+			Description:    "Canpar courier tracking barcode",
+		},
+
+		// 52. OnTrac
+		{
+			CarrierSlug:    "ontrac",
+			CarrierName:    "OnTrac",
+			Country:        "US",
+			CountryName:    "United States",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       85,
+			ConfidenceBase: 0.94,
+			Regex:          regexp.MustCompile(`^[CD]\d{14}$`),
+			Description:    "OnTrac delivery barcode format",
+		},
+
+		// 53. Intelcom Express
+		{
+			CarrierSlug:    "intelcom-express",
+			CarrierName:    "Intelcom Express",
+			Country:        "CA",
+			CountryName:    "Canada",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       85,
+			ConfidenceBase: 0.94,
+			Regex:          regexp.MustCompile(`^(INTLC|IN)\d{8,12}$`),
+			Description:    "Intelcom Express Canada tracking code",
+		},
+
+		// 54. Chit Chats
+		{
+			CarrierSlug:    "chitchats",
+			CarrierName:    "Chit Chats",
+			Country:        "CA",
+			CountryName:    "Canada",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       85,
+			ConfidenceBase: 0.94,
+			Regex:          regexp.MustCompile(`^CC[0-9A-Z]{10,14}$`),
+			Description:    "Chit Chats parcel tracking number",
+		},
+
 		// 39. Poland Post (Poczta Polska) UPU S10
 		{
 			CarrierSlug:    "poland-post",
