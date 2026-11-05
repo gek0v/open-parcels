@@ -50,6 +50,10 @@ func TestDetector(t *testing.T) {
 		{"Redur Tracking", "RD1234567890", "ES", "redur-tracking"},
 		{"InPost Spain", "612345678901234567890123", "ES", "inpost-es"},
 		{"MRW Spain 12 digits", "123456789012", "ES", "mrw-spain"},
+		{"Portugal Post CTT UPU", "DA123456785PT", "PT", "portugal-post"},
+		{"DPD Portugal", "09801234567890", "PT", "dpd-portugal"},
+		{"Delnext", "DLN123456789PT", "PT", "delnext"},
+		{"WePickUp", "WPU123456789", "PT", "wepickup-pt"},
 	}
 
 	for _, tt := range tests {

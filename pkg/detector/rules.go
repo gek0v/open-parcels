@@ -313,7 +313,74 @@ func (d *Detector) initRules() {
 			Description:    "InPost Locker / Mondial Relay parcel number",
 		},
 
-		// 24. General UPU S10 International Postal
+		// 24. Portugal Post (CTT Correios de Portugal - UPU S10 ending in PT)
+		{
+			CarrierSlug:    "portugal-post",
+			CarrierName:    "Portugal Post - CTT",
+			Country:        "PT",
+			CountryName:    "Portugal",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       85,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^[A-Z]{2}\d{9}PT$`),
+			Validator:      validateUPUS10,
+			Description:    "Portugal Post CTT UPU S10 postal format (XX123456789PT)",
+		},
+
+		// 25. Portugal Post Domestic Format
+		{
+			CarrierSlug:    "portugal-post",
+			CarrierName:    "Portugal Post - CTT",
+			Country:        "PT",
+			CountryName:    "Portugal",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       82,
+			ConfidenceBase: 0.93,
+			Regex:          regexp.MustCompile(`^(DA|RA|LX|EM|CO|RH)\d{9}PT$`),
+			Validator:      validateUPUS10,
+			Description:    "Portugal Post domestic express/registered barcode",
+		},
+
+		// 26. DPD Portugal
+		{
+			CarrierSlug:    "dpd-portugal",
+			CarrierName:    "DPD Portugal",
+			Country:        "PT",
+			CountryName:    "Portugal",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       80,
+			ConfidenceBase: 0.90,
+			Regex:          regexp.MustCompile(`^(098|099|058)\d{11}$|^098\d{8}$`),
+			Description:    "DPD Portugal parcel tracking format (098, 099, 058)",
+		},
+
+		// 27. Delnext
+		{
+			CarrierSlug:    "delnext",
+			CarrierName:    "Delnext",
+			Country:        "PT",
+			CountryName:    "Portugal",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       80,
+			ConfidenceBase: 0.90,
+			Regex:          regexp.MustCompile(`^(DLN|DLX)[0-9A-Z]{7,13}$|^DLN\d{8,12}$`),
+			Description:    "Delnext Portugal tracking number (DLN/DLX prefix)",
+		},
+
+		// 28. WePickUp
+		{
+			CarrierSlug:    "wepickup-pt",
+			CarrierName:    "WePickUp",
+			Country:        "PT",
+			CountryName:    "Portugal",
+			CarrierType:    models.CarrierTypeLogistics,
+			Priority:       82,
+			ConfidenceBase: 0.92,
+			Regex:          regexp.MustCompile(`^WPU[0-9A-Z]{8,14}$`),
+			Description:    "WePickUp locker & PUDO network tracking number (WPU prefix)",
+		},
+
+		// 29. General UPU S10 International Postal
 		{
 			CarrierSlug:    "upu-s10",
 			CarrierName:    "Universal Postal Union (UPU S10)",
