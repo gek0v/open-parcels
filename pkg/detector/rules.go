@@ -963,7 +963,7 @@ func (d *Detector) initRules() {
 			CarrierType:    models.CarrierTypeExpress,
 			Priority:       84,
 			ConfidenceBase: 0.92,
-			Regex:          regexp.MustCompile(`^(PIN\d{9,12}|[0-9A-Z]{12})$`),
+			Regex:          regexp.MustCompile(`^(PIN\d{9,12}|\d{12})$`),
 			Description:    "Purolator PIN parcel tracking number",
 		},
 

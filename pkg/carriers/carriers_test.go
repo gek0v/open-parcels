@@ -73,8 +73,6 @@ func TestRegistry(t *testing.T) {
 			t.Errorf("expected global carrier %s to be registered", slug)
 		}
 	}
-		}
-	}
 
 	shipment, err := cainiao.Track(context.Background(), "LP00561234567890", models.TrackOptions{Language: "en"})
 	if err != nil {
