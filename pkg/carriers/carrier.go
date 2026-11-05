@@ -47,15 +47,38 @@ func GetRegistry() *Registry {
 func registerDefaultCarriers(r *Registry) {
 	r.Register(NewCainiaoCarrier())
 	r.Register(NewCorreosSpainCarrier())
-	r.Register(NewCorreosExpressCarrier())
+
+	correosExpress := NewCorreosExpressCarrier()
+	r.Register(correosExpress)
+	r.RegisterAlias("correos-express", correosExpress)
+
 	r.Register(NewCTTExpressCarrier())
 	r.Register(NewDHLExpressCarrier())
-	r.Register(NewDHLParcelCarrier())
+
+	dhlParcel := NewDHLParcelCarrier()
+	r.Register(dhlParcel)
+	r.RegisterAlias("dhl-parcel", dhlParcel)
+
+	r.Register(NewDHLParcelSpainCarrier())
 	r.Register(NewFedExCarrier())
 	r.Register(NewFourPXCarrier())
-	r.Register(NewGLSCarrier())
-	r.Register(NewInPostCarrier())
-	r.Register(NewMRWCarrier())
+
+	gls := NewGLSCarrier()
+	r.Register(gls)
+	r.RegisterAlias("gls", gls)
+
+	r.Register(NewGLSSpainCarrier())
+
+	inpost := NewInPostCarrier()
+	r.Register(inpost)
+	r.RegisterAlias("inpost", inpost)
+
+	r.Register(NewInPostSpainCarrier())
+
+	mrw := NewMRWCarrier()
+	r.Register(mrw)
+	r.RegisterAlias("mrw", mrw)
+
 	r.Register(NewPaackCarrier())
 	r.Register(NewSEURCarrier())
 	r.Register(NewUPSCarrier())
@@ -65,8 +88,7 @@ func registerDefaultCarriers(r *Registry) {
 	r.Register(NewColissimoCarrier())
 	r.Register(NewAirCargoCarrier())
 	r.Register(NewOceanContainerCarrier())
-
-	// Italy & San Marino carriers
+	// Italy & San Marino carriers (Issue #9)
 	r.Register(NewBRTBartoliniCarrier())
 	r.Register(NewBRTItalyParcelIDCarrier())
 	r.Register(NewMyBRTCarrier())
@@ -86,6 +108,30 @@ func registerDefaultCarriers(r *Registry) {
 	r.Register(NewRhenusITCarrier())
 	r.Register(NewSpediamoITCarrier())
 	r.Register(NewUnieuroITCarrier())
+
+	// Spanish carriers (Issue #7)
+	r.Register(NewActivos24Carrier())
+	r.Register(NewAsendiaSpainCarrier())
+	r.Register(NewAsignaCarrier())
+	r.Register(NewCeleritasCarrier())
+	r.Register(NewEnvialiaCarrier())
+	r.Register(NewInstapackCarrier())
+	r.Register(NewMBESpainCarrier())
+	r.Register(NewNacexCarrier())
+	r.Register(NewOntimeCarrier())
+	r.Register(NewPacklinkCarrier())
+	r.Register(NewRedurSpainCarrier())
+	r.Register(NewRedurSpainRefCarrier())
+	r.Register(NewRedurTrackingCarrier())
+	r.Register(NewSendingCarrier())
+	r.Register(NewTipsaCarrier())
+	r.Register(NewZelerisCarrier())
+
+	// Portugal carriers (Issue #17)
+	r.Register(NewDelnextCarrier())
+	r.Register(NewDPDPortugalCarrier())
+	r.Register(NewPortugalPostCarrier())
+	r.Register(NewWePickUpCarrier())
 }
 
 // Register adds a carrier to the registry.
@@ -93,6 +139,13 @@ func (r *Registry) Register(c Carrier) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.carriers[strings.ToLower(c.Slug())] = c
+}
+
+// RegisterAlias registers an alternative slug pointing to the same Carrier.
+func (r *Registry) RegisterAlias(alias string, c Carrier) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.carriers[strings.ToLower(alias)] = c
 }
 
 // Get finds a carrier by its slug.
@@ -110,8 +163,13 @@ func (r *Registry) List(query string) []models.CarrierInfo {
 
 	q := strings.ToLower(strings.TrimSpace(query))
 	var list []models.CarrierInfo
+	seen := make(map[string]bool)
 
 	for _, c := range r.carriers {
+		if seen[c.Slug()] {
+			continue
+		}
+		seen[c.Slug()] = true
 		info := c.Info()
 		if q == "" || strings.Contains(strings.ToLower(info.Slug), q) ||
 			strings.Contains(strings.ToLower(info.Name), q) ||
