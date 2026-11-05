@@ -804,6 +804,131 @@ func (d *Detector) initRules() {
 			Description:    "UPU S10 Standard International Postal barcode",
 		},
 
+		// MENA & Africa carriers (Issue #12)
+		{
+			CarrierSlug:    "emirates-post-group",
+			CarrierName:    "Emirates Post",
+			Country:        "AE",
+			CountryName:    "United Arab Emirates",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       86,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^[A-Z]{2}\d{9}AE$`),
+			Validator:      validateUPUS10,
+			Description:    "Emirates Post UPU S10 tracking format",
+		},
+
+		// 73. Saudi Post (SPL) UPU S10
+		{
+			CarrierSlug:    "saudi-post",
+			CarrierName:    "Saudi Post (SPL)",
+			Country:        "SA",
+			CountryName:    "Saudi Arabia",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       86,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^[A-Z]{2}\d{9}SA$`),
+			Validator:      validateUPUS10,
+			Description:    "Saudi Post (SPL) UPU S10 format",
+		},
+
+		// 74. Turkey Post (PTT) UPU S10
+		{
+			CarrierSlug:    "turkey-post",
+			CarrierName:    "Turkey Post (PTT)",
+			Country:        "TR",
+			CountryName:    "Turkey",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       86,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^[A-Z]{2}\d{9}TR$`),
+			Validator:      validateUPUS10,
+			Description:    "Turkey Post (PTT) UPU S10 format",
+		},
+
+		// 75. Israel Post UPU S10
+		{
+			CarrierSlug:    "israel-post",
+			CarrierName:    "Israel Post",
+			Country:        "IL",
+			CountryName:    "Israel",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       86,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^[A-Z]{2}\d{9}IL$`),
+			Validator:      validateUPUS10,
+			Description:    "Israel Post UPU S10 tracking format",
+		},
+
+		// 76. South Africa Post Office UPU S10
+		{
+			CarrierSlug:    "south-africa-post",
+			CarrierName:    "South Africa Post",
+			Country:        "ZA",
+			CountryName:    "South Africa",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       86,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^[A-Z]{2}\d{9}ZA$`),
+			Validator:      validateUPUS10,
+			Description:    "South Africa Post UPU S10 tracking format",
+		},
+
+		// 77. Egypt Post UPU S10
+		{
+			CarrierSlug:    "egypt-post",
+			CarrierName:    "Egypt Post",
+			Country:        "EG",
+			CountryName:    "Egypt",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       86,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^[A-Z]{2}\d{9}EG$`),
+			Validator:      validateUPUS10,
+			Description:    "Egypt Post UPU S10 tracking format",
+		},
+
+		// 78. Morocco Post UPU S10
+		{
+			CarrierSlug:    "morocco-post",
+			CarrierName:    "Morocco Post",
+			Country:        "MA",
+			CountryName:    "Morocco",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       86,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^[A-Z]{2}\d{9}MA$`),
+			Validator:      validateUPUS10,
+			Description:    "Morocco Post UPU S10 tracking format",
+		},
+
+		// 79. KazPost UPU S10
+		{
+			CarrierSlug:    "kazpost",
+			CarrierName:    "KazPost",
+			Country:        "KZ",
+			CountryName:    "Kazakhstan",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       86,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^[A-Z]{2}\d{9}KZ$`),
+			Validator:      validateUPUS10,
+			Description:    "KazPost Kazakhstan UPU S10 format",
+		},
+
+		// 80. Naqel Express
+		{
+			CarrierSlug:    "naqel-express",
+			CarrierName:    "Naqel Express",
+			Country:        "SA",
+			CountryName:    "Saudi Arabia",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       85,
+			ConfidenceBase: 0.94,
+			Regex:          regexp.MustCompile(`^NQ\d{8,12}$`),
+			Description:    "Naqel Express shipment barcode",
+		},
+
 		// UK and Ireland carriers (Issue #11)
 		{
 			CarrierSlug:    "anpost",
