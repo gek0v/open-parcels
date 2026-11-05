@@ -254,8 +254,8 @@ func (d *Detector) initRules() {
 			Country:        "GLOBAL",
 			CountryName:    "Global",
 			CarrierType:    models.CarrierTypeExpress,
-			Priority:       76,
-			ConfidenceBase: 0.88,
+			Priority:       78,
+			ConfidenceBase: 0.90,
 			Regex:          regexp.MustCompile(`^\d{10}$`),
 			Description:    "DHL Express 10-digit Air Waybill / Tracking Number",
 		},
@@ -325,6 +325,84 @@ func (d *Detector) initRules() {
 			Regex:          regexp.MustCompile(`^[A-Z]{2}\d{9}[A-Z]{2}$`),
 			Validator:      validateUPUS10,
 			Description:    "UPU S10 Standard International Postal barcode",
+		},
+
+		// 25. SpeedPAK (Orange Connex cross-border)
+		{
+			CarrierSlug:    "speedpak",
+			CarrierName:    "SpeedPAK",
+			Country:        "GLOBAL",
+			CountryName:    "International",
+			CarrierType:    models.CarrierTypeCrossBorder,
+			Priority:       87,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^(EE|ES)\d{16}$`),
+			Description:    "SpeedPAK Orange Connex tracking format (EE/ES prefix)",
+		},
+
+		// 26. Pitney Bowes / eBay Global Shipping
+		{
+			CarrierSlug:    "pitney-bowes",
+			CarrierName:    "Pitney Bowes",
+			Country:        "GLOBAL",
+			CountryName:    "International",
+			CarrierType:    models.CarrierTypeLogistics,
+			Priority:       86,
+			ConfidenceBase: 0.95,
+			Regex:          regexp.MustCompile(`^(UPAAB|PB|PBI)\d{10,16}$`),
+			Description:    "Pitney Bowes Global Shipping Program barcode",
+		},
+
+		// 27. Aramex
+		{
+			CarrierSlug:    "aramex",
+			CarrierName:    "Aramex",
+			Country:        "GLOBAL",
+			CountryName:    "International",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       74,
+			ConfidenceBase: 0.86,
+			Regex:          regexp.MustCompile(`^(AWB\d{8,11}|\d{11})$`),
+			Description:    "Aramex international waybill barcode",
+		},
+
+		// 28. Landmark Global
+		{
+			CarrierSlug:    "landmark-global",
+			CarrierName:    "Landmark Global",
+			Country:        "GLOBAL",
+			CountryName:    "International",
+			CarrierType:    models.CarrierTypeCrossBorder,
+			Priority:       85,
+			ConfidenceBase: 0.94,
+			Regex:          regexp.MustCompile(`^(LTN|LDN)\d{8,12}$`),
+			Description:    "Landmark Global tracking format",
+		},
+
+		// 29. WanbExpress
+		{
+			CarrierSlug:    "wanbexpress",
+			CarrierName:    "WANBExpress",
+			Country:        "GLOBAL",
+			CountryName:    "International",
+			CarrierType:    models.CarrierTypeCrossBorder,
+			Priority:       85,
+			ConfidenceBase: 0.94,
+			Regex:          regexp.MustCompile(`^WNB[0-9A-Z]{10,16}$`),
+			Description:    "WANBExpress cross-border format",
+		},
+
+		// 30. Winit
+		{
+			CarrierSlug:    "winit",
+			CarrierName:    "Winit",
+			Country:        "GLOBAL",
+			CountryName:    "International",
+			CarrierType:    models.CarrierTypeCrossBorder,
+			Priority:       84,
+			ConfidenceBase: 0.93,
+			Regex:          regexp.MustCompile(`^(ID|WN)\d{10,16}$`),
+			Description:    "Winit cross-border tracking number",
 		},
 	}
 }

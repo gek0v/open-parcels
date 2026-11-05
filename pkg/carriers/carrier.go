@@ -65,6 +65,8 @@ func registerDefaultCarriers(r *Registry) {
 	r.Register(NewColissimoCarrier())
 	r.Register(NewAirCargoCarrier())
 	r.Register(NewOceanContainerCarrier())
+	// Register the global cross-border and multinational catalog (595 carriers)
+	registerGlobalCrossBorderCatalog(r)
 }
 
 // Register adds a carrier to the registry.

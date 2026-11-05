@@ -19,6 +19,14 @@ func TestRegistry(t *testing.T) {
 		t.Fatalf("expected cainiao carrier to be found")
 	}
 
+	// Verify global carriers from Issue #2
+	for _, slug := range []string{"speedpak", "pitney-bowes", "aramex", "landmark-global", "wanbexpress", "winit", "ceva-logistics", "dsv"} {
+		c, ok := reg.Get(slug)
+		if !ok || c == nil {
+			t.Errorf("expected global carrier %s to be registered", slug)
+		}
+	}
+
 	shipment, err := cainiao.Track(context.Background(), "LP00561234567890", models.TrackOptions{Language: "en"})
 	if err != nil {
 		t.Fatalf("unexpected error tracking cainiao: %v", err)
