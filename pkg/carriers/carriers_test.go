@@ -34,6 +34,21 @@ func TestRegistry(t *testing.T) {
 		t.Fatalf("expected cainiao carrier to be found")
 	}
 
+	// Verify Air Cargo carriers from Issue #8
+	for _, slug := range []string{"qatar-airways-cargo", "emirates-skycargo", "lufthansa-cargo", "iberia-airlines-cargo", "british-airways-cargo", "turkish-airlines-cargo", "cathay-pacific-cargo"} {
+		c, ok := reg.Get(slug)
+		if !ok || c == nil {
+			continue
+		}
+		shp, err := c.Track(context.Background(), "157-52471764", models.TrackOptions{})
+		if err != nil {
+			t.Errorf("unexpected error tracking %s: %v", slug, err)
+		}
+		if shp == nil || len(shp.FlightLegs) == 0 {
+			t.Errorf("expected flight legs for %s", slug)
+		}
+	}
+
 	// Verify Nordic and Baltic carriers from Issue #6
 	for _, slug := range []string{"sweden-post", "posten-norway", "posti-finland", "omniva", "latvia-post", "post-litva", "iceland-post", "bring", "dao", "matkahuolto"} {
 		c, ok := reg.Get(slug)
