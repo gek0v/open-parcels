@@ -75,3 +75,35 @@ func TestEngineAirCargo(t *testing.T) {
 		t.Errorf("expected flight legs for air cargo tracking")
 	}
 }
+
+func TestEngineItalianTrackingAndLocalization(t *testing.T) {
+	eng := New()
+
+	shipment, err := eng.Track(context.Background(), "RA123456785IT", models.TrackOptions{
+		DestinationCountry: "IT",
+		Language:           "it",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error tracking Italian shipment: %v", err)
+	}
+
+	if shipment.Carrier.Slug != "poste-italiane" {
+		t.Errorf("expected carrier poste-italiane, got %s", shipment.Carrier.Slug)
+	}
+
+	if shipment.StatusText != "In consegna" {
+		t.Errorf("expected Italian localized status 'In consegna', got %s", shipment.StatusText)
+	}
+
+	// Verify normalizer for Italian events
+	status, stage := NormalizeEventStatus("Pacco consegnato al destinatario")
+	if status != models.StatusDelivered || stage != models.StageDelivery {
+		t.Errorf("expected Delivered/Delivery, got %s/%s", status, stage)
+	}
+
+	status, stage = NormalizeEventStatus("Spedizione in giacenza")
+	if status != models.StatusException || stage != models.StageException {
+		t.Errorf("expected Exception/Exception, got %s/%s", status, stage)
+	}
+}
+
