@@ -44,18 +44,50 @@ func GetRegistry() *Registry {
 	return defaultRegistry
 }
 
+// AliasCarrier wraps a Carrier under an alternative slug.
+type AliasCarrier struct {
+	Carrier
+	slug string
+}
+
+func (a *AliasCarrier) Slug() string { return a.slug }
+
 func registerDefaultCarriers(r *Registry) {
 	r.Register(NewCainiaoCarrier())
 	r.Register(NewCorreosSpainCarrier())
-	r.Register(NewCorreosExpressCarrier())
+
+	correosExpress := NewCorreosExpressCarrier()
+	r.Register(correosExpress)
+	r.RegisterAlias("correos-express", correosExpress)
+
 	r.Register(NewCTTExpressCarrier())
 	r.Register(NewDHLExpressCarrier())
-	r.Register(NewDHLParcelCarrier())
+
+	dhlParcel := NewDHLParcelCarrier()
+	r.Register(dhlParcel)
+	r.RegisterAlias("dhl-parcel", dhlParcel)
+
+	r.Register(NewDHLParcelSpainCarrier())
 	r.Register(NewFedExCarrier())
-	r.Register(NewFourPXCarrier())
-	r.Register(NewGLSCarrier())
-	r.Register(NewInPostCarrier())
-	r.Register(NewMRWCarrier())
+	fpx := NewFourPXCarrier()
+	r.Register(fpx)
+	r.RegisterAlias("four-px", fpx)
+
+	gls := NewGLSCarrier()
+	r.Register(gls)
+	r.RegisterAlias("gls", gls)
+
+	r.Register(NewGLSSpainCarrier())
+
+	inpost := NewInPostCarrier()
+	r.Register(inpost)
+	r.RegisterAlias("inpost", inpost)
+
+	r.Register(NewInPostSpainCarrier())
+
+	mrw := NewMRWCarrier()
+	r.Register(mrw)
+	r.RegisterAlias("mrw", mrw)
 	r.Register(NewPaackCarrier())
 	r.Register(NewSEURCarrier())
 	r.Register(NewUPSCarrier())
@@ -65,8 +97,101 @@ func registerDefaultCarriers(r *Registry) {
 	r.Register(NewColissimoCarrier())
 	r.Register(NewAirCargoCarrier())
 	r.Register(NewOceanContainerCarrier())
-	// Register Benelux regional catalog (18 carriers)
+	// Register Benelux regional catalog (18 carriers - Issue #16)
 	registerBeneluxCatalog(r)
+
+	// Register global ocean freight & container lines catalog (49 carriers - Issue #15)
+	registerOceanFreightCatalog(r)
+
+	// Register LATAM regional catalog (25 carriers - Issue #14)
+	registerLATAMCatalog(r)
+
+	// Register DACH region catalog (26 carriers - Issue #13)
+	registerDACHCatalog(r)
+
+	// Register Middle East & Africa regional catalog (57 carriers - Issue #12)
+	registerMENAAfricaCatalog(r)
+
+	// Register UK and Ireland regional catalog (38 carriers - Issue #11)
+	registerUKIrelandCatalog(r)
+
+	// Register France and Monaco regional catalog (22 carriers - Issue #10)
+	registerFranceCatalog(r)
+
+	// Register global air cargo catalog (136 airlines - Issue #8)
+	registerAirCargoCatalog(r)
+
+	// Register Nordic and Baltic regional catalog (23 carriers - Issue #6)
+	registerNordicBalticCatalog(r)
+
+	// Register North America regional catalog (42 carriers - Issue #5)
+	registerNorthAmericaCatalog(r)
+
+	// Register the Central & Eastern Europe and Balkans regional catalog (81 carriers - Issue #4)
+	registerCEECatalog(r)
+
+	// Register the Asia-Pacific regional catalog (125 carriers - Issue #3)
+	registerAPACCatalog(r)
+
+	// Register the global cross-border and multinational catalog (595 carriers - Issue #2)
+	registerGlobalCrossBorderCatalog(r)
+
+	// China & Hong Kong flagship carriers (Issue #1)
+	r.Register(NewChinaPostCarrier())
+	r.Register(NewSFExpressCarrier())
+	r.Register(NewHongKongPostCarrier())
+	r.Register(NewYanwenCarrier())
+	r.Register(NewSunYouCarrier())
+	r.Register(NewCNECarrier())
+	r.Register(NewDepponCarrier())
+	r.Register(NewYTOExpressCarrier())
+	// Register the full China & Hong Kong regional catalog (271 carriers)
+	registerChinaHongKongCatalog(r)
+
+	// Italy & San Marino carriers (Issue #9)
+	r.Register(NewBRTBartoliniCarrier())
+	r.Register(NewBRTItalyParcelIDCarrier())
+	r.Register(NewMyBRTCarrier())
+	r.Register(NewPosteItalianeCarrier())
+	r.Register(NewGLSItalyCarrier())
+	r.Register(NewInPostItalyCarrier())
+	r.Register(NewTNTItalyCarrier())
+	r.Register(NewAmazonItalyCarrier())
+	r.Register(NewSailpostCarrier())
+	r.Register(NewAlfredITCarrier())
+	r.Register(NewArcoSpedizioniCarrier())
+	r.Register(NewCEVAITCarrier())
+	r.Register(NewBDMITCarrier())
+	r.Register(NewDeliverITCarrier())
+	r.Register(NewLiccardiITCarrier())
+	r.Register(NewMBEITCarrier())
+	r.Register(NewRhenusITCarrier())
+	r.Register(NewSpediamoITCarrier())
+	r.Register(NewUnieuroITCarrier())
+
+	// Spanish carriers (Issue #7)
+	r.Register(NewActivos24Carrier())
+	r.Register(NewAsendiaSpainCarrier())
+	r.Register(NewAsignaCarrier())
+	r.Register(NewCeleritasCarrier())
+	r.Register(NewEnvialiaCarrier())
+	r.Register(NewInstapackCarrier())
+	r.Register(NewMBESpainCarrier())
+	r.Register(NewNacexCarrier())
+	r.Register(NewOntimeCarrier())
+	r.Register(NewPacklinkCarrier())
+	r.Register(NewRedurSpainCarrier())
+	r.Register(NewRedurSpainRefCarrier())
+	r.Register(NewRedurTrackingCarrier())
+	r.Register(NewSendingCarrier())
+	r.Register(NewTipsaCarrier())
+	r.Register(NewZelerisCarrier())
+
+	// Portugal carriers (Issue #17)
+	r.Register(NewDelnextCarrier())
+	r.Register(NewDPDPortugalCarrier())
+	r.Register(NewPortugalPostCarrier())
+	r.Register(NewWePickUpCarrier())
 }
 
 // Register adds a carrier to the registry.
@@ -74,6 +199,13 @@ func (r *Registry) Register(c Carrier) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.carriers[strings.ToLower(c.Slug())] = c
+}
+
+// RegisterAlias registers an alternative slug pointing to the same Carrier.
+func (r *Registry) RegisterAlias(alias string, c Carrier) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.carriers[strings.ToLower(alias)] = c
 }
 
 // Get finds a carrier by its slug.
@@ -91,8 +223,13 @@ func (r *Registry) List(query string) []models.CarrierInfo {
 
 	q := strings.ToLower(strings.TrimSpace(query))
 	var list []models.CarrierInfo
+	seen := make(map[string]bool)
 
 	for _, c := range r.carriers {
+		if seen[c.Slug()] {
+			continue
+		}
+		seen[c.Slug()] = true
 		info := c.Info()
 		if q == "" || strings.Contains(strings.ToLower(info.Slug), q) ||
 			strings.Contains(strings.ToLower(info.Name), q) ||
