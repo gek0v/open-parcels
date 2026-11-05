@@ -804,6 +804,72 @@ func (d *Detector) initRules() {
 			Description:    "UPU S10 Standard International Postal barcode",
 		},
 
+		// DACH carriers (Issue #13)
+		{
+			CarrierSlug:    "swiss-post",
+			CarrierName:    "Swiss Post",
+			Country:        "CH",
+			CountryName:    "Switzerland",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       86,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^[A-Z]{2}\d{9}CH$|^99\d{16}$`),
+			Description:    "Swiss Post tracking format (UPU S10 / 18-digit)",
+		},
+
+		// 82. Austria Post UPU S10
+		{
+			CarrierSlug:    "austria-mail",
+			CarrierName:    "Austrian Post",
+			Country:        "AT",
+			CountryName:    "Austria",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       86,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^[A-Z]{2}\d{9}AT$`),
+			Validator:      validateUPUS10,
+			Description:    "Austrian Post UPU S10 format",
+		},
+
+		// 83. Deutsche Post DHL Paket
+		{
+			CarrierSlug:    "deutsche-post",
+			CarrierName:    "Deutsche Post / DHL Paket",
+			Country:        "DE",
+			CountryName:    "Germany",
+			CarrierType:    models.CarrierTypePostal,
+			Priority:       85,
+			ConfidenceBase: 0.94,
+			Regex:          regexp.MustCompile(`^(0034043\d{11}|10\d{10})$`),
+			Description:    "Deutsche Post DHL Paket national barcode",
+		},
+
+		// 84. Hermes Germany H-prefix
+		{
+			CarrierSlug:    "myhermes-de",
+			CarrierName:    "Hermes Germany",
+			Country:        "DE",
+			CountryName:    "Germany",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       85,
+			ConfidenceBase: 0.94,
+			Regex:          regexp.MustCompile(`^H\d{19}$`),
+			Description:    "Hermes Germany 20-digit barcode",
+		},
+
+		// 85. Trans-o-Flex
+		{
+			CarrierSlug:    "trans-o-flex",
+			CarrierName:    "Trans-o-Flex",
+			Country:        "DE",
+			CountryName:    "Germany",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       84,
+			ConfidenceBase: 0.93,
+			Regex:          regexp.MustCompile(`^TOF\d{8,12}$`),
+			Description:    "Trans-o-Flex shipment identifier",
+		},
+
 		// MENA & Africa carriers (Issue #12)
 		{
 			CarrierSlug:    "emirates-post-group",

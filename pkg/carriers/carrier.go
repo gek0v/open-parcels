@@ -97,6 +97,9 @@ func registerDefaultCarriers(r *Registry) {
 	r.Register(NewColissimoCarrier())
 	r.Register(NewAirCargoCarrier())
 	r.Register(NewOceanContainerCarrier())
+	// Register DACH region catalog (26 carriers - Issue #13)
+	registerDACHCatalog(r)
+
 	// Register Middle East & Africa regional catalog (57 carriers - Issue #12)
 	registerMENAAfricaCatalog(r)
 
