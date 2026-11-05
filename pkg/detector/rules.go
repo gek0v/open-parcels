@@ -118,7 +118,7 @@ func (d *Detector) initRules() {
 
 		// 9. Correos Express (16 digits starting with 69, 32, 00, 08)
 		{
-			CarrierSlug:    "correos-express",
+			CarrierSlug:    "correosexpress",
 			CarrierName:    "Correos Express",
 			Country:        "ES",
 			CountryName:    "Spain",
@@ -131,7 +131,7 @@ func (d *Detector) initRules() {
 
 		// 10. Correos Express 23-digit format
 		{
-			CarrierSlug:    "correos-express",
+			CarrierSlug:    "correosexpress",
 			CarrierName:    "Correos Express",
 			Country:        "ES",
 			CountryName:    "Spain",
@@ -164,8 +164,8 @@ func (d *Detector) initRules() {
 			CarrierType:    models.CarrierTypeExpress,
 			Priority:       78,
 			ConfidenceBase: 0.88,
-			Regex:          regexp.MustCompile(`^(SEUR\d{10,14}|36\d{12}|\d{14,16})$`),
-			Description:    "SEUR Spain parcel number (14-16 digits)",
+			Regex:          regexp.MustCompile(`^(SEUR\d{10,14}|36\d{12})$`),
+			Description:    "SEUR Spain parcel number",
 		},
 
 		// 13. Paack Delivery
@@ -183,7 +183,7 @@ func (d *Detector) initRules() {
 
 		// 14. MRW (12 digits or 5 agency + 7 order)
 		{
-			CarrierSlug:    "mrw",
+			CarrierSlug:    "mrw-spain",
 			CarrierName:    "MRW",
 			Country:        "ES",
 			CountryName:    "Spain",
@@ -392,6 +392,254 @@ func (d *Detector) initRules() {
 			Regex:          regexp.MustCompile(`^[A-Z]{2}\d{9}[A-Z]{2}$`),
 			Validator:      validateUPUS10,
 			Description:    "UPU S10 Standard International Postal barcode",
+		},
+
+		// --- Spanish Carriers (Issue #7) ---
+		// 25. Nacex Spain
+		{
+			CarrierSlug:    "nacex-spain",
+			CarrierName:    "Nacex",
+			Country:        "ES",
+			CountryName:    "Spain",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       80,
+			ConfidenceBase: 0.90,
+			Regex:          regexp.MustCompile(`^(NCX[0-9A-Z]{7,12}|\d{4}\d{7})$`),
+			Description:    "Nacex Spain tracking number (NCX... or 11 digits)",
+		},
+
+		// 26. TIPSA Spain
+		{
+			CarrierSlug:    "tipsa",
+			CarrierName:    "TIPSA",
+			Country:        "ES",
+			CountryName:    "Spain",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       80,
+			ConfidenceBase: 0.90,
+			Regex:          regexp.MustCompile(`^TIP[0-9A-Z]{7,12}$`),
+			Description:    "TIPSA Spain parcel tracking code",
+		},
+
+		// 27. Zeleris
+		{
+			CarrierSlug:    "zeleris",
+			CarrierName:    "Zeleris",
+			Country:        "ES",
+			CountryName:    "Spain",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       80,
+			ConfidenceBase: 0.90,
+			Regex:          regexp.MustCompile(`^ZEL[0-9A-Z]{7,12}$`),
+			Description:    "Zeleris express tracking number",
+		},
+
+		// 28. Sending Spain
+		{
+			CarrierSlug:    "sending-es",
+			CarrierName:    "Sending",
+			Country:        "ES",
+			CountryName:    "Spain",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       80,
+			ConfidenceBase: 0.90,
+			Regex:          regexp.MustCompile(`^SND[0-9A-Z]{7,12}$`),
+			Description:    "Sending Spain parcel code",
+		},
+
+		// 29. Celeritas Transporte
+		{
+			CarrierSlug:    "celeritas",
+			CarrierName:    "Celeritas Transporte",
+			Country:        "ES",
+			CountryName:    "Spain",
+			CarrierType:    models.CarrierTypeLogistics,
+			Priority:       80,
+			ConfidenceBase: 0.90,
+			Regex:          regexp.MustCompile(`^CEL[0-9A-Z]{8,14}$`),
+			Description:    "Celeritas tracking code",
+		},
+
+		// 30. Envialia
+		{
+			CarrierSlug:    "envialia",
+			CarrierName:    "Envialia",
+			Country:        "ES",
+			CountryName:    "Spain",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       80,
+			ConfidenceBase: 0.90,
+			Regex:          regexp.MustCompile(`^(ENV[0-9A-Z]{7,12}|010\d{8,10})$`),
+			Description:    "Envialia parcel tracking number",
+		},
+
+		// 31. GLS Spain (ASM)
+		{
+			CarrierSlug:    "asm-gls-spain",
+			CarrierName:    "GLS Spain (ASM)",
+			Country:        "ES",
+			CountryName:    "Spain",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       81,
+			ConfidenceBase: 0.91,
+			Regex:          regexp.MustCompile(`^ASM[0-9A-Z]{8,14}$`),
+			Description:    "GLS Spain / ASM express barcode",
+		},
+
+		// 32. Ontime
+		{
+			CarrierSlug:    "ontime",
+			CarrierName:    "Ontime",
+			Country:        "ES",
+			CountryName:    "Spain",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       80,
+			ConfidenceBase: 0.90,
+			Regex:          regexp.MustCompile(`^ONT[0-9A-Z]{7,12}$`),
+			Description:    "Ontime parcel tracking number",
+		},
+
+		// 33. Packlink
+		{
+			CarrierSlug:    "packlink",
+			CarrierName:    "Packlink",
+			Country:        "ES",
+			CountryName:    "Spain",
+			CarrierType:    models.CarrierTypeLogistics,
+			Priority:       80,
+			ConfidenceBase: 0.90,
+			Regex:          regexp.MustCompile(`^(ES\d{10,12}[A-Z]{0,2}|PL[0-9A-Z]{8,14})$`),
+			Description:    "Packlink tracking code",
+		},
+
+		// 34. Asendia Spain
+		{
+			CarrierSlug:    "asendia-es",
+			CarrierName:    "Asendia Spain",
+			Country:        "ES",
+			CountryName:    "Spain",
+			CarrierType:    models.CarrierTypeCrossBorder,
+			Priority:       80,
+			ConfidenceBase: 0.90,
+			Regex:          regexp.MustCompile(`^(AE\d{9,16}|EPA\d{9,16})$`),
+			Description:    "Asendia Spain cross-border parcel number",
+		},
+
+		// 35. Asigna
+		{
+			CarrierSlug:    "asigna-es",
+			CarrierName:    "Asigna",
+			Country:        "ES",
+			CountryName:    "Spain",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       80,
+			ConfidenceBase: 0.90,
+			Regex:          regexp.MustCompile(`^ASG[0-9A-Z]{7,12}$`),
+			Description:    "Asigna parcel tracking code",
+		},
+
+		// 36. Activos24
+		{
+			CarrierSlug:    "activos24",
+			CarrierName:    "Activos24",
+			Country:        "ES",
+			CountryName:    "Spain",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       80,
+			ConfidenceBase: 0.90,
+			Regex:          regexp.MustCompile(`^ACT[0-9A-Z]{7,12}$`),
+			Description:    "Activos24 shipment tracking number",
+		},
+
+		// 37. Instapack
+		{
+			CarrierSlug:    "instapack-es",
+			CarrierName:    "Instapack",
+			Country:        "ES",
+			CountryName:    "Spain",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       80,
+			ConfidenceBase: 0.90,
+			Regex:          regexp.MustCompile(`^IPK[0-9A-Z]{7,12}$`),
+			Description:    "Instapack courier parcel number",
+		},
+
+		// 38. Mail Boxes Etc. Spain
+		{
+			CarrierSlug:    "mbe-es",
+			CarrierName:    "Mail Boxes Etc. Spain",
+			Country:        "ES",
+			CountryName:    "Spain",
+			CarrierType:    models.CarrierTypeExpress,
+			Priority:       80,
+			ConfidenceBase: 0.90,
+			Regex:          regexp.MustCompile(`^MBE[0-9A-Z]{7,12}$`),
+			Description:    "Mail Boxes Etc. Spain parcel code",
+		},
+
+		// 39. Redur Spain
+		{
+			CarrierSlug:    "redur-spain",
+			CarrierName:    "Redur Spain",
+			Country:        "ES",
+			CountryName:    "Spain",
+			CarrierType:    models.CarrierTypeLogistics,
+			Priority:       80,
+			ConfidenceBase: 0.90,
+			Regex:          regexp.MustCompile(`^RDR[0-9A-Z]{7,12}$`),
+			Description:    "Redur Spain standard albaran code",
+		},
+
+		// 40. Redur Spain Reference
+		{
+			CarrierSlug:    "redur-spain-ref",
+			CarrierName:    "Redur Spain Reference",
+			Country:        "ES",
+			CountryName:    "Spain",
+			CarrierType:    models.CarrierTypeLogistics,
+			Priority:       80,
+			ConfidenceBase: 0.90,
+			Regex:          regexp.MustCompile(`^REF[0-9A-Z]{7,12}$`),
+			Description:    "Redur Spain customer reference format",
+		},
+
+		// 41. Redur Tracking
+		{
+			CarrierSlug:    "redur-tracking",
+			CarrierName:    "Redur Tracking",
+			Country:        "ES",
+			CountryName:    "Spain",
+			CarrierType:    models.CarrierTypeLogistics,
+			Priority:       80,
+			ConfidenceBase: 0.90,
+			Regex:          regexp.MustCompile(`^RD\d{10,12}$`),
+			Description:    "Redur standard tracking format",
+		},
+
+		// 42. InPost Spain
+		{
+			CarrierSlug:    "inpost-es",
+			CarrierName:    "InPost Spain",
+			Country:        "ES",
+			CountryName:    "Spain",
+			CarrierType:    models.CarrierTypeLogistics,
+			Priority:       76,
+			ConfidenceBase: 0.86,
+			Regex:          regexp.MustCompile(`^6\d{23}$`),
+			Description:    "InPost Spain 24-digit locker barcode",
+		},
+
+		// 43. DHL Parcel Spain
+		{
+			CarrierSlug:    "dhl-parcel-es",
+			CarrierName:    "DHL Parcel Spain",
+			Country:        "ES",
+			CountryName:    "Spain",
+			CarrierType:    models.CarrierTypeLogistics,
+			Priority:       83,
+			ConfidenceBase: 0.94,
+			Regex:          regexp.MustCompile(`^(JJD\d{16,18}|JJ\d{16}|0034043\d{11})$`),
+			Description:    "DHL Parcel Spain barcode format",
 		},
 	}
 }
