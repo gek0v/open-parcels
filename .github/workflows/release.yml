@@ -1,0 +1,144 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build Multi-Platform Binaries
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - os: linux
+            arch: amd64
+            ext: ""
+          - os: linux
+            arch: arm64
+            ext: ""
+          - os: darwin
+            arch: amd64
+            ext: ""
+          - os: darwin
+            arch: arm64
+            ext: ""
+          - os: windows
+            arch: amd64
+            ext: ".exe"
+          - os: windows
+            arch: arm64
+            ext: ".exe"
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          check-latest: true
+
+      - name: Determine version
+        id: vars
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          if [ -z "$VERSION" ] || [ "$VERSION" = "refs/heads/main" ]; then
+            VERSION="v1.0.0"
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Compile binary (${{ matrix.os }}/${{ matrix.arch }})
+        env:
+          GOOS: ${{ matrix.os }}
+          GOARCH: ${{ matrix.arch }}
+          CGO_ENABLED: 0
+        run: |
+          BINARY_NAME="open-parcels${{ matrix.ext }}"
+          go build -trimpath -ldflags="-s -w -X open-parcels/cmd.Version=${{ steps.vars.outputs.version }}" -o dist/${BINARY_NAME} .
+
+      - name: Package archive
+        run: |
+          VERSION="${{ steps.vars.outputs.version }}"
+          ARCHIVE_DIR="open-parcels_${VERSION}_${{ matrix.os }}_${{ matrix.arch }}"
+          mkdir -p "pkg_out/${ARCHIVE_DIR}"
+          cp dist/open-parcels${{ matrix.ext }} "pkg_out/${ARCHIVE_DIR}/"
+          cp LICENSE "pkg_out/${ARCHIVE_DIR}/"
+          cp README.md "pkg_out/${ARCHIVE_DIR}/"
+
+          cd pkg_out
+          if [ "${{ matrix.os }}" = "windows" ]; then
+            zip -r "${ARCHIVE_DIR}.zip" "${ARCHIVE_DIR}"
+            echo "ARCHIVE_FILE=${ARCHIVE_DIR}.zip" >> $GITHUB_ENV
+          else
+            tar -czvf "${ARCHIVE_DIR}.tar.gz" "${ARCHIVE_DIR}"
+            echo "ARCHIVE_FILE=${ARCHIVE_DIR}.tar.gz" >> $GITHUB_ENV
+          fi
+          cd ..
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifacts-${{ matrix.os }}-${{ matrix.arch }}
+          path: pkg_out/*.zip pkg_out/*.tar.gz
+          retention-days: 1
+
+  publish:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Download all built artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release_artifacts
+          merge-multiple: true
+
+      - name: Generate SHA256 Checksums
+        run: |
+          cd release_artifacts
+          sha256sum * > checksums.txt
+          cat checksums.txt
+          cd ..
+
+      - name: Extract Release Notes from CHANGELOG.md
+        id: changelog
+        run: |
+          TAG_NAME="${GITHUB_REF#refs/tags/}"
+          if [ -z "$TAG_NAME" ] || [ "$TAG_NAME" = "refs/heads/main" ]; then
+            TAG_NAME="v1.0.0"
+          fi
+          VERSION_NUM="${TAG_NAME#v}"
+          
+          # Extract section from CHANGELOG.md between header for this version and next header
+          awk -v ver="[${VERSION_NUM}]" '
+            $0 ~ "^## \\["ver"\\]" { found=1; next }
+            found && /^## \[/ { exit }
+            found { print }
+          ' CHANGELOG.md > RELEASE_NOTES.md
+
+          if [ ! -s RELEASE_NOTES.md ]; then
+            echo "Universal Parcel Tracking Engine, CLI & MCP server release ${TAG_NAME}." > RELEASE_NOTES.md
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          name: open-parcels ${{ github.ref_name }}
+          body_path: RELEASE_NOTES.md
+          draft: false
+          prerelease: false
+          files: |
+            release_artifacts/*
+            release_artifacts/checksums.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

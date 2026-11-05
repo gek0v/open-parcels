@@ -12,6 +12,9 @@ import (
 	"open-parcels/pkg/ui"
 )
 
+// Version represents the build version, modifiable via ldflags during release compilation.
+var Version = "v1.0.0"
+
 // Execute runs the CLI application parsing os.Args.
 func Execute() {
 	if len(os.Args) < 2 {
@@ -36,7 +39,7 @@ func Execute() {
 	case "help", "-h", "--help":
 		printUsage()
 	case "version", "-v", "--version":
-		fmt.Println("open-parcels v1.0.0 (Go engine & CLI)")
+		fmt.Printf("open-parcels %s (Go engine & CLI)\n", Version)
 	default:
 		// If the argument looks like a tracking number directly, track it!
 		if !strings.HasPrefix(command, "-") {
