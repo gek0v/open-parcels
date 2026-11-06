@@ -107,3 +107,79 @@ func TestEngineItalianTrackingAndLocalization(t *testing.T) {
 	}
 }
 
+func TestEngineTracking323CainiaoAndCorreosExpress(t *testing.T) {
+	eng := New()
+
+	// 1. Auto-detection tracking: 32300035210642701471403 with ES language
+	shipment, err := eng.Track(context.Background(), "32300035210642701471403", models.TrackOptions{
+		Language: "es",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if shipment.Status != models.StatusDelivered {
+		t.Errorf("expected status Delivered, got %s", shipment.Status)
+	}
+	if shipment.Progress != 100 {
+		t.Errorf("expected progress 100, got %d", shipment.Progress)
+	}
+	if shipment.Carrier.Slug != "cainiao" {
+		t.Errorf("expected primary carrier cainiao, got %s", shipment.Carrier.Slug)
+	}
+
+	// Verify Correos Express is in AdditionalCarriers
+	hasCE := false
+	for _, ac := range shipment.AdditionalCarriers {
+		if ac.Slug == "correosexpress" {
+			hasCE = true
+			break
+		}
+	}
+	if !hasCE {
+		t.Errorf("expected Correos Express in AdditionalCarriers")
+	}
+
+	// Verify events show Correos Express for local delivery
+	hasCorreosEvent := false
+	for _, ev := range shipment.Events {
+		if ev.CarrierSlug == "correosexpress" {
+			hasCorreosEvent = true
+			break
+		}
+	}
+	if !hasCorreosEvent {
+		t.Errorf("expected at least one event attributed to Correos Express")
+	}
+
+	// 2. Direct query with correosexpress hint
+	ceShipment, err := eng.Track(context.Background(), "32300035210642701471403", models.TrackOptions{
+		CarrierHint: "correosexpress",
+		Language:    "es",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error with correosexpress hint: %v", err)
+	}
+	if ceShipment.Status != models.StatusDelivered {
+		t.Errorf("expected status Delivered with correosexpress hint, got %s", ceShipment.Status)
+	}
+	if ceShipment.Progress != 100 {
+		t.Errorf("expected progress 100 with correosexpress hint, got %d", ceShipment.Progress)
+	}
+	// Verify Cainiao is present
+	hasCainiao := false
+	if ceShipment.Carrier.Slug == "cainiao" {
+		hasCainiao = true
+	}
+	for _, ac := range ceShipment.AdditionalCarriers {
+		if ac.Slug == "cainiao" {
+			hasCainiao = true
+			break
+		}
+	}
+	if !hasCainiao {
+		t.Errorf("expected Cainiao Global represented when tracked with correosexpress hint")
+	}
+}
+
+

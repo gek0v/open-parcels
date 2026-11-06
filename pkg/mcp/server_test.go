@@ -85,6 +85,13 @@ func TestMCPServer(t *testing.T) {
 	if detectResp == nil || detectResp.Error != nil {
 		t.Fatalf("expected detect_carrier success, got: %v", detectResp.Error)
 	}
+	detectCallRes, ok := detectResp.Result.(ToolCallResult)
+	if !ok || detectCallRes.IsError || len(detectCallRes.Content) == 0 {
+		t.Fatalf("expected valid detect_carrier ToolCallResult, got: %v", detectResp.Result)
+	}
+	if !strings.Contains(detectCallRes.Content[0].Text, "correosexpress") {
+		t.Errorf("expected correosexpress in detect output text, got: %s", detectCallRes.Content[0].Text)
+	}
 
 	// 5. Tools Call: list_carriers
 	listCarriersReq := JSONRPCRequest{
@@ -102,6 +109,13 @@ func TestMCPServer(t *testing.T) {
 	if listCarriersResp == nil || listCarriersResp.Error != nil {
 		t.Fatalf("expected list_carriers success, got: %v", listCarriersResp.Error)
 	}
+	listCallRes, ok := listCarriersResp.Result.(ToolCallResult)
+	if !ok || listCallRes.IsError || len(listCallRes.Content) == 0 {
+		t.Fatalf("expected valid list_carriers ToolCallResult, got: %v", listCarriersResp.Result)
+	}
+	if !strings.Contains(listCallRes.Content[0].Text, "cainiao") {
+		t.Errorf("expected cainiao carrier in output text, got: %s", listCallRes.Content[0].Text)
+	}
 
 	// 6. Tools Call: estimate_delivery
 	estReq := JSONRPCRequest{
@@ -118,6 +132,13 @@ func TestMCPServer(t *testing.T) {
 	estResp := srv.handleRequest(ctx, estReq)
 	if estResp == nil || estResp.Error != nil {
 		t.Fatalf("expected estimate_delivery success, got: %v", estResp.Error)
+	}
+	estCallRes, ok := estResp.Result.(ToolCallResult)
+	if !ok || estCallRes.IsError || len(estCallRes.Content) == 0 {
+		t.Fatalf("expected valid estimate_delivery ToolCallResult, got: %v", estResp.Result)
+	}
+	if !strings.Contains(estCallRes.Content[0].Text, "days_in_transit") || !strings.Contains(estCallRes.Content[0].Text, "progress") {
+		t.Errorf("expected days_in_transit and progress fields in estimate output text, got: %s", estCallRes.Content[0].Text)
 	}
 
 	// 7. Test HTTP Transport

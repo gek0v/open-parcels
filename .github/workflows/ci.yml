@@ -2,29 +2,29 @@ name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, master ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, master ]
 
 jobs:
   test:
-    name: Run Unit Tests
+    name: Test & Concurrency Checks
     runs-on: ubuntu-latest
     steps:
-      - name: Check out code
+      - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version: '1.23'
-          check-latest: true
+          cache: true
 
-      - name: Verify dependencies
+      - name: Verify Module Dependencies
         run: go mod verify
 
-      - name: Run tests with race detector and coverage
-        run: go test -v -race -cover ./...
+      - name: Run Tests with Race Detector
+        run: go test -v -race -coverprofile=coverage.out ./...
 
-      - name: Build binary
+      - name: Build Binary
         run: go build -v -o open-parcels .

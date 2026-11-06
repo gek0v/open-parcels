@@ -192,3 +192,48 @@ func TestServerLifecycle(t *testing.T) {
 		t.Errorf("server shutdown timed out")
 	}
 }
+
+func TestNegativeErrorPaths(t *testing.T) {
+	srv := setupTestServer()
+
+	// 1. Detect without ?number= parameter should return 400 Bad Request
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/detect", nil)
+	rec := httptest.NewRecorder()
+	srv.handleDetect(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for missing number in detect, got %d", rec.Code)
+	}
+
+	// 2. Track GET without ?number= parameter should return 400 Bad Request
+	reqTrack := httptest.NewRequest(http.MethodGet, "/api/v1/track", nil)
+	recTrack := httptest.NewRecorder()
+	srv.handleTrackV1(recTrack, reqTrack)
+	if recTrack.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for missing number in track GET, got %d", recTrack.Code)
+	}
+
+	// 3. Track POST with invalid JSON should return 400 Bad Request
+	reqInvalidJSON := httptest.NewRequest(http.MethodPost, "/api/v1/track", bytes.NewReader([]byte("{invalid-json")))
+	recInvalidJSON := httptest.NewRecorder()
+	srv.handleTrackV1(recInvalidJSON, reqInvalidJSON)
+	if recInvalidJSON.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for invalid json in track POST, got %d", recInvalidJSON.Code)
+	}
+
+	// 4. ParcelsApp trackings with empty shipments should return 400 Bad Request
+	emptyPayload := []byte(`{"shipments":[]}`)
+	reqEmpty := httptest.NewRequest(http.MethodPost, "/trackings", bytes.NewReader(emptyPayload))
+	recEmpty := httptest.NewRecorder()
+	srv.handleParcelsAppTrackings(recEmpty, reqEmpty)
+	if recEmpty.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for empty shipments array, got %d", recEmpty.Code)
+	}
+
+	// 5. GET /trackings with non-existent request ID should return 404 Not Found
+	getReq := httptest.NewRequest(http.MethodGet, "/trackings/req_non_existent", nil)
+	getRec := httptest.NewRecorder()
+	srv.handleParcelsAppGetTracking(getRec, getReq)
+	if getRec.Code != http.StatusNotFound {
+		t.Errorf("expected 404 for non-existent tracking request ID, got %d", getRec.Code)
+	}
+}

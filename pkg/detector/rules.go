@@ -181,10 +181,10 @@ func (d *Detector) initRules() {
 			Country:        "CN",
 			CountryName:    "China",
 			CarrierType:    models.CarrierTypeCrossBorder,
-			Priority:       85,
-			ConfidenceBase: 0.95,
-			Regex:          regexp.MustCompile(`^(LP\d{14,16}|CAINIAO\d+|CNESP\d+|UN\d{9}CN|SYB\d+|SYA\d+)$`),
-			Description:    "Cainiao / AliExpress standard tracking (LP, CAINIAO, CNESP, UN...CN)",
+			Priority:       88,
+			ConfidenceBase: 0.96,
+			Regex:          regexp.MustCompile(`^(LP\d{14,16}|CAINIAO\d+|CNESP\d+|UN\d{9}CN|SYB\d+|SYA\d+|323\d{20})$`),
+			Description:    "Cainiao / AliExpress standard tracking (LP, CAINIAO, CNESP, UN...CN, 323... 23 digits)",
 		},
 
 		// 6. 4PX
@@ -445,8 +445,8 @@ func (d *Detector) initRules() {
 			CountryName:    "Spain",
 			CarrierType:    models.CarrierTypeExpress,
 			Priority:       81,
-			ConfidenceBase: 0.92,
-			Regex:          regexp.MustCompile(`^(32|69)\d{21}$`),
+			ConfidenceBase: 0.80,
+			Regex:          regexp.MustCompile(`^(32\d{21}|69\d{21})$`),
 			Description:    "Correos Express 23-digit shipment identifier",
 		},
 

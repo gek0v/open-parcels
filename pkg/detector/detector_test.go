@@ -17,7 +17,11 @@ func TestDetector(t *testing.T) {
 		{"YunExpress YT", "YT2401234567890123", "", "yunexpress"},
 		{"Cainiao LP", "LP00561234567890", "ES", "cainiao"},
 		{"Cainiao CNESP", "CNESP0012345678", "ES", "cainiao"},
+		{"Cainiao 23 digits AliExpress", "32300035210642701471403", "", "cainiao"},
+		{"Cainiao 23 digits AliExpress with ES hint", "32300035210642701471403", "ES", "cainiao"},
 		{"Correos Express 16 digits", "6900123456789012", "ES", "correosexpress"},
+		{"Correos Express 23 digits (69)", "69001234567890123456789", "ES", "correosexpress"},
+		{"Correos Express 23 digits (321)", "32101234567890123456789", "ES", "correosexpress"},
 		{"CTT Express", "0001234567890123456789", "ES", "ctt-express"},
 		{"SEUR 14 digits", "36150127630406", "ES", "seur"},
 		{"USPS 22 digits", "9400111206213785678901", "US", "usps"},
@@ -217,5 +221,24 @@ func TestDetectorCandidates(t *testing.T) {
 	}
 	if smCandidates[0].Carrier.Slug != "poste-italiane" {
 		t.Errorf("expected top candidate to be poste-italiane for SM UPU, got %s", smCandidates[0].Carrier.Slug)
+	}
+
+	// 323... 23 digits AliExpress/Cainiao cross-border and Correos Express last-mile
+	c323 := d.Detect("32300035210642701471403", "ES")
+	foundCainiao := false
+	foundCorreosExpress := false
+	for _, c := range c323 {
+		if c.Carrier.Slug == "cainiao" {
+			foundCainiao = true
+		}
+		if c.Carrier.Slug == "correosexpress" {
+			foundCorreosExpress = true
+		}
+	}
+	if !foundCainiao {
+		t.Errorf("expected cainiao in candidates for 32300035210642701471403")
+	}
+	if !foundCorreosExpress {
+		t.Errorf("expected correosexpress in candidates for 32300035210642701471403")
 	}
 }
