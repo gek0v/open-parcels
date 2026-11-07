@@ -2,8 +2,10 @@ package detector
 
 import (
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"unicode"
 
 	"open-parcels/pkg/models"
@@ -21,6 +23,111 @@ type PatternRule struct {
 	Regex          *regexp.Regexp
 	Validator      func(cleanNumber string) bool
 	Description    string
+	MinLen         int
+	MaxLen         int
+	DigitsOnly     bool
+	RequiresAlpha  bool
+}
+
+var (
+	globalRulesOnce sync.Once
+	globalRules     []PatternRule
+)
+
+func getCompiledRules() []PatternRule {
+	globalRulesOnce.Do(func() {
+		raw := buildDefaultRules()
+		globalRules = make([]PatternRule, len(raw))
+		copy(globalRules, raw)
+		for i := range globalRules {
+			inspectRulePattern(&globalRules[i])
+		}
+	})
+	return globalRules
+}
+
+func isDigitsOnly(s string) bool {
+	for i := 0; i < len(s); i++ {
+		if s[i] < '0' || s[i] > '9' {
+			return false
+		}
+	}
+	return len(s) > 0
+}
+
+func deriveRegexLengthBounds(pattern string) (int, int) {
+	// Fixed hyphenated AWB: \d{3}-\d{8} -> 12
+	if strings.Contains(pattern, `\d{3}-\d{8}`) {
+		return 12, 12
+	}
+
+	// Do not constrain if regex has alternations
+	if strings.Contains(pattern, "|") {
+		return 0, 0
+	}
+
+	p := strings.TrimPrefix(pattern, "^")
+	p = strings.TrimSuffix(p, "$")
+
+	// UPU S10: [A-Z]{2}\d{9}[A-Z]{2} -> 13
+	if strings.Contains(p, `[A-Z]{2}\d{9}[A-Z]{2}`) {
+		return 13, 13
+	}
+
+	// Container ISO 6346: [A-Z]{3}[UJZ]\d{7} -> 11
+	if strings.Contains(p, `[A-Z]{3}[UJZ]\d{7}`) {
+		return 11, 11
+	}
+
+	// Container prefix: e.g. MSCU\d{7} -> 11
+	if strings.HasSuffix(p, `\d{7}`) && len(p) == len(`MSCU\d{7}`) {
+		return 11, 11
+	}
+
+	// UPS 1Z: 1Z[0-9A-Z]{16} -> 18
+	if strings.HasPrefix(p, "1Z") && strings.HasSuffix(p, "{16}") {
+		return 18, 18
+	}
+
+	// Pure digit quantifier: ^\d{N}$ or ^[0-9]{N}$
+	if (strings.HasPrefix(p, `\d{`) || strings.HasPrefix(p, `[0-9]{`)) && strings.HasSuffix(p, `}`) {
+		open := strings.Index(p, "{")
+		close := strings.Index(p, "}")
+		if open != -1 && close > open {
+			content := p[open+1 : close]
+			if parts := strings.Split(content, ","); len(parts) == 2 {
+				minVal, err1 := strconv.Atoi(parts[0])
+				maxVal, err2 := strconv.Atoi(parts[1])
+				if err1 == nil && err2 == nil {
+					return minVal, maxVal
+				}
+			} else if n, err := strconv.Atoi(content); err == nil {
+				return n, n
+			}
+		}
+	}
+
+	return 0, 0
+}
+
+func inspectRulePattern(r *PatternRule) {
+	if r.Regex == nil {
+		return
+	}
+	pattern := r.Regex.String()
+	r.MinLen, r.MaxLen = deriveRegexLengthBounds(pattern)
+
+	// DigitsOnly: strictly pure digit regex without | and without hyphen
+	if !strings.Contains(pattern, "|") && !strings.Contains(pattern, "-") && (strings.HasPrefix(pattern, `^\d{`) || strings.HasPrefix(pattern, `^[0-9]{`)) && strings.HasSuffix(pattern, `$`) {
+		r.DigitsOnly = true
+	}
+
+	// RequiresAlpha: strictly requiring letters (e.g. 1Z, UPU S10, MSCU) without |
+	if !strings.Contains(pattern, "|") {
+		if strings.HasPrefix(pattern, `^1Z`) || strings.HasPrefix(pattern, `^[A-Z]`) || strings.HasPrefix(pattern, `^MSCU`) || strings.HasPrefix(pattern, `^CMAU`) {
+			r.RequiresAlpha = true
+		}
+	}
 }
 
 // Detector is the carrier identification engine.
@@ -30,9 +137,9 @@ type Detector struct {
 
 // New creates a new initialized Detector with all carrier rules.
 func New() *Detector {
-	d := &Detector{}
-	d.initRules()
-	return d
+	return &Detector{
+		rules: getCompiledRules(),
+	}
 }
 
 // Detect analyzes a tracking number and returns candidate carrier matches ranked by confidence.
@@ -42,11 +149,29 @@ func (d *Detector) Detect(rawNumber string, destCountryHint string) []models.Det
 		return nil
 	}
 
+	cleanLen := len(clean)
+	cleanIsDigits := isDigitsOnly(clean)
+
 	destUpper := strings.ToUpper(strings.TrimSpace(destCountryHint))
-	var candidates []models.DetectResult
+	var scoredCandidates []candidateWithPriority
 	seenCarrier := make(map[string]bool)
 
 	for _, rule := range d.rules {
+		// Fast pre-filter: length bounds
+		if rule.MinLen > 0 && cleanLen < rule.MinLen {
+			continue
+		}
+		if rule.MaxLen > 0 && cleanLen > rule.MaxLen {
+			continue
+		}
+		// Fast pre-filter: character set constraints
+		if rule.DigitsOnly && !cleanIsDigits {
+			continue
+		}
+		if rule.RequiresAlpha && cleanIsDigits {
+			continue
+		}
+
 		if rule.Regex != nil && !rule.Regex.MatchString(clean) {
 			continue
 		}
@@ -61,10 +186,10 @@ func (d *Detector) Detect(rawNumber string, destCountryHint string) []models.Det
 			}
 		}
 
-		// Boost confidence if country matches destination hint
+		// Boost confidence if country matches destination hint (+0.35)
 		if destUpper != "" && rule.Country != "" {
 			if strings.EqualFold(rule.Country, destUpper) || (destUpper == "SM" && rule.Country == "IT") || (destUpper == "IT" && rule.Country == "SM") {
-				conf = minFloat(1.0, conf+0.15)
+				conf = minFloat(1.0, conf+0.35)
 			} else if rule.Country != "GLOBAL" && rule.Country != "CN" {
 				// Slight penalty if carrier is country-specific and doesn't match hint
 				conf = maxFloat(0.3, conf-0.10)
@@ -77,24 +202,47 @@ func (d *Detector) Detect(rawNumber string, destCountryHint string) []models.Det
 		}
 		seenCarrier[rule.CarrierSlug] = true
 
-		candidates = append(candidates, models.DetectResult{
-			Carrier: models.CarrierInfo{
-				Slug:        rule.CarrierSlug,
-				Name:        rule.CarrierName,
-				Country:     rule.Country,
-				CountryName: rule.CountryName,
-				Type:        rule.CarrierType,
+		scoredCandidates = append(scoredCandidates, candidateWithPriority{
+			result: models.DetectResult{
+				Carrier: models.CarrierInfo{
+					Slug:        rule.CarrierSlug,
+					Name:        rule.CarrierName,
+					Country:     rule.Country,
+					CountryName: rule.CountryName,
+					Type:        rule.CarrierType,
+				},
+				Confidence:     conf,
+				MatchedPattern: rule.Description,
+				Reason:         "Matched pattern: " + rule.Description,
 			},
-			Confidence:     conf,
-			MatchedPattern: rule.Description,
-			Reason:         "Matched pattern: " + rule.Description,
+			priority: rule.Priority,
 		})
 	}
 
-	// Sort candidates by confidence descending
-	sortCandidates(candidates)
+	// Sort candidates by confidence descending with priority tie-breaker
+	sortCandidatesWithPriority(scoredCandidates)
+
+	candidates := make([]models.DetectResult, len(scoredCandidates))
+	for i, c := range scoredCandidates {
+		candidates[i] = c.result
+	}
 
 	return candidates
+}
+
+type candidateWithPriority struct {
+	result   models.DetectResult
+	priority int
+}
+
+func sortCandidatesWithPriority(arr []candidateWithPriority) {
+	sort.SliceStable(arr, func(i, j int) bool {
+		diff := arr[i].result.Confidence - arr[j].result.Confidence
+		if diff > 0.0001 || diff < -0.0001 {
+			return arr[i].result.Confidence > arr[j].result.Confidence
+		}
+		return arr[i].priority > arr[j].priority
+	})
 }
 
 // BestMatch returns the single highest confidence carrier match or nil.
