@@ -90,4 +90,78 @@ func TestInPostLiveTracking(t *testing.T) {
 	if !foundEvent {
 		t.Errorf("did not find expected 2026-11-06 event in events: %+v", shipment.Events)
 	}
+
+	if shipment.Origin.Name != "Unknown" {
+		t.Errorf("expected Origin.Name 'Unknown', got %q", shipment.Origin.Name)
+	}
+	if shipment.Origin.Code != "" {
+		t.Errorf("expected Origin.Code '', got %q", shipment.Origin.Code)
+	}
+
+	if shipment.Destination.Name != "Spain" || shipment.Destination.Code != "ES" {
+		t.Errorf("expected Destination 'Spain' (ES), got %q (%q)", shipment.Destination.Name, shipment.Destination.Code)
+	}
+}
+
+func TestInPostOriginAndDestinationDetermination(t *testing.T) {
+	// 1. Unknown when no explicit location
+	evsNoLoc := []models.TrackingEvent{
+		{
+			Status:      models.StatusInfoReceived,
+			Stage:       models.StageCreated,
+			Description: "El envío ha sido registrado informáticamente",
+		},
+	}
+	orig1 := extractInPostOrigin(evsNoLoc)
+	if orig1.Name != "Unknown" || orig1.Code != "" {
+		t.Errorf("expected Unknown origin, got %+v", orig1)
+	}
+
+	// 2. Cross-border origin: France
+	evsFR := []models.TrackingEvent{
+		{
+			Status:      models.StatusInfoReceived,
+			Stage:       models.StageCreated,
+			Description: "Colis enregistré",
+			Location:    "Hub Lille, France",
+		},
+		{
+			Status:      models.StatusOutForDelivery,
+			Stage:       models.StageLastMile,
+			Description: "En reparto",
+			Location:    "Madrid Locker, Spain",
+		},
+	}
+	origFR := extractInPostOrigin(evsFR)
+	if origFR.Name != "France" || origFR.Code != "FR" {
+		t.Errorf("expected France / FR, got %+v", origFR)
+	}
+
+	// 3. Cross-border origin: Poland
+	evsPL := []models.TrackingEvent{
+		{
+			Status:      models.StatusInTransit,
+			Stage:       models.StageTransit,
+			Description: "Przesyłka w oddziale",
+			Location:    "Paczkomat Warszawa (PL)",
+		},
+	}
+	origPL := extractInPostOrigin(evsPL)
+	if origPL.Name != "Poland" || origPL.Code != "PL" {
+		t.Errorf("expected Poland / PL, got %+v", origPL)
+	}
+
+	// 4. Destination resolution: Spanish 5-digit postal code
+	cGlobal := NewInPostCarrier()
+	destES := resolveInPostDestination(cGlobal, "47140", models.TrackOptions{})
+	if destES.Name != "Spain" || destES.Code != "ES" {
+		t.Errorf("expected Spain / ES for 47140, got %+v", destES)
+	}
+
+	// 5. Destination resolution: carrier with country ES
+	cSpain := NewInPostSpainCarrier()
+	destSpainCarrier := resolveInPostDestination(cSpain, "", models.TrackOptions{})
+	if destSpainCarrier.Name != "Spain" || destSpainCarrier.Code != "ES" {
+		t.Errorf("expected Spain / ES for inpost-es, got %+v", destSpainCarrier)
+	}
 }

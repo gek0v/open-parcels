@@ -48,7 +48,7 @@ func (c *InPostCarrier) generateSimulatedShipment(trackingNumber string, opts mo
 		{
 			Date:        now.Add(-30 * time.Hour),
 			Description: "Parcel registered by sender for locker drop-off",
-			Location:    "Point Relais / Locker, Spain",
+			Location:    "Point Relais / Locker",
 			CarrierSlug: c.Slug(),
 			CarrierName: c.Name(),
 			Status:      models.StatusInfoReceived,
@@ -57,7 +57,7 @@ func (c *InPostCarrier) generateSimulatedShipment(trackingNumber string, opts mo
 		{
 			Date:        now.Add(-18 * time.Hour),
 			Description: "Parcel collected from locker and in transit to sorting depot",
-			Location:    "Regional Depot, Spain",
+			Location:    "Regional Depot",
 			CarrierSlug: c.Slug(),
 			CarrierName: c.Name(),
 			Status:      models.StatusInTransit,
@@ -77,6 +77,8 @@ func (c *InPostCarrier) generateSimulatedShipment(trackingNumber string, opts mo
 	return &models.Shipment{
 		TrackingNumber: trackingNumber,
 		Carrier:        c.Info(),
+		Origin:         extractInPostOrigin(events),
+		Destination:    resolveInPostDestination(c, opts.PostalCode, opts),
 		Status:         models.StatusOutForDelivery,
 		StatusText:     "Out for delivery to Locker / Pickup Point",
 		Progress:       85,
@@ -104,7 +106,7 @@ func trackInPostShared(
 		return nil, models.ErrShipmentNotFound
 	}
 
-	shipment, err := fetchInPostLive(ctx, carrier, trackingNumber, postalCode)
+	shipment, err := fetchInPostLive(ctx, carrier, trackingNumber, postalCode, opts)
 	if err == nil && shipment != nil {
 		return shipment, nil
 	}
@@ -120,7 +122,7 @@ func trackInPostShared(
 	return nil, models.ErrShipmentNotFound
 }
 
-func fetchInPostLive(ctx context.Context, carrier Carrier, trackingNumber, postalCode string) (*models.Shipment, error) {
+func fetchInPostLive(ctx context.Context, carrier Carrier, trackingNumber, postalCode string, opts models.TrackOptions) (*models.Shipment, error) {
 	targetURL := fmt.Sprintf(
 		"https://www.inpost.es/seguimiento-del-envio?parcelNumber=%s&zipCode=%s",
 		url.QueryEscape(trackingNumber),
@@ -202,6 +204,14 @@ func fetchInPostLive(ctx context.Context, carrier Carrier, trackingNumber, posta
 		eventsRaw := mMap["events"]
 		eventsList := unwrapAstroList(eventsRaw)
 
+		mLocation := unwrapAstroString(mMap["location"])
+		if mLocation == "" {
+			mLocation = unwrapAstroString(mMap["place"])
+		}
+		if mLocation == "" {
+			mLocation = unwrapAstroString(mMap["city"])
+		}
+
 		if len(eventsList) > 0 {
 			for _, evItem := range eventsList {
 				evMap := unwrapAstroMap(evItem)
@@ -213,6 +223,23 @@ func fetchInPostLive(ctx context.Context, carrier Carrier, trackingNumber, posta
 				evName := unwrapAstroString(evMap["name"])
 				evDateStr := unwrapAstroString(evMap["date"])
 				evDesc := unwrapAstroString(evMap["description"])
+
+				evLocation := unwrapAstroString(evMap["location"])
+				if evLocation == "" {
+					evLocation = unwrapAstroString(evMap["place"])
+				}
+				if evLocation == "" {
+					evLocation = unwrapAstroString(evMap["city"])
+				}
+				if evLocation == "" {
+					evLocation = unwrapAstroString(evMap["agency"])
+				}
+				if evLocation == "" {
+					evLocation = unwrapAstroString(evMap["depot"])
+				}
+				if evLocation == "" {
+					evLocation = mLocation
+				}
 
 				if evDesc == "" {
 					evDesc = evName
@@ -237,6 +264,7 @@ func fetchInPostLive(ctx context.Context, carrier Carrier, trackingNumber, posta
 					Status:      evStatus,
 					Stage:       evStage,
 					Description: evDesc,
+					Location:    evLocation,
 					EventCode:   evCode,
 					CarrierSlug: carrier.Slug(),
 					CarrierName: carrier.Name(),
@@ -255,6 +283,7 @@ func fetchInPostLive(ctx context.Context, carrier Carrier, trackingNumber, posta
 				Status:      evStatus,
 				Stage:       evStage,
 				Description: mName,
+				Location:    mLocation,
 				CarrierSlug: carrier.Slug(),
 				CarrierName: carrier.Name(),
 			})
@@ -296,6 +325,9 @@ func fetchInPostLive(ctx context.Context, carrier Carrier, trackingNumber, posta
 		daysInTransit = int(time.Since(firstDate).Hours() / 24)
 	}
 
+	origin := extractInPostOrigin(events)
+	destination := resolveInPostDestination(carrier, postalCode, opts)
+
 	return &models.Shipment{
 		TrackingNumber: trackingNumber,
 		Carrier:        carrier.Info(),
@@ -303,17 +335,11 @@ func fetchInPostLive(ctx context.Context, carrier Carrier, trackingNumber, posta
 		StatusText:     statusText,
 		Progress:       progress,
 		DeliveredAt:    deliveredAt,
-		Origin: models.CountryInfo{
-			Name: "Spain",
-			Code: "ES",
-		},
-		Destination: models.CountryInfo{
-			Name: "Spain",
-			Code: "ES",
-		},
-		DaysInTransit: daysInTransit,
-		Events:        events,
-		UpdatedAt:     time.Now(),
+		Origin:         origin,
+		Destination:    destination,
+		DaysInTransit:  daysInTransit,
+		Events:         events,
+		UpdatedAt:      time.Now(),
 	}, nil
 }
 
@@ -460,4 +486,196 @@ func inpostProgress(status models.Status) int {
 	default:
 		return 20
 	}
+}
+
+// extractInPostOrigin inspects events to determine origin if an explicit location exists.
+// If no explicit origin location is found or recognizable, it returns Name: "Unknown", Code: "".
+func extractInPostOrigin(events []models.TrackingEvent) models.CountryInfo {
+	// Look through non-delivery events for an explicit origin location.
+	// In InPost, events are chronologically ordered. The earliest event with an explicit location
+	// represents the parcel's origin.
+	for _, ev := range events {
+		if ev.Stage == models.StageLastMile || ev.Stage == models.StageDelivery ||
+			ev.Status == models.StatusOutForDelivery || ev.Status == models.StatusDelivered {
+			continue
+		}
+		loc := strings.TrimSpace(ev.Location)
+		if loc != "" {
+			if country, ok := detectCountryFromLocation(loc); ok {
+				return country
+			}
+		}
+	}
+
+	return models.CountryInfo{
+		Name: "Unknown",
+		Code: "",
+	}
+}
+
+// resolveInPostDestination determines destination country info based on carrier and postal code.
+func resolveInPostDestination(carrier Carrier, postalCode string, opts models.TrackOptions) models.CountryInfo {
+	postalCode = strings.TrimSpace(postalCode)
+	destCountry := strings.ToUpper(strings.TrimSpace(opts.DestinationCountry))
+
+	if destCountry == "ES" || strings.EqualFold(destCountry, "Spain") || strings.EqualFold(destCountry, "España") {
+		return models.CountryInfo{Name: "Spain", Code: "ES"}
+	}
+
+	if isSpanishPostalCode(postalCode) || carrier.Country() == "ES" || strings.Contains(carrier.Website(), ".es") {
+		return models.CountryInfo{
+			Name: "Spain",
+			Code: "ES",
+		}
+	}
+
+	if destCountry != "" {
+		return models.CountryInfo{
+			Name: destCountry,
+			Code: destCountry,
+		}
+	}
+
+	return models.CountryInfo{
+		Name: "Unknown",
+		Code: "",
+	}
+}
+
+func isSpanishPostalCode(postalCode string) bool {
+	postalCode = strings.TrimSpace(postalCode)
+	if len(postalCode) != 5 {
+		return false
+	}
+	for _, r := range postalCode {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	prefix := postalCode[:2]
+	return prefix >= "01" && prefix <= "52"
+}
+
+func detectCountryFromLocation(loc string) (models.CountryInfo, bool) {
+	loc = strings.TrimSpace(loc)
+	if loc == "" {
+		return models.CountryInfo{}, false
+	}
+
+	lower := strings.ToLower(loc)
+
+	// France
+	if containsAny(lower, "france", "francia", "français", "francais", "paris", "lille", "lyon", "marseille", "bordeaux", "toulouse", "strasbourg", "nantes") || matchExplicitCountryCode(loc, "FR") {
+		return models.CountryInfo{Name: "France", Code: "FR"}, true
+	}
+
+	// Poland
+	if containsAny(lower, "poland", "polonia", "polska", "warsaw", "warszawa", "krakow", "kraków", "lodz", "łódź", "wroclaw", "wrocław", "poznan", "poznań", "gdansk", "gdańsk") || matchExplicitCountryCode(loc, "PL") {
+		return models.CountryInfo{Name: "Poland", Code: "PL"}, true
+	}
+
+	// Spain
+	if containsAny(lower, "spain", "españa", "espana", "espanya", "madrid", "barcelona", "valencia", "sevilla", "zaragoza", "málaga", "malaga", "bilbao", "valladolid") || matchExplicitCountryCode(loc, "ES") {
+		return models.CountryInfo{Name: "Spain", Code: "ES"}, true
+	}
+
+	// Italy
+	if containsAny(lower, "italy", "italia", "rome", "roma", "milan", "milano", "naples", "napoli", "turin", "torino", "bologna", "firenze") || matchExplicitCountryCode(loc, "IT") {
+		return models.CountryInfo{Name: "Italy", Code: "IT"}, true
+	}
+
+	// Portugal
+	if containsAny(lower, "portugal", "lisbon", "lisboa", "porto", "braga", "coimbra", "faro") || matchExplicitCountryCode(loc, "PT") {
+		return models.CountryInfo{Name: "Portugal", Code: "PT"}, true
+	}
+
+	// Belgium
+	if containsAny(lower, "belgium", "belgique", "bélgica", "belgica", "belgië", "belgie", "brussels", "bruxelles", "antwerp", "anvers", "gent", "liege") || matchExplicitCountryCode(loc, "BE") {
+		return models.CountryInfo{Name: "Belgium", Code: "BE"}, true
+	}
+
+	// Netherlands
+	if containsAny(lower, "netherlands", "países bajos", "paises bajos", "nederland", "amsterdam", "rotterdam", "utrecht", "the hague") || matchExplicitCountryCode(loc, "NL") {
+		return models.CountryInfo{Name: "Netherlands", Code: "NL"}, true
+	}
+
+	// Luxembourg
+	if containsAny(lower, "luxembourg", "luxemburgo") || matchExplicitCountryCode(loc, "LU") {
+		return models.CountryInfo{Name: "Luxembourg", Code: "LU"}, true
+	}
+
+	// Germany
+	if containsAny(lower, "germany", "allemagne", "alemania", "deutschland", "berlin", "munich", "münchen", "frankfurt", "hamburg", "köln", "cologne") || matchExplicitCountryCode(loc, "DE") {
+		return models.CountryInfo{Name: "Germany", Code: "DE"}, true
+	}
+
+	// United Kingdom
+	if containsAny(lower, "united kingdom", "reino unido", "london", "manchester") || matchExplicitCountryCode(loc, "GB") || matchExplicitCountryCode(loc, "UK") {
+		return models.CountryInfo{Name: "United Kingdom", Code: "GB"}, true
+	}
+
+	// Austria
+	if containsAny(lower, "austria", "österreich", "vienna", "wien") || matchExplicitCountryCode(loc, "AT") {
+		return models.CountryInfo{Name: "Austria", Code: "AT"}, true
+	}
+
+	// Switzerland
+	if containsAny(lower, "switzerland", "suisse", "schweiz", "svizzera", "suiza", "zurich", "geneva") || matchExplicitCountryCode(loc, "CH") {
+		return models.CountryInfo{Name: "Switzerland", Code: "CH"}, true
+	}
+
+	// Czech Republic
+	if containsAny(lower, "czech", "czechia", "chequia", "prague", "praha") || matchExplicitCountryCode(loc, "CZ") {
+		return models.CountryInfo{Name: "Czech Republic", Code: "CZ"}, true
+	}
+
+	// Slovakia
+	if containsAny(lower, "slovakia", "eslovaquia", "bratislava") || matchExplicitCountryCode(loc, "SK") {
+		return models.CountryInfo{Name: "Slovakia", Code: "SK"}, true
+	}
+
+	// Hungary
+	if containsAny(lower, "hungary", "hungría", "hungria", "budapest") || matchExplicitCountryCode(loc, "HU") {
+		return models.CountryInfo{Name: "Hungary", Code: "HU"}, true
+	}
+
+	// Romania
+	if containsAny(lower, "romania", "rumania", "bucharest", "bucuresti") || matchExplicitCountryCode(loc, "RO") {
+		return models.CountryInfo{Name: "Romania", Code: "RO"}, true
+	}
+
+	// Ireland
+	if containsAny(lower, "ireland", "irlanda", "dublin") || matchExplicitCountryCode(loc, "IE") {
+		return models.CountryInfo{Name: "Ireland", Code: "IE"}, true
+	}
+
+	return models.CountryInfo{}, false
+}
+
+func matchExplicitCountryCode(loc, code string) bool {
+	if strings.EqualFold(strings.TrimSpace(loc), code) {
+		return true
+	}
+	patterns := []string{
+		"(" + code + ")",
+		"[" + code + "]",
+		", " + code,
+		"-" + code,
+		" " + code,
+	}
+	for _, p := range patterns {
+		if strings.Contains(loc, p) {
+			return true
+		}
+	}
+	return false
+}
+
+func containsAny(s string, substrs ...string) bool {
+	for _, sub := range substrs {
+		if strings.Contains(s, sub) {
+			return true
+		}
+	}
+	return false
 }

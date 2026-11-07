@@ -35,7 +35,7 @@ func (c *InPostSpainCarrier) generateSimulatedShipment(trackingNumber string, op
 		{
 			Date:        now.Add(-28 * time.Hour),
 			Description: "Envío registrado por remitente para Punto Pack o Locker / Parcel registered for locker",
-			Location:    "Madrid, Spain",
+			Location:    "Punto Pack / Locker",
 			CarrierSlug: c.Slug(),
 			CarrierName: c.Name(),
 			Status:      models.StatusInfoReceived,
@@ -44,7 +44,7 @@ func (c *InPostSpainCarrier) generateSimulatedShipment(trackingNumber string, op
 		{
 			Date:        now.Add(-16 * time.Hour),
 			Description: "Paquete recogido y en tránsito a nave de clasificación / In transit to depot",
-			Location:    "Centro de Clasificación, Madrid, Spain",
+			Location:    "Centro de Clasificación",
 			CarrierSlug: c.Slug(),
 			CarrierName: c.Name(),
 			Status:      models.StatusInTransit,
@@ -64,14 +64,8 @@ func (c *InPostSpainCarrier) generateSimulatedShipment(trackingNumber string, op
 	return &models.Shipment{
 		TrackingNumber: trackingNumber,
 		Carrier:        c.Info(),
-		Origin: models.CountryInfo{
-			Name: "Spain",
-			Code: "ES",
-		},
-		Destination: models.CountryInfo{
-			Name: "Spain",
-			Code: "ES",
-		},
+		Origin:         extractInPostOrigin(events),
+		Destination:    resolveInPostDestination(c, opts.PostalCode, opts),
 		Status:        models.StatusOutForDelivery,
 		StatusText:    "En reparto / Out for delivery",
 		Progress:      85,
