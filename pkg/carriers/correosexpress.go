@@ -154,6 +154,10 @@ func (c *CorreosExpressCarrier) Track(ctx context.Context, trackingNumber string
 		}
 	}
 
+	if !opts.AllowSimulated {
+		return nil, models.ErrCarrierNotImplemented
+	}
+
 	now := time.Now()
 
 	// Typical Spanish Correos Express timeline

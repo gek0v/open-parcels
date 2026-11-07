@@ -87,7 +87,7 @@ func TestTrackV1Endpoint(t *testing.T) {
 	srv := setupTestServer()
 
 	// GET test
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/track?number=LP00561234567890&lang=es", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/track?number=LP00561234567890&lang=es&mock=true", nil)
 	rec := httptest.NewRecorder()
 
 	srv.handleTrackV1(rec, req)
@@ -108,7 +108,7 @@ func TestTrackV1Endpoint(t *testing.T) {
 	}
 
 	// POST test
-	body := []byte(`{"tracking_number":"9400111206213785678901","carrier_hint":"usps"}`)
+	body := []byte(`{"tracking_number":"9400111206213785678901","carrier_hint":"usps","allow_simulated":true}`)
 	postReq := httptest.NewRequest(http.MethodPost, "/api/v1/track", bytes.NewReader(body))
 	postRec := httptest.NewRecorder()
 
@@ -128,6 +128,7 @@ func TestParcelsAppV4Compatibility(t *testing.T) {
 			{
 				TrackingNumber:     "LP00561234567890",
 				DestinationCountry: "ES",
+				AllowSimulated:     true,
 			},
 		},
 	}

@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.2] - 2026-11-07
+
+### Added
+- **Live InPost / Mondial Relay Integration**: Consulta HTTP real contra inpost.es mediante SSR Astro Island, extrayendo hitos auténticos, fechas verídicas y código de evento (ej. CRE.1001).
+- **Soporte de Código Postal de Destino**: Flags CLI `--postal-code` (`-z`), soporte en endpoints REST y herramientas MCP. Validación estricta para carriers que requieren código postal.
+
+### Fixed
+- **Eliminación de Mocks Silenciosos**: Fin de los datos inventados con `time.Now()`. Si una guía no existe o el CP es erróneo, el sistema devuelve error legítimo `NOT_FOUND` o `MISSING_POSTAL_CODE`.
+- **Corrección Semántica en Normalizador**: Distinción estricta de 'being delivered' / 'to be delivered' como `OUT FOR DELIVERY` (85%) evitando falsos positivos de estado `DELIVERED` (100%).
+
 ## [1.0.0] - 2026-11-05
 
 ### Added

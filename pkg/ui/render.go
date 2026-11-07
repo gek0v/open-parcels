@@ -235,7 +235,18 @@ func RenderDetections(out io.Writer, num string, candidates []models.DetectResul
 	fmt.Fprintln(out)
 }
 
-// RenderCarriersTable formats the carrier catalog.
+// RenderErrorCard writes a visually polished error card in ANSI mode to out.
+func RenderErrorCard(out io.Writer, code string, err error, suggestion string) {
+	fmt.Fprintln(out)
+	fmt.Fprintf(out, "%s%s✖ TRACKING ERROR [%s]%s\n", Bold, Red, code, Reset)
+	fmt.Fprintln(out, strings.Repeat("─", 68))
+	fmt.Fprintf(out, " %sMessage:%s    %s%s%s\n", Dim, Reset, Bold, err.Error(), Reset)
+	if suggestion != "" {
+		fmt.Fprintf(out, " %sSuggestion:%s %s💡 %s%s\n", Dim, Reset, Yellow, suggestion, Reset)
+	}
+	fmt.Fprintln(out, strings.Repeat("─", 68))
+	fmt.Fprintln(out)
+}
 func RenderCarriersTable(out io.Writer, list []models.CarrierInfo) {
 	fmt.Fprintln(out)
 	fmt.Fprintf(out, "%s%s📋 SUPPORTED CARRIERS CATALOG (%d)%s\n", Bold, Cyan, len(list), Reset)

@@ -145,7 +145,7 @@ func TestRegistry(t *testing.T) {
 		}
 	}
 
-	shipment, err := cainiao.Track(context.Background(), "LP00561234567890", models.TrackOptions{Language: "en"})
+	shipment, err := cainiao.Track(context.Background(), "LP00561234567890", models.TrackOptions{Language: "en", AllowSimulated: true})
 	if err != nil {
 		t.Fatalf("unexpected error tracking cainiao: %v", err)
 	}

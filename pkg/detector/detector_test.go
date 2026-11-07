@@ -92,6 +92,7 @@ func TestDetector(t *testing.T) {
 		{"Intelcom Express", "INTLC12345678", "", "intelcom-express"},
 		{"Chit Chats", "CC1234567890", "", "chitchats"},
 		{"Poland Post UPU S10", "RR123456785PL", "", "poland-post"},
+		{"InPost 7-8 digits", "7561674", "", "inpost"},
 		{"InPost Poland 24 digits", "612345678901234567890123", "", "inpost-poland"},
 		{"Czech Post UPU S10", "RR123456785CZ", "", "czech-republic-post"},
 		{"Romania Post UPU S10", "RR123456785RO", "", "romania-post"},

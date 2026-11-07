@@ -75,7 +75,7 @@ func TestSpainCarriersRegistryAndTracking(t *testing.T) {
 				t.Errorf("carrier %s returned empty tracking URL", sc.slug)
 			}
 
-			shipment, err := c.Track(context.Background(), sc.trackingNumber, models.TrackOptions{Language: "es"})
+			shipment, err := c.Track(context.Background(), sc.trackingNumber, models.TrackOptions{Language: "es", AllowSimulated: true, PostalCode: "28001"})
 			if err != nil {
 				t.Fatalf("carrier %s track error: %v", sc.slug, err)
 			}

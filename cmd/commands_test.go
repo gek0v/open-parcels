@@ -36,6 +36,18 @@ func TestNormalizeArgsWithPositional(t *testing.T) {
 			expectedFlags:      []string{"--json"},
 			expectedPositional: "LP00561234567890",
 		},
+		{
+			name:               "postal code shorthand -z followed by positional",
+			args:               []string{"-z", "28001", "7561674"},
+			expectedFlags:      []string{"-z", "28001"},
+			expectedPositional: "7561674",
+		},
+		{
+			name:               "mock boolean flag with postal-code and positional",
+			args:               []string{"--mock", "--postal-code", "28001", "7561674"},
+			expectedFlags:      []string{"--mock", "--postal-code", "28001"},
+			expectedPositional: "7561674",
+		},
 	}
 
 	for _, tt := range tests {

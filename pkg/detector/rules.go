@@ -617,7 +617,7 @@ func (d *Detector) initRules() {
 			CarrierType:    models.CarrierTypeLogistics,
 			Priority:       74,
 			ConfidenceBase: 0.85,
-			Regex:          regexp.MustCompile(`^(6\d{23}|\d{8}|\d{10})$`),
+			Regex:          regexp.MustCompile(`^(6\d{23}|\d{7,10})$`),
 			Description:    "InPost Locker / Mondial Relay parcel number",
 		},
 

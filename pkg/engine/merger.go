@@ -16,9 +16,7 @@ func MergeEvents(primaryEvents []models.TrackingEvent, secondaryEvents []models.
 	for _, ev := range primaryEvents {
 		if ev.Status == "" || ev.Stage == "" {
 			ev.Status, ev.Stage = NormalizeEventStatus(ev.Description)
-		}
-		descLower := strings.ToLower(ev.Description)
-		if strings.Contains(descLower, "entregado") || strings.Contains(descLower, "delivered") {
+		} else if ev.Status != models.StatusDelivered && IsDeliveredText(ev.Description) {
 			ev.Status = models.StatusDelivered
 			ev.Stage = models.StageDelivery
 		}
@@ -32,9 +30,7 @@ func MergeEvents(primaryEvents []models.TrackingEvent, secondaryEvents []models.
 		}
 		if ev.Status == "" || ev.Stage == "" {
 			ev.Status, ev.Stage = NormalizeEventStatus(ev.Description)
-		}
-		descLower := strings.ToLower(ev.Description)
-		if strings.Contains(descLower, "entregado") || strings.Contains(descLower, "delivered") {
+		} else if ev.Status != models.StatusDelivered && IsDeliveredText(ev.Description) {
 			ev.Status = models.StatusDelivered
 			ev.Stage = models.StageDelivery
 		}
@@ -109,8 +105,7 @@ func DeriveOverallStatus(events []models.TrackingEvent) models.Status {
 		if ev.Status == models.StatusDelivered {
 			return models.StatusDelivered
 		}
-		descLower := strings.ToLower(ev.Description)
-		if strings.Contains(descLower, "entregado") || strings.Contains(descLower, "delivered") {
+		if IsDeliveredText(ev.Description) {
 			return models.StatusDelivered
 		}
 	}

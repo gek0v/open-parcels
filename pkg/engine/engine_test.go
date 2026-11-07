@@ -14,6 +14,7 @@ func TestEngineTrackChaining(t *testing.T) {
 	shipment, err := eng.Track(context.Background(), "LP00561234567890", models.TrackOptions{
 		DestinationCountry: "ES",
 		Language:           "es",
+		AllowSimulated:     true,
 	})
 	if err != nil {
 		t.Fatalf("expected successful tracking, got err: %v", err)
@@ -179,6 +180,58 @@ func TestEngineTracking323CainiaoAndCorreosExpress(t *testing.T) {
 	}
 	if !hasCainiao {
 		t.Errorf("expected Cainiao Global represented when tracked with correosexpress hint")
+	}
+}
+
+func TestNormalizerInPostBeingDelivered(t *testing.T) {
+	// 1. Normalizer should map "Parcel is being delivered to destination locker / Punto Pack" to OutForDelivery
+	desc := "Parcel is being delivered to destination locker / Punto Pack"
+	status, stage := NormalizeEventStatus(desc)
+	if status != models.StatusOutForDelivery {
+		t.Errorf("expected StatusOutForDelivery for '%s', got %s", desc, status)
+	}
+	if stage != models.StageLastMile {
+		t.Errorf("expected StageLastMile, got %s", stage)
+	}
+
+	// 2. IsDeliveredText should return false for "being delivered", "to be delivered", "undelivered"
+	if IsDeliveredText(desc) {
+		t.Errorf("IsDeliveredText returned true for '%s'", desc)
+	}
+	if IsDeliveredText("Package is to be delivered today") {
+		t.Errorf("IsDeliveredText returned true for 'Package is to be delivered today'")
+	}
+	if IsDeliveredText("Package undelivered: address incomplete") {
+		t.Errorf("IsDeliveredText returned true for 'Package undelivered: address incomplete'")
+	}
+
+	// 3. True delivery text must still return true
+	if !IsDeliveredText("Parcel delivered to locker") {
+		t.Errorf("IsDeliveredText returned false for 'Parcel delivered to locker'")
+	}
+	if !IsDeliveredText("Envío entregado al destinatario") {
+		t.Errorf("IsDeliveredText returned false for 'Envío entregado al destinatario'")
+	}
+
+	// 4. Test InPost tracking through engine (guide 7561674)
+	eng := New()
+	shipment, err := eng.Track(context.Background(), "7561674", models.TrackOptions{
+		CarrierHint:    "inpost",
+		PostalCode:     "28001",
+		AllowSimulated: true,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error tracking InPost: %v", err)
+	}
+
+	if shipment.Status != models.StatusOutForDelivery {
+		t.Errorf("expected status OutForDelivery (%s), got %s", models.StatusOutForDelivery, shipment.Status)
+	}
+	if shipment.Progress != 85 {
+		t.Errorf("expected progress 85%%, got %d%%", shipment.Progress)
+	}
+	if shipment.DeliveredAt != nil {
+		t.Errorf("DeliveredAt should be nil for out_for_delivery parcel, got %v", shipment.DeliveredAt)
 	}
 }
 

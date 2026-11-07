@@ -20,12 +20,16 @@ func NewInPostSpainCarrier() *InPostSpainCarrier {
 			"Spain",
 			models.CarrierTypeLogistics,
 			"https://inpost.es",
-			"https://inpost.es/seguimiento-del-envio/?number=%s",
+			"https://www.inpost.es/seguimiento-del-envio?parcelNumber=%s",
 		),
 	}
 }
 
 func (c *InPostSpainCarrier) Track(ctx context.Context, trackingNumber string, opts models.TrackOptions) (*models.Shipment, error) {
+	return trackInPostShared(ctx, c, trackingNumber, opts, c.generateSimulatedShipment)
+}
+
+func (c *InPostSpainCarrier) generateSimulatedShipment(trackingNumber string, opts models.TrackOptions) *models.Shipment {
 	now := time.Now()
 	events := []models.TrackingEvent{
 		{
@@ -74,5 +78,5 @@ func (c *InPostSpainCarrier) Track(ctx context.Context, trackingNumber string, o
 		DaysInTransit: 1,
 		Events:        events,
 		UpdatedAt:     time.Now(),
-	}, nil
+	}
 }

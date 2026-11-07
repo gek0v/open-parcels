@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -13,7 +14,7 @@ import (
 )
 
 // Version represents the build version, modifiable via ldflags during release compilation.
-var Version = "v1.0.0"
+var Version = "v1.0.2"
 
 // Execute runs the CLI application parsing os.Args.
 func Execute() {
@@ -70,6 +71,8 @@ Flags for 'track':
   --carrier, -c       Explicit carrier slug hint (e.g. cainiao, correos-express, ups, usps)
   --lang, -l          Language for status & descriptions ('en' or 'es', default: en)
   --country           Destination country hint ISO-2 (e.g. ES, US, DE)
+  --postal-code, -z   Destination postal code (required by carriers such as InPost)
+  --mock, --allow-simulated Allow simulated/mock fallback tracking data for dev/testing
   --json              Output raw JSON response instead of visual terminal UI
 
 Examples:
@@ -89,6 +92,10 @@ func runTrack(args []string) {
 	lang := fs.String("lang", "en", "Language for status text (en, es)")
 	fs.StringVar(lang, "l", "en", "Language for status text (shorthand)")
 	country := fs.String("country", "", "Destination country code (ISO-2)")
+	postalCode := fs.String("postal-code", "", "Destination postal code")
+	fs.StringVar(postalCode, "z", "", "Destination postal code (shorthand)")
+	mock := fs.Bool("mock", false, "Allow simulated tracking data")
+	fs.BoolVar(mock, "allow-simulated", false, "Allow simulated tracking data (alias)")
 	jsonOutput := fs.Bool("json", false, "Output JSON format")
 
 	// Normalize arguments so flags can appear before or after the tracking number
@@ -103,7 +110,14 @@ func runTrack(args []string) {
 	}
 
 	if trackingNumber == "" {
-		fmt.Fprintln(os.Stderr, "Error: tracking number is required. Usage: open-parcels track <tracking_number> [--carrier <slug>] [--lang es|en] [--json]")
+		if *jsonOutput {
+			_ = ui.RenderJSON(os.Stdout, map[string]string{
+				"error": "tracking number is required",
+				"code":  "MISSING_NUMBER",
+			})
+			os.Exit(1)
+		}
+		fmt.Fprintln(os.Stderr, "Error: tracking number is required. Usage: open-parcels track <tracking_number> [--carrier <slug>] [--postal-code <CP>] [--mock] [--json]")
 		os.Exit(1)
 	}
 
@@ -112,10 +126,33 @@ func runTrack(args []string) {
 		CarrierHint:        *carrier,
 		Language:           *lang,
 		DestinationCountry: *country,
+		PostalCode:         *postalCode,
+		AllowSimulated:     *mock,
 	})
 
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "%sError tracking shipment:%s %v\n", ui.Red+ui.Bold, ui.Reset, err)
+		code := "NOT_FOUND"
+		suggestion := "Check the tracking number or pass --mock to allow simulated test data."
+		if errors.Is(err, models.ErrMissingPostalCode) || strings.Contains(strings.ToLower(err.Error()), "postal code") {
+			code = "MISSING_POSTAL_CODE"
+			suggestion = "This carrier requires a destination postal code. Pass --postal-code <CP> (or -z <CP>)."
+		} else if errors.Is(err, models.ErrCarrierNotImplemented) || strings.Contains(strings.ToLower(err.Error()), "not implemented") {
+			code = "NOT_IMPLEMENTED"
+			suggestion = "Live API tracking is not implemented for this carrier yet. Use --mock for testing."
+		} else if errors.Is(err, models.ErrShipmentNotFound) || strings.Contains(strings.ToLower(err.Error()), "not found") {
+			code = "NOT_FOUND"
+			suggestion = "Shipment not found by carrier. Ensure the tracking number is correct or use --mock for testing."
+		}
+
+		if *jsonOutput {
+			_ = ui.RenderJSON(os.Stdout, map[string]string{
+				"error": err.Error(),
+				"code":  code,
+			})
+			os.Exit(1)
+		}
+
+		ui.RenderErrorCard(os.Stderr, code, err, suggestion)
 		os.Exit(1)
 	}
 
@@ -202,7 +239,8 @@ func normalizeArgsWithPositional(args []string) ([]string, string) {
 				// Flags that take values
 				flagName := strings.TrimLeft(arg, "-")
 				if flagName == "c" || flagName == "carrier" || flagName == "l" || flagName == "lang" ||
-					flagName == "country" || flagName == "p" || flagName == "port" || flagName == "q" || flagName == "query" {
+					flagName == "country" || flagName == "p" || flagName == "port" || flagName == "q" || flagName == "query" ||
+					flagName == "z" || flagName == "postal-code" {
 					i++
 					flags = append(flags, args[i])
 				}

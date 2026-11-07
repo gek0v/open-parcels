@@ -54,6 +54,7 @@ func TestMCPServer(t *testing.T) {
 			"arguments": map[string]any{
 				"tracking_number": "LP00561234567890",
 				"language":        "es",
+				"allow_simulated": true,
 			},
 		},
 	}
@@ -126,6 +127,7 @@ func TestMCPServer(t *testing.T) {
 			"name": "estimate_delivery",
 			"arguments": map[string]any{
 				"tracking_number": "LP00561234567890",
+				"allow_simulated": true,
 			},
 		},
 	}

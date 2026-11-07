@@ -53,6 +53,14 @@ func (s *Server) initTools() {
 						Type:        "string",
 						Description: "Language for status text and descriptions ('en' or 'es', default: 'en')",
 					},
+					"postal_code": {
+						Type:        "string",
+						Description: "Destination postal code (required by carriers such as InPost)",
+					},
+					"allow_simulated": {
+						Type:        "boolean",
+						Description: "Allow simulated/mock fallback tracking data for development or testing",
+					},
 				},
 				Required: []string{"tracking_number"},
 			},
@@ -97,6 +105,10 @@ func (s *Server) initTools() {
 					"tracking_number": {
 						Type:        "string",
 						Description: "Tracking number to estimate",
+					},
+					"allow_simulated": {
+						Type:        "boolean",
+						Description: "Allow simulated/mock fallback tracking data for development or testing",
 					},
 				},
 				Required: []string{"tracking_number"},
@@ -234,6 +246,8 @@ func (s *Server) executeTool(ctx context.Context, name string, args map[string]a
 
 		carrierHint, _ := args["carrier_hint"].(string)
 		destCountry, _ := args["destination_country"].(string)
+		postalCode, _ := args["postal_code"].(string)
+		allowSimulated, _ := args["allow_simulated"].(bool)
 		lang, _ := args["language"].(string)
 		if lang == "" {
 			lang = "en"
@@ -242,6 +256,8 @@ func (s *Server) executeTool(ctx context.Context, name string, args map[string]a
 		shipment, err := s.engine.Track(ctx, trackingNum, models.TrackOptions{
 			CarrierHint:        carrierHint,
 			DestinationCountry: destCountry,
+			PostalCode:         postalCode,
+			AllowSimulated:     allowSimulated,
 			Language:           lang,
 		})
 		if err != nil {
@@ -309,7 +325,8 @@ func (s *Server) executeTool(ctx context.Context, name string, args map[string]a
 			return errorResult("tracking_number argument is required")
 		}
 
-		shipment, err := s.engine.Track(ctx, trackingNum, models.TrackOptions{})
+		allowSimulated, _ := args["allow_simulated"].(bool)
+		shipment, err := s.engine.Track(ctx, trackingNum, models.TrackOptions{AllowSimulated: allowSimulated})
 		if err != nil {
 			return errorResult(fmt.Sprintf("Failed to retrieve shipment for estimate: %v", err))
 		}

@@ -56,6 +56,17 @@ func (s *Server) handleTrackV1(w http.ResponseWriter, r *http.Request) {
 		opts.CarrierHint = r.URL.Query().Get("carrier")
 		opts.Language = r.URL.Query().Get("lang")
 		opts.DestinationCountry = r.URL.Query().Get("country")
+		opts.PostalCode = r.URL.Query().Get("postal_code")
+		if opts.PostalCode == "" {
+			opts.PostalCode = r.URL.Query().Get("postalCode")
+		}
+		mockVal := r.URL.Query().Get("mock")
+		if mockVal == "" {
+			mockVal = r.URL.Query().Get("allow_simulated")
+		}
+		if strings.EqualFold(mockVal, "true") || mockVal == "1" {
+			opts.AllowSimulated = true
+		}
 	} else if r.Method == http.MethodPost {
 		var req struct {
 			TrackingNumber     string `json:"tracking_number"`
@@ -63,6 +74,8 @@ func (s *Server) handleTrackV1(w http.ResponseWriter, r *http.Request) {
 			Language           string `json:"language,omitempty"`
 			DestinationCountry string `json:"destination_country,omitempty"`
 			PostalCode         string `json:"postal_code,omitempty"`
+			AllowSimulated     bool   `json:"allow_simulated,omitempty"`
+			Mock               bool   `json:"mock,omitempty"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			writeError(w, http.StatusBadRequest, "INVALID_JSON", "Failed to parse JSON body.")
@@ -73,6 +86,7 @@ func (s *Server) handleTrackV1(w http.ResponseWriter, r *http.Request) {
 		opts.Language = req.Language
 		opts.DestinationCountry = req.DestinationCountry
 		opts.PostalCode = req.PostalCode
+		opts.AllowSimulated = req.AllowSimulated || req.Mock
 	} else {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
@@ -124,6 +138,7 @@ func (s *Server) handleParcelsAppTrackings(w http.ResponseWriter, r *http.Reques
 			Language:           req.Language,
 			DestinationCountry: shp.DestinationCountry,
 			PostalCode:         shp.PostalCode,
+			AllowSimulated:     shp.AllowSimulated,
 			Email:              shp.Email,
 			Phone:              shp.Phone,
 			AdditionalFields:   shp.AdditionalFields,

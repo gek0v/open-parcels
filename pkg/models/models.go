@@ -1,7 +1,15 @@
 package models
 
 import (
+	"errors"
 	"time"
+)
+
+// Sentinel errors for tracking operations
+var (
+	ErrShipmentNotFound      = errors.New("shipment not found")
+	ErrMissingPostalCode     = errors.New("postal code is required for this carrier")
+	ErrCarrierNotImplemented = errors.New("carrier live tracking driver is not implemented")
 )
 
 // Standard shipment statuses
@@ -132,6 +140,7 @@ type TrackOptions struct {
 	Language           string            `json:"language,omitempty"` // "es", "en" (default: "en")
 	DestinationCountry string            `json:"destination_country,omitempty"`
 	PostalCode         string            `json:"postal_code,omitempty"`
+	AllowSimulated     bool              `json:"allow_simulated,omitempty"`
 	Email              string            `json:"email,omitempty"`
 	Phone              string            `json:"phone,omitempty"`
 	AdditionalFields   map[string]string `json:"additional_fields,omitempty"`
@@ -150,6 +159,7 @@ type ParcelsAppShipmentIn struct {
 	DestinationCountry string            `json:"destination_country,omitempty"`
 	CarrierHint        string            `json:"carrier_hint,omitempty"`
 	PostalCode         string            `json:"postal_code,omitempty"`
+	AllowSimulated     bool              `json:"allow_simulated,omitempty"`
 	Email              string            `json:"email,omitempty"`
 	Phone              string            `json:"phone,omitempty"`
 	AdditionalFields   map[string]string `json:"additional_fields,omitempty"`

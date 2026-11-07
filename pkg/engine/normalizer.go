@@ -6,24 +6,46 @@ import (
 	"open-parcels/pkg/models"
 )
 
-// NormalizeEventStatus inspects an event's text and classifies its status and lifecycle stage.
-func NormalizeEventStatus(desc string) (models.Status, models.Stage) {
+// IsDeliveredText checks if a status text represents an already completed delivery,
+// being careful to avoid false positives like "being delivered", "to be delivered", "undelivered", etc.
+func IsDeliveredText(desc string) bool {
 	d := strings.ToLower(desc)
 
-	// Delivered
-	if strings.Contains(d, "delivered") ||
+	// Filter out non-delivered contexts first
+	if strings.Contains(d, "being delivered") ||
+		strings.Contains(d, "to be delivered") ||
+		strings.Contains(d, "undelivered") ||
+		strings.Contains(d, "undeliverable") ||
+		strings.Contains(d, "cannot be delivered") ||
+		strings.Contains(d, "not delivered") ||
+		strings.Contains(d, "could not be delivered") ||
+		strings.Contains(d, "attempted") ||
+		strings.Contains(d, "intentando") ||
+		strings.Contains(d, "pendiente de entrega") ||
+		strings.Contains(d, "en reparto") ||
+		strings.Contains(d, "out for delivery") ||
+		strings.Contains(d, "in consegna") {
+		return false
+	}
+
+	return strings.Contains(d, "delivered") ||
 		strings.Contains(d, "entregado") ||
 		strings.Contains(d, "consegnato") ||
 		strings.Contains(d, "consegnata") ||
 		strings.Contains(d, "livré") ||
 		strings.Contains(d, "zugestellt") ||
 		strings.Contains(d, "in/at mailbox") ||
-		strings.Contains(d, "signed by") {
-		return models.StatusDelivered, models.StageDelivery
-	}
+		strings.Contains(d, "signed by")
+}
 
-	// Out for delivery
-	if strings.Contains(d, "out for delivery") ||
+// NormalizeEventStatus inspects an event's text and classifies its status and lifecycle stage.
+func NormalizeEventStatus(desc string) (models.Status, models.Stage) {
+	d := strings.ToLower(desc)
+
+	// Out for delivery / in delivery process (must be checked before delivered to catch "being delivered", etc.)
+	if strings.Contains(d, "being delivered") ||
+		strings.Contains(d, "to be delivered") ||
+		strings.Contains(d, "out for delivery") ||
 		strings.Contains(d, "en reparto") ||
 		strings.Contains(d, "in consegna") ||
 		strings.Contains(d, "en cours de livraison") ||
@@ -32,6 +54,11 @@ func NormalizeEventStatus(desc string) (models.Status, models.Stage) {
 		strings.Contains(d, "loaded onto delivery vehicle") ||
 		strings.Contains(d, "repartidor") {
 		return models.StatusOutForDelivery, models.StageLastMile
+	}
+
+	// Delivered
+	if IsDeliveredText(d) {
+		return models.StatusDelivered, models.StageDelivery
 	}
 
 	// Failed attempt
