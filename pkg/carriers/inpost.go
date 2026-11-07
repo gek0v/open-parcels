@@ -38,6 +38,11 @@ func NewInPostCarrier() *InPostCarrier {
 	}
 }
 
+// HasLiveTracking signals that InPost implements real network scraping/API.
+func (c *InPostCarrier) HasLiveTracking() bool {
+	return true
+}
+
 func (c *InPostCarrier) Track(ctx context.Context, trackingNumber string, opts models.TrackOptions) (*models.Shipment, error) {
 	return trackInPostShared(ctx, c, trackingNumber, opts, c.generateSimulatedShipment)
 }

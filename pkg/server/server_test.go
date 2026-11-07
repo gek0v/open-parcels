@@ -237,4 +237,28 @@ func TestNegativeErrorPaths(t *testing.T) {
 	if getRec.Code != http.StatusNotFound {
 		t.Errorf("expected 404 for non-existent tracking request ID, got %d", getRec.Code)
 	}
+
+	// 6. Track with unknown shipment should return 404 Not Found
+	reqNotFound := httptest.NewRequest(http.MethodGet, "/api/v1/track?number=FAKE000000000", nil)
+	recNotFound := httptest.NewRecorder()
+	srv.handleTrackV1(recNotFound, reqNotFound)
+	if recNotFound.Code != http.StatusNotFound {
+		t.Errorf("expected 404 for non-existent shipment, got %d", recNotFound.Code)
+	}
+
+	// 7. Track requiring postal code without one should return 422 Unprocessable Entity
+	reqPostalCode := httptest.NewRequest(http.MethodGet, "/api/v1/track?number=7561674&carrier=inpost", nil)
+	recPostalCode := httptest.NewRecorder()
+	srv.handleTrackV1(recPostalCode, reqPostalCode)
+	if recPostalCode.Code != http.StatusUnprocessableEntity {
+		t.Errorf("expected 422 for postal code required, got %d", recPostalCode.Code)
+	}
+
+	// 8. Track for catalog carrier without live driver should return 501 Not Implemented
+	reqNotImpl := httptest.NewRequest(http.MethodGet, "/api/v1/track?number=PQ1234567890123456789012&carrier=correos-spain", nil)
+	recNotImpl := httptest.NewRecorder()
+	srv.handleTrackV1(recNotImpl, reqNotImpl)
+	if recNotImpl.Code != http.StatusNotImplemented {
+		t.Errorf("expected 501 for unimplemented carrier, got %d", recNotImpl.Code)
+	}
 }

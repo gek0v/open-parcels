@@ -37,28 +37,6 @@ func MergeEvents(primaryEvents []models.TrackingEvent, secondaryEvents []models.
 		all = append(all, ev)
 	}
 
-	// If shipment has a delivered event, discard any non-delivered anomalies/mocks with timestamps after delivery
-	var deliveredDate *time.Time
-	for _, ev := range all {
-		if ev.Status == models.StatusDelivered {
-			d := ev.Date
-			if deliveredDate == nil || d.After(*deliveredDate) {
-				deliveredDate = &d
-			}
-		}
-	}
-
-	if deliveredDate != nil {
-		filtered := make([]models.TrackingEvent, 0, len(all))
-		for _, ev := range all {
-			if ev.Date.After(*deliveredDate) && ev.Status != models.StatusDelivered {
-				continue
-			}
-			filtered = append(filtered, ev)
-		}
-		all = filtered
-	}
-
 	// Sort events chronologically descending (newest first)
 	sort.SliceStable(all, func(i, j int) bool {
 		return all[i].Date.After(all[j].Date)

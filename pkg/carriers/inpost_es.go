@@ -25,6 +25,11 @@ func NewInPostSpainCarrier() *InPostSpainCarrier {
 	}
 }
 
+// HasLiveTracking signals that InPost Spain implements real network tracking.
+func (c *InPostSpainCarrier) HasLiveTracking() bool {
+	return true
+}
+
 func (c *InPostSpainCarrier) Track(ctx context.Context, trackingNumber string, opts models.TrackOptions) (*models.Shipment, error) {
 	return trackInPostShared(ctx, c, trackingNumber, opts, c.generateSimulatedShipment)
 }

@@ -22,6 +22,25 @@ type Carrier interface {
 	Track(ctx context.Context, trackingNumber string, opts models.TrackOptions) (*models.Shipment, error)
 }
 
+// LiveTracker is implemented by carrier drivers that connect to real external APIs/networks.
+type LiveTracker interface {
+	HasLiveTracking() bool
+}
+
+// HasLiveTracking checks whether a carrier adapter supports real live network tracking.
+func HasLiveTracking(c Carrier) bool {
+	if c == nil {
+		return false
+	}
+	if lt, ok := c.(LiveTracker); ok {
+		return lt.HasLiveTracking()
+	}
+	if ac, ok := c.(*AliasCarrier); ok {
+		return HasLiveTracking(ac.Carrier)
+	}
+	return false
+}
+
 // Registry manages the set of available carrier adapters.
 type Registry struct {
 	mu       sync.RWMutex
