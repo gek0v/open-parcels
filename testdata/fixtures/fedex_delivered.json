@@ -1,0 +1,60 @@
+{
+  "output": {
+    "completeTrackResults": [
+      {
+        "trackingNumber": "123456789012",
+        "trackResults": [
+          {
+            "trackingNumberInfo": {
+              "trackingNumber": "123456789012"
+            },
+            "latestStatusDetail": {
+              "code": "DL",
+              "derivedCode": "Delivered",
+              "statusByLocale": "Delivered",
+              "description": "Package delivered to recipient"
+            },
+            "dateAndTimes": [
+              {
+                "type": "ACTUAL_DELIVERY",
+                "dateTime": "2024-11-15T15:20:00Z"
+              }
+            ],
+            "scanEvents": [
+              {
+                "date": "2024-11-15T15:20:00Z",
+                "eventType": "DL",
+                "eventDescription": "Delivered",
+                "scanLocation": {
+                  "city": "NEW YORK",
+                  "stateOrProvinceCode": "NY",
+                  "countryCode": "US"
+                }
+              },
+              {
+                "date": "2024-11-15T08:15:00Z",
+                "eventType": "OD",
+                "eventDescription": "On FedEx vehicle for delivery",
+                "scanLocation": {
+                  "city": "NEW YORK",
+                  "stateOrProvinceCode": "NY",
+                  "countryCode": "US"
+                }
+              },
+              {
+                "date": "2024-11-14T20:00:00Z",
+                "eventType": "PU",
+                "eventDescription": "Picked up",
+                "scanLocation": {
+                  "city": "MEMPHIS",
+                  "stateOrProvinceCode": "TN",
+                  "countryCode": "US"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
