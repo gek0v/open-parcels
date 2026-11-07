@@ -1,0 +1,65 @@
+{
+  "trackResponse": {
+    "shipment": [
+      {
+        "inquiryNumber": "1Z12345E0205271688",
+        "package": [
+          {
+            "trackingNumber": "1Z12345E0205271688",
+            "currentStatus": {
+              "description": "Delivered",
+              "code": "FS"
+            },
+            "activity": [
+              {
+                "date": "20241115",
+                "time": "164500",
+                "status": {
+                  "type": "D",
+                  "description": "Delivered",
+                  "code": "FS"
+                },
+                "location": {
+                  "address": {
+                    "city": "MADRID",
+                    "country": "ES"
+                  }
+                }
+              },
+              {
+                "date": "20241115",
+                "time": "083000",
+                "status": {
+                  "type": "I",
+                  "description": "Out For Delivery",
+                  "code": "OT"
+                },
+                "location": {
+                  "address": {
+                    "city": "MADRID",
+                    "country": "ES"
+                  }
+                }
+              },
+              {
+                "date": "20241114",
+                "time": "190000",
+                "status": {
+                  "type": "I",
+                  "description": "Departed from Facility",
+                  "code": "DP"
+                },
+                "location": {
+                  "address": {
+                    "city": "LOUISVILLE",
+                    "country": "US"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
