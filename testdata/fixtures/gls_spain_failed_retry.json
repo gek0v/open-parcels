@@ -1,0 +1,27 @@
+{
+  "trackingNumber": "ASM987654321",
+  "status": "FAILED_ATTEMPT",
+  "statusDescription": "Entrega fallida - Ausente",
+  "origin": { "city": "BILBAO", "country": "ES" },
+  "destination": { "city": "MADRID", "country": "ES", "postalCode": "28010" },
+  "history": [
+    {
+      "date": "2024-11-15T15:30:00Z",
+      "status": "FAILED_ATTEMPT",
+      "description": "Destinatario ausente durante el reparto. Se programa segundo intento.",
+      "location": "MADRID"
+    },
+    {
+      "date": "2024-11-15T15:28:00Z",
+      "status": "FAILED_ATTEMPT",
+      "description": "Destinatario ausente durante el reparto. Se programa segundo intento.",
+      "location": "MADRID"
+    },
+    {
+      "date": "2024-11-15T09:00:00Z",
+      "status": "OUT_FOR_DELIVERY",
+      "description": "En reparto",
+      "location": "MADRID"
+    }
+  ]
+}
