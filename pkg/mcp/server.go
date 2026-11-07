@@ -10,6 +10,7 @@ import (
 	"os"
 	"strings"
 
+	"open-parcels/pkg/carriers"
 	"open-parcels/pkg/engine"
 	"open-parcels/pkg/models"
 )
@@ -97,6 +98,20 @@ func (s *Server) initTools() {
 			},
 		},
 		{
+			Name: "check_carrier_status",
+			Description: "Inspect the operational status, integration mode (live_api, public_scraper, or not_implemented), and capabilities of a carrier.",
+			InputSchema: InputSchema{
+				Type: "object",
+				Properties: map[string]Property{
+					"carrier_slug": {
+						Type:        "string",
+						Description: "The carrier identifier slug (e.g. cainiao, inpost, correos-spain, correosexpress, seur, asm-gls-spain, dhl-express, ups, fedex, tipsa)",
+					},
+				},
+				Required: []string{"carrier_slug"},
+			},
+		},
+		{
 			Name: "estimate_delivery",
 			Description: "Estimate shipment delivery progress, transit time, and status based on tracked milestones.",
 			InputSchema: InputSchema{
@@ -105,6 +120,10 @@ func (s *Server) initTools() {
 					"tracking_number": {
 						Type:        "string",
 						Description: "Tracking number to estimate",
+					},
+					"postal_code": {
+						Type:        "string",
+						Description: "Optional destination postal code for carriers requiring it",
 					},
 					"allow_simulated": {
 						Type:        "boolean",
@@ -264,9 +283,70 @@ func (s *Server) executeTool(ctx context.Context, name string, args map[string]a
 			return errorResult(fmt.Sprintf("Failed to track package: %v", err))
 		}
 
-		data, err := json.MarshalIndent(shipment, "", "  ")
+		isLive := !allowSimulated
+		var rawMap map[string]any
+		shpBytes, _ := json.Marshal(shipment)
+		_ = json.Unmarshal(shpBytes, &rawMap)
+		rawMap["is_live_data"] = isLive
+
+		data, err := json.MarshalIndent(rawMap, "", "  ")
 		if err != nil {
 			return errorResult("Failed to serialize tracking result")
+		}
+
+		return ToolCallResult{
+			Content: []ToolCallContent{
+				{
+					Type: "text",
+					Text: string(data),
+				},
+			},
+		}
+
+	case "check_carrier_status":
+		slug, _ := args["carrier_slug"].(string)
+		cleanSlug := strings.ToLower(strings.TrimSpace(slug))
+		if cleanSlug == "" {
+			return errorResult("carrier_slug argument is required")
+		}
+
+		c, found := s.engine.Registry().Get(cleanSlug)
+		if !found {
+			return errorResult(fmt.Sprintf("carrier with slug '%s' is not registered in catalog", cleanSlug))
+		}
+
+		mode := "not_implemented"
+		var caps carriers.CarrierCapabilities
+		isLive := carriers.HasLiveTracking(c)
+
+		if adapter, ok := c.(carriers.CarrierAdapter); ok {
+			caps = adapter.Capabilities()
+			if caps.SupportsLiveAPI {
+				mode = "live_api"
+			} else if caps.SupportsWebScraping {
+				mode = "public_scraper"
+			}
+		} else if isLive {
+			mode = "live_api"
+		}
+
+		statusReport := map[string]any{
+			"carrier_slug":         c.Slug(),
+			"carrier_name":         c.Name(),
+			"country":              c.Country(),
+			"country_name":         c.CountryName(),
+			"service_type":         c.Type(),
+			"status":               mode,
+			"mode":                 mode,
+			"is_live_adapter":      isLive,
+			"requires_postal_code": caps.RequiresPostalCode,
+			"requires_auth":        caps.RequiresAuth,
+			"capabilities":         caps,
+		}
+
+		data, err := json.MarshalIndent(statusReport, "", "  ")
+		if err != nil {
+			return errorResult("Failed to serialize carrier status")
 		}
 
 		return ToolCallResult{
@@ -325,8 +405,12 @@ func (s *Server) executeTool(ctx context.Context, name string, args map[string]a
 			return errorResult("tracking_number argument is required")
 		}
 
+		postalCode, _ := args["postal_code"].(string)
 		allowSimulated, _ := args["allow_simulated"].(bool)
-		shipment, err := s.engine.Track(ctx, trackingNum, models.TrackOptions{AllowSimulated: allowSimulated})
+		shipment, err := s.engine.Track(ctx, trackingNum, models.TrackOptions{
+			PostalCode:     postalCode,
+			AllowSimulated: allowSimulated,
+		})
 		if err != nil {
 			return errorResult(fmt.Sprintf("Failed to retrieve shipment for estimate: %v", err))
 		}

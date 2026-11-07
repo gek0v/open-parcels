@@ -3,6 +3,7 @@ package mcp
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -48,11 +49,11 @@ func TestMCPServer(t *testing.T) {
 	}
 	resMap := listResp.Result.(map[string]any)
 	tools := resMap["tools"].([]Tool)
-	if len(tools) < 4 {
-		t.Errorf("expected at least 4 tools, got %d", len(tools))
+	if len(tools) < 5 {
+		t.Errorf("expected at least 5 tools, got %d", len(tools))
 	}
 
-	// 3. Tools Call: track_shipment
+	// 3. Tools Call: track_shipment (simulated: is_live_data = false)
 	trackReq := JSONRPCRequest{
 		JSONRPC: "2.0",
 		ID:      3,
@@ -63,6 +64,7 @@ func TestMCPServer(t *testing.T) {
 				"tracking_number": "LP00561234567890",
 				"language":        "es",
 				"allow_simulated": true,
+				"postal_code":     "28001",
 			},
 		},
 	}
@@ -76,6 +78,35 @@ func TestMCPServer(t *testing.T) {
 	}
 	if !strings.Contains(callRes.Content[0].Text, "LP00561234567890") {
 		t.Errorf("expected tracking number in tool output text")
+	}
+	if !strings.Contains(callRes.Content[0].Text, `"is_live_data": false`) {
+		t.Errorf("expected is_live_data: false when allow_simulated is true, got: %s", callRes.Content[0].Text)
+	}
+
+	// 3b. Tools Call: track_shipment (live/fixture: is_live_data = true)
+	trackLiveReq := JSONRPCRequest{
+		JSONRPC: "2.0",
+		ID:      31,
+		Method:  "tools/call",
+		Params: map[string]any{
+			"name": "track_shipment",
+			"arguments": map[string]any{
+				"tracking_number": "LP00561234567890",
+				"language":        "es",
+				"allow_simulated": false,
+			},
+		},
+	}
+	trackLiveResp := srv.handleRequest(ctx, trackLiveReq)
+	if trackLiveResp == nil || trackLiveResp.Error != nil {
+		t.Fatalf("expected track_shipment success with live fixture, got: %v", trackLiveResp.Error)
+	}
+	callLiveRes := trackLiveResp.Result.(ToolCallResult)
+	if callLiveRes.IsError || len(callLiveRes.Content) == 0 {
+		t.Fatalf("expected tool content for live track, got error: %s", callLiveRes.Content[0].Text)
+	}
+	if !strings.Contains(callLiveRes.Content[0].Text, `"is_live_data": true`) {
+		t.Errorf("expected is_live_data: true for live track, got: %s", callLiveRes.Content[0].Text)
 	}
 
 	// 4. Tools Call: detect_carrier
@@ -149,6 +180,44 @@ func TestMCPServer(t *testing.T) {
 	}
 	if !strings.Contains(estCallRes.Content[0].Text, "days_in_transit") || !strings.Contains(estCallRes.Content[0].Text, "progress") {
 		t.Errorf("expected days_in_transit and progress fields in estimate output text, got: %s", estCallRes.Content[0].Text)
+	}
+
+	// 6b. Tools Call: check_carrier_status (live_api, public_scraper, not_implemented)
+	statusTests := []struct {
+		slug         string
+		expectedMode string
+		expectedLive bool
+	}{
+		{"cainiao", "live_api", true},
+		{"inpost", "public_scraper", true},
+		{"tipsa", "not_implemented", false},
+	}
+	for _, tc := range statusTests {
+		req := JSONRPCRequest{
+			JSONRPC: "2.0",
+			ID:      60,
+			Method:  "tools/call",
+			Params: map[string]any{
+				"name": "check_carrier_status",
+				"arguments": map[string]any{
+					"carrier_slug": tc.slug,
+				},
+			},
+		}
+		resp := srv.handleRequest(ctx, req)
+		if resp == nil || resp.Error != nil {
+			t.Fatalf("expected check_carrier_status success for %s, got error: %v", tc.slug, resp.Error)
+		}
+		callRes := resp.Result.(ToolCallResult)
+		if callRes.IsError || len(callRes.Content) == 0 {
+			t.Fatalf("expected tool content for %s, got error", tc.slug)
+		}
+		if !strings.Contains(callRes.Content[0].Text, fmt.Sprintf(`"mode": "%s"`, tc.expectedMode)) {
+			t.Errorf("carrier %s: expected mode %s, got output: %s", tc.slug, tc.expectedMode, callRes.Content[0].Text)
+		}
+		if !strings.Contains(callRes.Content[0].Text, fmt.Sprintf(`"is_live_adapter": %t`, tc.expectedLive)) {
+			t.Errorf("carrier %s: expected is_live_adapter %t, got output: %s", tc.slug, tc.expectedLive, callRes.Content[0].Text)
+		}
 	}
 
 	// 7. Test HTTP Transport
