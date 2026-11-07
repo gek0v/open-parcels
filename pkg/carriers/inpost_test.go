@@ -54,7 +54,10 @@ func TestInPostExtractPropsAndNormalize(t *testing.T) {
 }
 
 func TestInPostDeterministicFixture(t *testing.T) {
-	fixtureData := LoadFixture(t, "inpost_response.html")
+	fixtureData, err := LoadFixture("inpost_response.html")
+	if err != nil {
+		t.Fatalf("failed to load fixture: %v", err)
+	}
 	origClient := inpostHTTPClient
 	inpostHTTPClient = NewFixtureClient(http.StatusOK, fixtureData, "text/html")
 	defer func() { inpostHTTPClient = origClient }()

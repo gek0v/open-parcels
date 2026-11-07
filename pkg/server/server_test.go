@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"open-parcels/pkg/carriers"
 	"open-parcels/pkg/models"
 )
 
@@ -84,6 +85,13 @@ func TestDetectEndpoint(t *testing.T) {
 }
 
 func TestTrackV1Endpoint(t *testing.T) {
+	fixtureData, err := carriers.LoadFixture("cainiao_delivered.json")
+	if err != nil {
+		t.Fatalf("failed to load fixture: %v", err)
+	}
+	teardown := carriers.SetCainiaoHTTPClientForTest(carriers.NewFixtureClient(http.StatusOK, fixtureData, "application/json"))
+	defer teardown()
+
 	srv := setupTestServer()
 
 	// GET test
@@ -120,6 +128,13 @@ func TestTrackV1Endpoint(t *testing.T) {
 }
 
 func TestParcelsAppV4Compatibility(t *testing.T) {
+	fixtureData, err := carriers.LoadFixture("cainiao_delivered.json")
+	if err != nil {
+		t.Fatalf("failed to load fixture: %v", err)
+	}
+	teardown := carriers.SetCainiaoHTTPClientForTest(carriers.NewFixtureClient(http.StatusOK, fixtureData, "application/json"))
+	defer teardown()
+
 	srv := setupTestServer()
 
 	reqPayload := models.ParcelsAppTrackingRequest{
