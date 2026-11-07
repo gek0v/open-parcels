@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -94,6 +95,26 @@ func (s *Server) handleTrackV1(w http.ResponseWriter, r *http.Request) {
 
 	shipment, err := s.engine.Track(r.Context(), trackingNumber, opts)
 	if err != nil {
+		if errors.Is(err, models.ErrPostalCodeRequired) || errors.Is(err, models.ErrMissingPostalCode) {
+			writeError(w, http.StatusUnprocessableEntity, "POSTAL_CODE_REQUIRED", err.Error())
+			return
+		}
+		if errors.Is(err, models.ErrShipmentNotFound) {
+			writeError(w, http.StatusNotFound, "SHIPMENT_NOT_FOUND", err.Error())
+			return
+		}
+		if errors.Is(err, models.ErrCarrierNotImplemented) {
+			writeError(w, http.StatusNotImplemented, "CARRIER_NOT_IMPLEMENTED", err.Error())
+			return
+		}
+		if errors.Is(err, models.ErrCarrierRateLimited) {
+			writeError(w, http.StatusTooManyRequests, "CARRIER_RATE_LIMITED", err.Error())
+			return
+		}
+		if errors.Is(err, models.ErrCarrierTemporarilyUnavailable) {
+			writeError(w, http.StatusBadGateway, "CARRIER_UNAVAILABLE", err.Error())
+			return
+		}
 		writeError(w, http.StatusNotFound, "TRACKING_FAILED", err.Error())
 		return
 	}
@@ -146,10 +167,20 @@ func (s *Server) handleParcelsAppTrackings(w http.ResponseWriter, r *http.Reques
 
 		shipment, err := s.engine.Track(r.Context(), shp.TrackingNumber, opts)
 		if err != nil {
+			errCode := "TRACKING_FAILED"
+			if errors.Is(err, models.ErrPostalCodeRequired) || errors.Is(err, models.ErrMissingPostalCode) {
+				errCode = "POSTAL_CODE_REQUIRED"
+			} else if errors.Is(err, models.ErrShipmentNotFound) {
+				errCode = "SHIPMENT_NOT_FOUND"
+			} else if errors.Is(err, models.ErrCarrierNotImplemented) {
+				errCode = "CARRIER_NOT_IMPLEMENTED"
+			} else if errors.Is(err, models.ErrCarrierRateLimited) {
+				errCode = "CARRIER_RATE_LIMITED"
+			}
 			rejected = append(rejected, models.ParcelsAppRejected{
 				Index:          idx,
 				TrackingNumber: shp.TrackingNumber,
-				Code:           "TRACKING_FAILED",
+				Code:           errCode,
 				Message:        err.Error(),
 			})
 			continue

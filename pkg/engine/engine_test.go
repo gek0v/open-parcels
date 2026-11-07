@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"open-parcels/pkg/models"
@@ -63,7 +64,9 @@ func TestEngineTrackChaining(t *testing.T) {
 
 func TestEngineAirCargo(t *testing.T) {
 	eng := New()
-	shipment, err := eng.Track(context.Background(), "157-52471764", models.TrackOptions{})
+	shipment, err := eng.Track(context.Background(), "157-52471764", models.TrackOptions{
+		AllowSimulated: true,
+	})
 	if err != nil {
 		t.Fatalf("unexpected error tracking AWB: %v", err)
 	}
@@ -83,6 +86,7 @@ func TestEngineItalianTrackingAndLocalization(t *testing.T) {
 	shipment, err := eng.Track(context.Background(), "RA123456785IT", models.TrackOptions{
 		DestinationCountry: "IT",
 		Language:           "it",
+		AllowSimulated:     true,
 	})
 	if err != nil {
 		t.Fatalf("unexpected error tracking Italian shipment: %v", err)
@@ -155,8 +159,9 @@ func TestEngineTracking323CainiaoAndCorreosExpress(t *testing.T) {
 
 	// 2. Direct query with correosexpress hint
 	ceShipment, err := eng.Track(context.Background(), "32300035210642701471403", models.TrackOptions{
-		CarrierHint: "correosexpress",
-		Language:    "es",
+		CarrierHint:    "correosexpress",
+		Language:       "es",
+		AllowSimulated: true,
 	})
 	if err != nil {
 		t.Fatalf("unexpected error with correosexpress hint: %v", err)
@@ -232,6 +237,55 @@ func TestNormalizerInPostBeingDelivered(t *testing.T) {
 	}
 	if shipment.DeliveredAt != nil {
 		t.Errorf("DeliveredAt should be nil for out_for_delivery parcel, got %v", shipment.DeliveredAt)
+	}
+}
+
+func TestEngineNoSimulatedByDefault(t *testing.T) {
+	eng := New()
+
+	// 1. Invalid or non-existent tracking number must return ErrShipmentNotFound
+	_, err := eng.Track(context.Background(), "FAKE000000000", models.TrackOptions{})
+	if err == nil {
+		t.Fatalf("expected error for non-existent guide, got nil")
+	}
+	if !errors.Is(err, models.ErrShipmentNotFound) && !errors.Is(err, models.ErrCarrierNotImplemented) {
+		t.Errorf("expected ErrShipmentNotFound or ErrCarrierNotImplemented, got: %v", err)
+	}
+
+	// 2. Catalog/mock carrier without live adapter must return ErrCarrierNotImplemented when AllowSimulated is false
+	_, err = eng.Track(context.Background(), "PQ1234567890123456789012", models.TrackOptions{
+		CarrierHint:    "correos-spain",
+		AllowSimulated: false,
+	})
+	if err == nil {
+		t.Fatalf("expected error for unimplemented carrier without AllowSimulated")
+	}
+	if !errors.Is(err, models.ErrCarrierNotImplemented) {
+		t.Errorf("expected ErrCarrierNotImplemented, got: %v", err)
+	}
+
+	// 3. When AllowSimulated is true, simulated carrier returns shipment without error
+	simShipment, err := eng.Track(context.Background(), "PQ1234567890123456789012", models.TrackOptions{
+		CarrierHint:    "correos-spain",
+		AllowSimulated: true,
+	})
+	if err != nil {
+		t.Fatalf("expected simulated shipment with AllowSimulated=true, got: %v", err)
+	}
+	if simShipment == nil || len(simShipment.Events) == 0 {
+		t.Errorf("expected non-empty simulated events when AllowSimulated=true")
+	}
+
+	// 4. InPost without postal code must return ErrPostalCodeRequired
+	_, err = eng.Track(context.Background(), "7561674", models.TrackOptions{
+		CarrierHint:    "inpost",
+		AllowSimulated: false,
+	})
+	if err == nil {
+		t.Fatalf("expected error for InPost without postal code")
+	}
+	if !errors.Is(err, models.ErrPostalCodeRequired) && !errors.Is(err, models.ErrMissingPostalCode) {
+		t.Errorf("expected ErrPostalCodeRequired, got: %v", err)
 	}
 }
 

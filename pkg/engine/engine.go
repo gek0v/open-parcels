@@ -39,7 +39,7 @@ func (e *Engine) Registry() *carriers.Registry {
 func (e *Engine) Track(ctx context.Context, trackingNumber string, opts models.TrackOptions) (*models.Shipment, error) {
 	cleanNumber := detector.CleanTrackingNumber(trackingNumber)
 	if cleanNumber == "" {
-		return nil, fmt.Errorf("empty or invalid tracking number")
+		return nil, fmt.Errorf("%w: empty or invalid tracking number", models.ErrShipmentNotFound)
 	}
 
 	var primaryCarrier carriers.Carrier
@@ -49,22 +49,27 @@ func (e *Engine) Track(ctx context.Context, trackingNumber string, opts models.T
 	if opts.CarrierHint != "" {
 		c, ok := e.registry.Get(opts.CarrierHint)
 		if !ok {
-			return nil, fmt.Errorf("unsupported carrier hint: %s", opts.CarrierHint)
+			return nil, fmt.Errorf("%w: unsupported carrier hint: %s", models.ErrCarrierNotImplemented, opts.CarrierHint)
 		}
 		primaryCarrier = c
 		carrierInfo = c.Info()
 	} else {
 		best := e.detector.BestMatch(cleanNumber, opts.DestinationCountry)
 		if best == nil {
-			return nil, fmt.Errorf("could not automatically detect carrier for tracking number: %s", cleanNumber)
+			return nil, fmt.Errorf("%w: could not automatically detect carrier for tracking number: %s", models.ErrShipmentNotFound, cleanNumber)
 		}
 		c, ok := e.registry.Get(best.Carrier.Slug)
 		if !ok {
 			// If not specifically registered, try base fallback or generic
-			return nil, fmt.Errorf("carrier detected (%s) but adapter not registered", best.Carrier.Slug)
+			return nil, fmt.Errorf("%w: carrier detected (%s) but adapter not registered", models.ErrCarrierNotImplemented, best.Carrier.Slug)
 		}
 		primaryCarrier = c
 		carrierInfo = c.Info()
+	}
+
+	// Strictly reject simulated fallbacks unless AllowSimulated is explicitly true
+	if !opts.AllowSimulated && !carriers.HasLiveTracking(primaryCarrier) {
+		return nil, fmt.Errorf("%w: carrier %s does not have an active live tracking adapter", models.ErrCarrierNotImplemented, primaryCarrier.Name())
 	}
 
 	// 2. Track primary carrier

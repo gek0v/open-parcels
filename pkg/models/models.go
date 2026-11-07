@@ -1,15 +1,7 @@
 package models
 
 import (
-	"errors"
 	"time"
-)
-
-// Sentinel errors for tracking operations
-var (
-	ErrShipmentNotFound      = errors.New("shipment not found")
-	ErrMissingPostalCode     = errors.New("postal code is required for this carrier")
-	ErrCarrierNotImplemented = errors.New("carrier live tracking driver is not implemented")
 )
 
 // Standard shipment statuses

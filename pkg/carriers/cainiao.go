@@ -29,6 +29,11 @@ func NewCainiaoCarrier() *CainiaoCarrier {
 	}
 }
 
+// HasLiveTracking signals that Cainiao implements real API connectivity.
+func (c *CainiaoCarrier) HasLiveTracking() bool {
+	return true
+}
+
 type cainiaoDetailItem struct {
 	Desc         string `json:"desc"`
 	Time         any    `json:"time"`
