@@ -1,0 +1,22 @@
+{
+  "codigoSeguimiento": "36159999888877",
+  "estado": "EN_REPARTO",
+  "descripcionEstado": "Su paquete está en reparto",
+  "origen": "VALENCIA",
+  "destino": "MADRID",
+  "codigoPostalDestino": "28001",
+  "eventos": [
+    {
+      "fecha": "2024-11-15T08:45:00Z",
+      "estado": "EN_REPARTO",
+      "descripcion": "En reparto con el conductor",
+      "centro": "MADRID CENTRAL"
+    },
+    {
+      "fecha": "2024-11-14T23:30:00Z",
+      "estado": "EN_TRANSITO",
+      "descripcion": "Llegada a plataforma",
+      "centro": "MADRID PLATAFORMA"
+    }
+  ]
+}

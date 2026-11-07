@@ -1,0 +1,35 @@
+{
+  "codigoSeguimiento": "36150127630406",
+  "estado": "ENTREGADO",
+  "descripcionEstado": "Entregado al destinatario",
+  "fechaEntrega": "2024-11-15T16:20:00Z",
+  "origen": "MADRID",
+  "destino": "BARCELONA",
+  "codigoPostalDestino": "08001",
+  "eventos": [
+    {
+      "fecha": "2024-11-15T16:20:00Z",
+      "estado": "ENTREGADO",
+      "descripcion": "Envío entregado al destinatario",
+      "centro": "BARCELONA NAVE"
+    },
+    {
+      "fecha": "2024-11-15T09:10:00Z",
+      "estado": "EN_REPARTO",
+      "descripcion": "En reparto con el repartidor",
+      "centro": "BARCELONA NAVE"
+    },
+    {
+      "fecha": "2024-11-14T21:00:00Z",
+      "estado": "EN_TRANSITO",
+      "descripcion": "En tránsito hacia la delegación de destino",
+      "centro": "MADRID PLATAFORMA"
+    },
+    {
+      "fecha": "2024-11-14T12:00:00Z",
+      "estado": "REGISTRADO",
+      "descripcion": "Datos del envío registrados por el remitente",
+      "centro": "MADRID"
+    }
+  ]
+}

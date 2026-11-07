@@ -1,0 +1,28 @@
+{
+  "trackingNumber": "ASM123456789",
+  "status": "DELIVERED",
+  "statusDescription": "Entregado",
+  "deliveryDate": "2024-11-15T14:40:00Z",
+  "origin": { "city": "MADRID", "country": "ES" },
+  "destination": { "city": "SEVILLA", "country": "ES", "postalCode": "41001" },
+  "history": [
+    {
+      "date": "2024-11-15T14:40:00Z",
+      "status": "DELIVERED",
+      "description": "El paquete ha sido entregado al destinatario",
+      "location": "SEVILLA"
+    },
+    {
+      "date": "2024-11-15T08:00:00Z",
+      "status": "OUT_FOR_DELIVERY",
+      "description": "En reparto con el repartidor de GLS",
+      "location": "SEVILLA"
+    },
+    {
+      "date": "2024-11-14T19:30:00Z",
+      "status": "IN_TRANSIT",
+      "description": "En tránsito en centro de clasificación",
+      "location": "MADRID HUB"
+    }
+  ]
+}
