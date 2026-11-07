@@ -1,0 +1,30 @@
+{
+  "codigoError": "0",
+  "mensajeError": "",
+  "codEnvio": "6900987654321098",
+  "referencia": "REF-BCN-5541",
+  "estado": "EN REPARTO",
+  "descEstado": "Envío en reparto",
+  "origen": "VALENCIA",
+  "destino": "MADRID",
+  "posicion": [
+    {
+      "fecha": "15/11/2024",
+      "hora": "09:15",
+      "desc": "EN REPARTO",
+      "descrip": "Envío asignado al repartidor para reparto",
+      "codOfi": "28010",
+      "nomOfi": "MADRID CHAMBERI",
+      "tipo": "R"
+    },
+    {
+      "fecha": "14/11/2024",
+      "hora": "22:00",
+      "desc": "EN TRANSITO",
+      "descrip": "Llegada a plataforma logística",
+      "codOfi": "28820",
+      "nomOfi": "COSLADA CENTRAL",
+      "tipo": "T"
+    }
+  ]
+}
