@@ -1,0 +1,37 @@
+{
+  "success": true,
+  "module": [
+    {
+      "mailNo": "LP00561234567890",
+      "originCountry": "China",
+      "destCountry": "Spain",
+      "status": "DELIVERED",
+      "statusDesc": "Entregado con éxito",
+      "destMailNo": "6900123456789012",
+      "destCp": "Correos Express",
+      "detailList": [
+        {
+          "time": 1793785505000,
+          "timeStr": "2026-11-04 17:45:05",
+          "desc": "Package delivered to recipient",
+          "standerdDesc": "Entregado",
+          "actionCode": "GTMS_SIGNED"
+        },
+        {
+          "time": 1793759245000,
+          "timeStr": "2026-11-04 10:27:25",
+          "desc": "Out for delivery",
+          "standerdDesc": "En proceso de entrega",
+          "actionCode": "GTMS_DELIVERING"
+        },
+        {
+          "time": 1793672845000,
+          "timeStr": "2026-11-03 10:27:25",
+          "desc": "Arrived at destination airport",
+          "standerdDesc": "Llegada al país de destino",
+          "actionCode": "GTMS_ARRIVED_AT_DEST_COUNTRY"
+        }
+      ]
+    }
+  ]
+}
