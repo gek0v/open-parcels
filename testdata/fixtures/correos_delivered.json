@@ -1,0 +1,56 @@
+{
+  "shipment": {
+    "shipmentCode": "PQ4F6P07000000000000000",
+    "status": "ENTREGADO",
+    "statusDescription": "Entregado",
+    "deliveryDate": "2024-11-15T12:30:00Z",
+    "origin": {
+      "country": "ES",
+      "countryName": "España",
+      "office": "MADRID CTA"
+    },
+    "destination": {
+      "country": "ES",
+      "countryName": "España",
+      "postalCode": "46001",
+      "office": "VALENCIA SUCURSAL 1"
+    },
+    "events": [
+      {
+        "eventDate": "2024-11-15T12:30:00Z",
+        "status": "ENTREGADO",
+        "description": "El envío ha sido entregado al destinatario",
+        "location": "VALENCIA",
+        "office": "046001"
+      },
+      {
+        "eventDate": "2024-11-15T08:30:00Z",
+        "status": "EN_REPARTO",
+        "description": "En reparto. El cartero ha iniciado el reparto del envío",
+        "location": "VALENCIA",
+        "office": "046001"
+      },
+      {
+        "eventDate": "2024-11-14T20:15:00Z",
+        "status": "EN_TRANSITO",
+        "description": "En tránsito. Envío en camino hacia la unidad de destino",
+        "location": "MADRID CTA",
+        "office": "28080"
+      },
+      {
+        "eventDate": "2024-11-13T10:00:00Z",
+        "status": "ADMITIDO",
+        "description": "Admitido en origen",
+        "location": "MADRID",
+        "office": "28001"
+      },
+      {
+        "eventDate": "2024-11-12T16:00:00Z",
+        "status": "PRE_REGISTRADO",
+        "description": "Pre-registrado en los sistemas de Correos",
+        "location": "MADRID",
+        "office": ""
+      }
+    ]
+  }
+}

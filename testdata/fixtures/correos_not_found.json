@@ -1,0 +1,5 @@
+{
+  "shipment": null,
+  "error": "No existe ningún envío asociado al código introducido",
+  "code": "SHIPMENT_NOT_FOUND"
+}

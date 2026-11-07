@@ -269,8 +269,8 @@ func TestEngineNoSimulatedByDefault(t *testing.T) {
 	}
 
 	// 2. Catalog/mock carrier without live adapter must return ErrCarrierNotImplemented when AllowSimulated is false
-	_, err = eng.Track(context.Background(), "PQ1234567890123456789012", models.TrackOptions{
-		CarrierHint:    "correos-spain",
+	_, err = eng.Track(context.Background(), "TIP123456789", models.TrackOptions{
+		CarrierHint:    "tipsa",
 		AllowSimulated: false,
 	})
 	if err == nil {
@@ -281,8 +281,8 @@ func TestEngineNoSimulatedByDefault(t *testing.T) {
 	}
 
 	// 3. When AllowSimulated is true, simulated carrier returns shipment without error
-	simShipment, err := eng.Track(context.Background(), "PQ1234567890123456789012", models.TrackOptions{
-		CarrierHint:    "correos-spain",
+	simShipment, err := eng.Track(context.Background(), "TIP123456789", models.TrackOptions{
+		CarrierHint:    "tipsa",
 		AllowSimulated: true,
 	})
 	if err != nil {
