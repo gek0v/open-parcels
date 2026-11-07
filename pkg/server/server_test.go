@@ -270,7 +270,7 @@ func TestNegativeErrorPaths(t *testing.T) {
 	}
 
 	// 8. Track for catalog carrier without live driver should return 501 Not Implemented
-	reqNotImpl := httptest.NewRequest(http.MethodGet, "/api/v1/track?number=PQ1234567890123456789012&carrier=correos-spain", nil)
+	reqNotImpl := httptest.NewRequest(http.MethodGet, "/api/v1/track?number=TIP123456789&carrier=tipsa", nil)
 	recNotImpl := httptest.NewRecorder()
 	srv.handleTrackV1(recNotImpl, reqNotImpl)
 	if recNotImpl.Code != http.StatusNotImplemented {

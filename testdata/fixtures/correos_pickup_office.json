@@ -1,0 +1,43 @@
+{
+  "shipment": {
+    "shipmentCode": "CD001234567ES",
+    "status": "DISPONIBLE_OFICINA",
+    "statusDescription": "En lista / Disponible en oficina",
+    "origin": {
+      "country": "ES",
+      "countryName": "España",
+      "office": "BARCELONA CTA"
+    },
+    "destination": {
+      "country": "ES",
+      "countryName": "España",
+      "postalCode": "28013",
+      "office": "SUCURSAL 13 MADRID"
+    },
+    "pickupOffice": "OFICINA PRINCIPAL MADRID - CALLE ALCALÁ, 1",
+    "deadlineDate": "2024-11-30",
+    "events": [
+      {
+        "eventDate": "2024-11-15T10:00:00Z",
+        "status": "DISPONIBLE_OFICINA",
+        "description": "Disponible en oficina para su recogida por el destinatario hasta el 30/11/2024",
+        "location": "OFICINA PRINCIPAL MADRID - CALLE ALCALÁ, 1",
+        "office": "28013"
+      },
+      {
+        "eventDate": "2024-11-14T11:00:00Z",
+        "status": "AVISO_LLEGADA",
+        "description": "Envío no entregado por ausencia. Se deja aviso para recogida en oficina",
+        "location": "MADRID",
+        "office": "28013"
+      },
+      {
+        "eventDate": "2024-11-13T14:00:00Z",
+        "status": "EN_TRANSITO",
+        "description": "En tránsito a la unidad de entrega",
+        "location": "MADRID CTA",
+        "office": "28080"
+      }
+    ]
+  }
+}
