@@ -1,6 +1,8 @@
 package server
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -141,6 +143,25 @@ func (s *Server) handleParcelsAppTrackings(w http.ResponseWriter, r *http.Reques
 	}
 
 	reqID := fmt.Sprintf("req_%d", time.Now().UnixNano())
+	isAsync := strings.EqualFold(r.URL.Query().Get("async"), "true") || strings.TrimSpace(req.WebhookURL) != ""
+
+	if isAsync {
+		initialResp := &models.ParcelsAppResponse{
+			RequestID: reqID,
+			Status:    "processing",
+			Done:      false,
+			ExpiresAt: time.Now().Add(1 * time.Hour).UTC().Format(time.RFC3339),
+			Results:   make([]models.ParcelsAppResultItem, 0),
+			Rejected:  make([]models.ParcelsAppRejected, 0),
+		}
+
+		s.setRequest(reqID, initialResp, 1*time.Hour)
+		go s.processAsyncTrackings(reqID, req)
+
+		writeJSON(w, http.StatusOK, initialResp)
+		return
+	}
+
 	var resultItems []models.ParcelsAppResultItem
 	var rejected []models.ParcelsAppRejected
 
@@ -207,17 +228,108 @@ func (s *Server) handleParcelsAppTrackings(w http.ResponseWriter, r *http.Reques
 		RequestID: reqID,
 		Status:    "completed",
 		Done:      true,
-		ExpiresAt: time.Now().Add(30 * time.Minute).UTC().Format(time.RFC3339),
+		ExpiresAt: time.Now().Add(1 * time.Hour).UTC().Format(time.RFC3339),
 		Results:   resultItems,
 		Rejected:  rejected,
 	}
 
-	// Cache request
-	s.mu.Lock()
-	s.requests[reqID] = finalResp
-	s.mu.Unlock()
+	// Cache request with 1 hour TTL
+	s.setRequest(reqID, finalResp, 1*time.Hour)
 
 	writeJSON(w, http.StatusOK, finalResp)
+}
+
+func (s *Server) processAsyncTrackings(reqID string, req models.ParcelsAppTrackingRequest) {
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	var resultItems []models.ParcelsAppResultItem
+	var rejected []models.ParcelsAppRejected
+
+	for idx, shp := range req.Shipments {
+		if strings.TrimSpace(shp.TrackingNumber) == "" {
+			rejected = append(rejected, models.ParcelsAppRejected{
+				Index:   idx,
+				Code:    "INVALID_TRACKING_NUMBER",
+				Message: "tracking_number is not valid for tracking.",
+			})
+			continue
+		}
+
+		opts := models.TrackOptions{
+			CarrierHint:        shp.CarrierHint,
+			Language:           req.Language,
+			DestinationCountry: shp.DestinationCountry,
+			PostalCode:         shp.PostalCode,
+			AllowSimulated:     shp.AllowSimulated,
+			Email:              shp.Email,
+			Phone:              shp.Phone,
+			AdditionalFields:   shp.AdditionalFields,
+		}
+
+		shipment, err := s.engine.Track(ctx, shp.TrackingNumber, opts)
+		if err != nil {
+			errCode := "TRACKING_FAILED"
+			if errors.Is(err, models.ErrPostalCodeRequired) || errors.Is(err, models.ErrMissingPostalCode) {
+				errCode = "POSTAL_CODE_REQUIRED"
+			} else if errors.Is(err, models.ErrShipmentNotFound) {
+				errCode = "SHIPMENT_NOT_FOUND"
+			} else if errors.Is(err, models.ErrCarrierNotImplemented) {
+				errCode = "CARRIER_NOT_IMPLEMENTED"
+			} else if errors.Is(err, models.ErrCarrierRateLimited) {
+				errCode = "CARRIER_RATE_LIMITED"
+			}
+			rejected = append(rejected, models.ParcelsAppRejected{
+				Index:          idx,
+				TrackingNumber: shp.TrackingNumber,
+				Code:           errCode,
+				Message:        err.Error(),
+			})
+			continue
+		}
+
+		pResp := s.engine.ToParcelsAppResponse(shipment, reqID)
+		if len(pResp.Results) > 0 {
+			resultItems = append(resultItems, pResp.Results[0])
+		}
+	}
+
+	finalResp := &models.ParcelsAppResponse{
+		RequestID: reqID,
+		Status:    "completed",
+		Done:      true,
+		ExpiresAt: time.Now().Add(1 * time.Hour).UTC().Format(time.RFC3339),
+		Results:   resultItems,
+		Rejected:  rejected,
+	}
+
+	s.setRequest(reqID, finalResp, 1*time.Hour)
+
+	if req.WebhookURL != "" {
+		sendWebhookCallback(req.WebhookURL, finalResp)
+	}
+}
+
+func sendWebhookCallback(webhookURL string, payload *models.ParcelsAppResponse) {
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, webhookURL, bytes.NewReader(data))
+	if err != nil {
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("User-Agent", "open-parcels-server/1.0")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err == nil {
+		_ = resp.Body.Close()
+	}
 }
 
 // handleParcelsAppGetTracking implements GET /trackings/{request_id}.
@@ -234,10 +346,7 @@ func (s *Server) handleParcelsAppGetTracking(w http.ResponseWriter, r *http.Requ
 	}
 	reqID := parts[1]
 
-	s.mu.RLock()
-	resp, ok := s.requests[reqID]
-	s.mu.RUnlock()
-
+	resp, ok := s.getRequest(reqID)
 	if !ok {
 		writeError(w, http.StatusNotFound, "REQUEST_NOT_FOUND", "The requested tracking record was not found or has expired.")
 		return

@@ -277,3 +277,139 @@ func TestNegativeErrorPaths(t *testing.T) {
 		t.Errorf("expected 501 for unimplemented carrier, got %d", recNotImpl.Code)
 	}
 }
+
+func TestParcelsAppAsyncPolling(t *testing.T) {
+	fixtureData, err := carriers.LoadFixture("cainiao_delivered.json")
+	if err != nil {
+		t.Fatalf("failed to load fixture: %v", err)
+	}
+	teardown := carriers.SetCainiaoHTTPClientForTest(carriers.NewFixtureClient(http.StatusOK, fixtureData, "application/json"))
+	defer teardown()
+
+	srv := setupTestServer()
+
+	reqPayload := models.ParcelsAppTrackingRequest{
+		Language: "es",
+		Shipments: []models.ParcelsAppShipmentIn{
+			{
+				TrackingNumber: "LP00561234567890",
+				AllowSimulated: true,
+			},
+		},
+	}
+	body, _ := json.Marshal(reqPayload)
+
+	// 1. Submit asynchronous tracking request (?async=true)
+	req := httptest.NewRequest(http.MethodPost, "/trackings?async=true", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+	srv.handleParcelsAppTrackings(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for async request, got %d", rec.Code)
+	}
+
+	var asyncResp models.ParcelsAppResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &asyncResp); err != nil {
+		t.Fatalf("invalid json: %v", err)
+	}
+
+	if asyncResp.Status != "processing" || asyncResp.Done != false {
+		t.Errorf("expected status 'processing' and done=false, got %s / %t", asyncResp.Status, asyncResp.Done)
+	}
+	if asyncResp.RequestID == "" {
+		t.Fatalf("expected non-empty request_id")
+	}
+
+	// 2. Poll until completed (goroutine executes concurrently)
+	var finalResp *models.ParcelsAppResponse
+	for i := 0; i < 20; i++ {
+		time.Sleep(50 * time.Millisecond)
+		resp, found := srv.getRequest(asyncResp.RequestID)
+		if found && resp.Done && resp.Status == "completed" {
+			finalResp = resp
+			break
+		}
+	}
+
+	if finalResp == nil {
+		t.Fatalf("async job did not complete within timeout")
+	}
+	if len(finalResp.Results) != 1 {
+		t.Errorf("expected 1 result, got %d", len(finalResp.Results))
+	}
+}
+
+func TestParcelsAppWebhookCallback(t *testing.T) {
+	fixtureData, err := carriers.LoadFixture("cainiao_delivered.json")
+	if err != nil {
+		t.Fatalf("failed to load fixture: %v", err)
+	}
+	teardown := carriers.SetCainiaoHTTPClientForTest(carriers.NewFixtureClient(http.StatusOK, fixtureData, "application/json"))
+	defer teardown()
+
+	webhookChan := make(chan models.ParcelsAppResponse, 1)
+	webhookServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload models.ParcelsAppResponse
+		if err := json.NewDecoder(r.Body).Decode(&payload); err == nil {
+			webhookChan <- payload
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer webhookServer.Close()
+
+	srv := setupTestServer()
+
+	reqPayload := models.ParcelsAppTrackingRequest{
+		Language:   "en",
+		WebhookURL: webhookServer.URL,
+		Shipments: []models.ParcelsAppShipmentIn{
+			{
+				TrackingNumber: "LP00561234567890",
+				AllowSimulated: true,
+			},
+		},
+	}
+	body, _ := json.Marshal(reqPayload)
+
+	req := httptest.NewRequest(http.MethodPost, "/trackings", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+	srv.handleParcelsAppTrackings(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for webhook request, got %d", rec.Code)
+	}
+
+	select {
+	case received := <-webhookChan:
+		if received.Status != "completed" || !received.Done {
+			t.Errorf("expected completed webhook payload, got %s / %t", received.Status, received.Done)
+		}
+		if len(received.Results) == 0 {
+			t.Errorf("expected results in webhook payload")
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatalf("timeout waiting for webhook callback")
+	}
+}
+
+func TestParcelsAppTTLExpiration(t *testing.T) {
+	srv := setupTestServer()
+
+	reqID := "req_expired_test"
+	expiredItem := &models.ParcelsAppResponse{
+		RequestID: reqID,
+		Status:    "completed",
+		Done:      true,
+	}
+
+	// Insert with negative TTL (already expired)
+	srv.setRequest(reqID, expiredItem, -10*time.Minute)
+
+	req := httptest.NewRequest(http.MethodGet, "/trackings/"+reqID, nil)
+	rec := httptest.NewRecorder()
+	srv.handleParcelsAppGetTracking(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected 404 for expired record, got %d", rec.Code)
+	}
+}
