@@ -1,0 +1,67 @@
+[
+  {
+    "idx": 1,
+    "title": "refactor(engine): Erradicación de fallbacks simulados silenciosos y gestión estricta de errores canónicos",
+    "url": "https://github.com/gek0v/open-parcels/issues/35"
+  },
+  {
+    "idx": 2,
+    "title": "feat(carriers): Especificación e interfaz estándar para adaptadores reales (`CarrierAdapter`), credenciales y fixtures",
+    "url": "https://github.com/gek0v/open-parcels/issues/36"
+  },
+  {
+    "idx": 3,
+    "title": "test(ci): Separación de tests unitarios vs integración en vivo (`//go:build integration`) y fixtures HTTP deterministas",
+    "url": "https://github.com/gek0v/open-parcels/issues/37"
+  },
+  {
+    "idx": 4,
+    "title": "feat(carriers): Integración real para Correos Express (eliminación de bypass estático 2026 y scraping API pública)",
+    "url": "https://github.com/gek0v/open-parcels/issues/38"
+  },
+  {
+    "idx": 5,
+    "title": "feat(carriers): Integración real para Correos España (seguimiento web público / localizador)",
+    "url": "https://github.com/gek0v/open-parcels/issues/39"
+  },
+  {
+    "idx": 6,
+    "title": "feat(carriers): Integración real para SEUR y GLS Spain con validación de código postal",
+    "url": "https://github.com/gek0v/open-parcels/issues/40"
+  },
+  {
+    "idx": 7,
+    "title": "refactor(cainiao): Eliminación de hardcode estático 2026, robustez ante anti-bot y optimización del handover",
+    "url": "https://github.com/gek0v/open-parcels/issues/41"
+  },
+  {
+    "idx": 8,
+    "title": "feat(carriers): Adaptador B2B para DHL Express y DHL Paket con autenticación OAuth2 / API Key",
+    "url": "https://github.com/gek0v/open-parcels/issues/42"
+  },
+  {
+    "idx": 9,
+    "title": "feat(carriers): Adaptador B2B para UPS y FedEx con soporte OAuth2 empresarial",
+    "url": "https://github.com/gek0v/open-parcels/issues/43"
+  },
+  {
+    "idx": 10,
+    "title": "perf(detector): Optimización de compilación de reglas regex, desambiguación y pre-filtrado por longitud",
+    "url": "https://github.com/gek0v/open-parcels/issues/44"
+  },
+  {
+    "idx": 11,
+    "title": "feat(mcp): Notificaciones de progreso y herramientas avanzadas de diagnóstico de transportistas en Servidor MCP",
+    "url": "https://github.com/gek0v/open-parcels/issues/45"
+  },
+  {
+    "idx": 12,
+    "title": "feat(server): Compatibilidad estricta con Webhooks y sondeo asíncrono en ParcelsApp v4 API",
+    "url": "https://github.com/gek0v/open-parcels/issues/46"
+  },
+  {
+    "idx": 13,
+    "title": "docs: Actualización de README, matriz de transportistas reales vs catálogo y guía de gobernanza",
+    "url": "https://github.com/gek0v/open-parcels/issues/47"
+  }
+]
