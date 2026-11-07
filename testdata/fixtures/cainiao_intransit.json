@@ -1,0 +1,30 @@
+{
+  "success": true,
+  "module": [
+    {
+      "mailNo": "LP00561234567890",
+      "originCountry": "China",
+      "destCountry": "Spain",
+      "destMailNo": "PQ4100123456789",
+      "destCp": "Correos",
+      "status": "IN_TRANSIT",
+      "statusDesc": "En tránsito internacional",
+      "detailList": [
+        {
+          "time": 1700100000000,
+          "timeStr": "2024-11-16 12:00:00",
+          "desc": "Arrived at destination country transit facility",
+          "standerdDesc": "Llegada al centro de tránsito de destino",
+          "actionCode": "GTMS_ARRIVED_FACILITY"
+        },
+        {
+          "time": 1699900000000,
+          "timeStr": "2024-11-14 06:00:00",
+          "desc": "Departed from departure country",
+          "standerdDesc": "Salida del país de origen",
+          "actionCode": "GTMS_DEPART_AIRLINE"
+        }
+      ]
+    }
+  ]
+}

@@ -4,12 +4,22 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"time"
 
 	"open-parcels/pkg/models"
 )
+
+var cainiaoHTTPClient = NewCarrierHTTPClient(DefaultRequestTimeout)
+
+// SetCainiaoHTTPClientForTest overrides the HTTP client for Cainiao in deterministic tests.
+func SetCainiaoHTTPClientForTest(client *http.Client) func() {
+	orig := cainiaoHTTPClient
+	cainiaoHTTPClient = client
+	return func() { cainiaoHTTPClient = orig }
+}
 
 type CainiaoCarrier struct {
 	BaseCarrier
@@ -73,9 +83,11 @@ type cainiaoItem struct {
 }
 
 type cainiaoResponse struct {
-	Success bool          `json:"success"`
-	Module  []cainiaoItem `json:"module"`
-	Data    []cainiaoItem `json:"data"`
+	Success   bool          `json:"success"`
+	ErrorCode string        `json:"errorCode"`
+	ErrorMsg  string        `json:"errorMsg"`
+	Module    []cainiaoItem `json:"module"`
+	Data      []cainiaoItem `json:"data"`
 }
 
 func parseCainiaoTime(det cainiaoDetailItem) (time.Time, string) {
@@ -119,101 +131,46 @@ func parseCainiaoTime(det cainiaoDetailItem) (time.Time, string) {
 		}
 	}
 
-	now := time.Now()
-	raw := det.TimeStr
-	if raw == "" {
-		raw = now.Format("2006-01-02 15:04:05")
-	}
-	return now, raw
+	return time.Time{}, ""
 }
 
 func normalizeCainiaoEvent(det cainiaoDetailItem) (models.Status, models.Stage) {
-	actionCode := strings.ToUpper(strings.TrimSpace(det.ActionCode))
-	nodeCode := ""
-	if det.Group != nil {
-		nodeCode = strings.ToUpper(strings.TrimSpace(det.Group.NodeCode))
-	}
-	combined := strings.ToLower(det.Desc + " " + det.StanderdDesc)
+	action := strings.ToUpper(strings.TrimSpace(det.ActionCode))
+	desc := strings.ToLower(det.Desc + " " + det.StanderdDesc)
 
-	// Delivered
-	if actionCode == "GTMS_SIGNED" ||
-		nodeCode == "AE_GROUP_DELIVERED" ||
-		strings.Contains(combined, "package delivered") ||
-		strings.Contains(combined, "delivered") ||
-		strings.Contains(combined, "entregado") ||
-		strings.Contains(combined, "signed") {
+	switch {
+	case action == "GTMS_SIGNED" || strings.Contains(desc, "delivered") || strings.Contains(desc, "entregado"):
 		return models.StatusDelivered, models.StageDelivery
-	}
-
-	// Out for delivery / in delivery
-	if actionCode == "GTMS_DELIVERING" ||
-		nodeCode == "AE_GROUP_DELIVERING" ||
-		strings.Contains(combined, "en reparto") ||
-		strings.Contains(combined, "out for delivery") ||
-		strings.Contains(combined, "in delivery") ||
-		strings.Contains(combined, "reparto") {
+	case action == "GTMS_DELIVERING" || strings.Contains(desc, "out for delivery") || strings.Contains(desc, "en reparto") || strings.Contains(desc, "en proceso de entrega"):
 		return models.StatusOutForDelivery, models.StageLastMile
-	}
-
-	// Customs
-	if strings.Contains(combined, "customs") ||
-		strings.Contains(combined, "clearance") ||
-		strings.Contains(combined, "aduana") ||
-		strings.Contains(combined, "despacho") {
-		return models.StatusInTransit, models.StageCustoms
-	}
-
-	// Handover / local delivery company
-	if actionCode == "GTMS_ACCEPT" ||
-		strings.Contains(combined, "local  delivery company") ||
-		strings.Contains(combined, "local delivery company") ||
-		strings.Contains(combined, "operador logístico") ||
-		strings.Contains(combined, "handed over") ||
-		strings.Contains(combined, "hand over") {
+	case action == "GTMS_ACCEPT" || strings.Contains(desc, "local delivery company") || strings.Contains(desc, "operador logístico"):
 		return models.StatusInTransit, models.StageHandover
-	}
-
-	// Transit / Outbound / Sorting center
-	if actionCode == "GWMS_OUTBOUND" ||
-		actionCode == "WMS_CONFIRMED" ||
-		nodeCode == "AE_GROUP_DES_PROCESSING" ||
-		strings.Contains(combined, "warehouse") ||
-		strings.Contains(combined, "sorting center") ||
-		strings.Contains(combined, "departed") ||
-		strings.Contains(combined, "arrived") ||
-		strings.Contains(combined, "in transit") ||
-		strings.Contains(combined, "en tránsito") ||
-		strings.Contains(combined, "en camino") {
+	case strings.Contains(desc, "customs") || strings.Contains(desc, "clearance") || strings.Contains(desc, "aduan") || strings.Contains(desc, "import"):
+		return models.StatusInTransit, models.StageCustoms
+	case strings.Contains(desc, "airline") || strings.Contains(desc, "departed") || strings.Contains(desc, "transit") || strings.Contains(desc, "flight") || strings.Contains(desc, "arrived at destination"):
+		return models.StatusInTransit, models.StageTransit
+	case strings.Contains(desc, "sorting") || strings.Contains(desc, "outbound") || strings.Contains(desc, "inbound") || strings.Contains(desc, "warehouse"):
+		return models.StatusInTransit, models.StagePickedUp
+	case strings.Contains(desc, "order received") || strings.Contains(desc, "electronic") || strings.Contains(desc, "pre-registered") || strings.Contains(desc, "recibida"):
+		return models.StatusInfoReceived, models.StageCreated
+	case strings.Contains(desc, "failed") || strings.Contains(desc, "fallido") || strings.Contains(desc, "exception") || strings.Contains(desc, "incidencia"):
+		return models.StatusFailedAttempt, models.StageException
+	default:
 		return models.StatusInTransit, models.StageTransit
 	}
-
-	// Picked up / Warehouse processing / Order received
-	if actionCode == "GWMS_PICK" ||
-		actionCode == "GWMS_PACKAGE" ||
-		actionCode == "GWMS_ACCEPT" ||
-		nodeCode == "AE_GROUP_WH_PROCESSING" ||
-		strings.Contains(combined, "order received") ||
-		strings.Contains(combined, "package finished") ||
-		strings.Contains(combined, "sorting is completed") ||
-		strings.Contains(combined, "pedido") ||
-		strings.Contains(combined, "empaquetado") {
-		return models.StatusInfoReceived, models.StageCreated
-	}
-
-	return models.StatusInTransit, models.StageTransit
 }
 
-func normalizeCainiaoShipmentStatus(cStatus string, events []models.TrackingEvent) (models.Status, models.Stage) {
-	upper := strings.ToUpper(strings.TrimSpace(cStatus))
+func normalizeCainiaoShipmentStatus(status string, events []models.TrackingEvent) (models.Status, models.Stage) {
+	upper := strings.ToUpper(strings.TrimSpace(status))
 	switch upper {
-	case "DELIVERED", "SIGN", "SIGNED":
+	case "DELIVERED", "SIGNED":
 		return models.StatusDelivered, models.StageDelivery
 	case "DELIVERING", "OUT_FOR_DELIVERY":
 		return models.StatusOutForDelivery, models.StageLastMile
 	case "EXCEPTION", "FAILED":
 		return models.StatusException, models.StageException
-	case "INFO_RECEIVED", "ORDER_RECEIVED":
-		return models.StatusInfoReceived, models.StageCreated
+	case "WAITING_FOR_DELIVERY", "TRANSIT":
+		return models.StatusInTransit, models.StageTransit
 	}
 
 	for _, ev := range events {
@@ -230,6 +187,95 @@ func normalizeCainiaoShipmentStatus(cStatus string, events []models.TrackingEven
 	return models.StatusInTransit, models.StageTransit
 }
 
+func isCainiaoAntiBot(statusCode int, body string) bool {
+	if statusCode == http.StatusForbidden || statusCode == http.StatusTooManyRequests {
+		return true
+	}
+	bodyUpper := strings.ToUpper(body)
+	return strings.Contains(bodyUpper, "RGV587_FLAG") ||
+		strings.Contains(bodyUpper, "SEC_CHALLENGE") ||
+		strings.Contains(bodyUpper, "PUNISH_ACTION") ||
+		strings.Contains(bodyUpper, "ANTI_BOT") ||
+		strings.Contains(bodyUpper, "CAPTCHA") ||
+		strings.Contains(bodyUpper, "DENIED")
+}
+
+func isCainiaoNotFound(cResp *cainiaoResponse) bool {
+	errCode := strings.ToUpper(strings.TrimSpace(cResp.ErrorCode))
+	errMsg := strings.ToUpper(strings.TrimSpace(cResp.ErrorMsg))
+	return errCode == "ORDER_NOT_FOUND" ||
+		errCode == "PACKAGE_NOT_FOUND" ||
+		errCode == "NOT_FOUND" ||
+		errCode == "MAIL_NO_NOT_FOUND" ||
+		errCode == "PARAM_ERROR" ||
+		strings.Contains(errMsg, "NOT FOUND") ||
+		strings.Contains(errMsg, "NOT EXIST") ||
+		strings.Contains(errMsg, "INEXISTENTE") ||
+		strings.Contains(errMsg, "NO EXISTE")
+}
+
+func resolveCainiaoLastMileCarrier(destCp, trackingNumber, destCode string) *models.CarrierInfo {
+	cleanCp := strings.ToLower(strings.TrimSpace(destCp))
+
+	switch {
+	case strings.Contains(cleanCp, "correos express") || (destCp == "" && strings.HasPrefix(trackingNumber, "323") && destCode == "ES"):
+		return &models.CarrierInfo{
+			Slug:        "correosexpress",
+			Name:        "Correos Express",
+			Country:     "ES",
+			CountryName: "Spain",
+			Type:        models.CarrierTypeExpress,
+			Website:     "https://www.correosexpress.com",
+			TrackingURL: "https://www.correosexpress.com/web/correosexpress/consultanos?shippingNumber=%s",
+		}
+	case strings.Contains(cleanCp, "correos"):
+		return &models.CarrierInfo{
+			Slug:        "correos-spain",
+			Name:        "Correos España",
+			Country:     "ES",
+			CountryName: "Spain",
+			Type:        models.CarrierTypePostal,
+			Website:     "https://www.correos.es",
+			TrackingURL: "https://www.correos.es/es/es/herramientas/localizador/envios/detalle?tracking-number=%s",
+		}
+	case strings.Contains(cleanCp, "ctt"):
+		return &models.CarrierInfo{
+			Slug:        "ctt-express",
+			Name:        "CTT Express",
+			Country:     "ES",
+			CountryName: "Spain",
+			Type:        models.CarrierTypeExpress,
+			Website:     "https://www.cttexpress.com",
+		}
+	case strings.Contains(cleanCp, "gls"):
+		return &models.CarrierInfo{
+			Slug:        "asm-gls-spain",
+			Name:        "GLS Spain",
+			Country:     "ES",
+			CountryName: "Spain",
+			Type:        models.CarrierTypeExpress,
+			Website:     "https://www.gls-spain.es",
+		}
+	case strings.Contains(cleanCp, "inpost") || strings.Contains(cleanCp, "mondial"):
+		return &models.CarrierInfo{
+			Slug:        "inpost-es",
+			Name:        "InPost Spain",
+			Country:     "ES",
+			CountryName: "Spain",
+			Type:        models.CarrierTypeLogistics,
+			Website:     "https://inpost.es",
+		}
+	case destCp != "":
+		slug := strings.ToLower(strings.ReplaceAll(strings.TrimSpace(destCp), " ", "-"))
+		return &models.CarrierInfo{
+			Slug: slug,
+			Name: destCp,
+		}
+	default:
+		return nil
+	}
+}
+
 func (c *CainiaoCarrier) Track(ctx context.Context, trackingNumber string, opts models.TrackOptions) (*models.Shipment, error) {
 	lang := "en-US"
 	if strings.HasPrefix(strings.ToLower(opts.Language), "es") {
@@ -238,465 +284,230 @@ func (c *CainiaoCarrier) Track(ctx context.Context, trackingNumber string, opts 
 		lang = strings.ToLower(opts.Language)
 	}
 
-	// Attempt real live Cainiao API call
 	apiURL := fmt.Sprintf("https://global.cainiao.com/global/detail.json?mailNos=%s&lang=%s", trackingNumber, lang)
-	req, err := newRequest(http.MethodGet, apiURL)
-	if err == nil {
-		req = req.WithContext(ctx)
-		resp, err := httpClient.Do(req)
-		if err == nil && resp.StatusCode == http.StatusOK {
-			defer resp.Body.Close()
-			var cResp cainiaoResponse
-			if err := json.NewDecoder(resp.Body).Decode(&cResp); err == nil {
-				var items []cainiaoItem
-				if len(cResp.Module) > 0 {
-					items = cResp.Module
-				} else if len(cResp.Data) > 0 {
-					items = cResp.Data
-				}
+	req, err := NewCarrierRequest(http.MethodGet, apiURL)
+	if err != nil {
+		return nil, fmt.Errorf("%w: failed to create request: %v", models.ErrCarrierTemporarilyUnavailable, err)
+	}
+	req = req.WithContext(ctx)
 
-				if len(items) > 0 {
-					item := items[0]
-					var rawDetails []cainiaoDetailItem
-					if len(item.DetailList) > 0 {
-						rawDetails = item.DetailList
-					} else {
-						for _, sec := range item.SectionList {
-							rawDetails = append(rawDetails, sec.DetailList...)
-						}
-					}
+	resp, err := cainiaoHTTPClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", models.ErrCarrierTemporarilyUnavailable, err)
+	}
+	defer resp.Body.Close()
 
-					originCode := "CN"
-					if strings.EqualFold(item.OriginCountry, "España") || strings.EqualFold(item.OriginCountry, "Spain") || strings.EqualFold(item.OriginCountry, "ES") {
-						originCode = "ES"
-					} else if len(item.OriginCountry) == 2 {
-						originCode = strings.ToUpper(item.OriginCountry)
-					}
+	if resp.StatusCode == http.StatusTooManyRequests {
+		return nil, models.ErrCarrierRateLimited
+	}
+	if resp.StatusCode == http.StatusForbidden {
+		return nil, models.ErrCarrierTemporarilyUnavailable
+	}
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, models.ErrShipmentNotFound
+	}
 
-					destCode := "ES"
-					if strings.EqualFold(item.DestCountry, "China") || strings.EqualFold(item.DestCountry, "CN") {
-						destCode = "CN"
-					} else if strings.EqualFold(item.DestCountry, "España") || strings.EqualFold(item.DestCountry, "Spain") || strings.EqualFold(item.DestCountry, "ES") {
-						destCode = "ES"
-					} else if len(item.DestCountry) == 2 {
-						destCode = strings.ToUpper(item.DestCountry)
-					} else if opts.DestinationCountry != "" {
-						destCode = strings.ToUpper(opts.DestinationCountry)
-					}
+	bodyBytes, err := io.ReadAll(io.LimitReader(resp.Body, 4*1024*1024))
+	if err != nil {
+		return nil, fmt.Errorf("%w: failed to read response body: %v", models.ErrCarrierTemporarilyUnavailable, err)
+	}
+	bodyStr := string(bodyBytes)
 
-					originName := item.OriginCountry
-					if originName == "" {
-						originName = "China"
-					}
-					destName := item.DestCountry
-					if destName == "" {
-						destName = "Spain"
-					}
+	if isCainiaoAntiBot(resp.StatusCode, bodyStr) {
+		return nil, models.ErrCarrierTemporarilyUnavailable
+	}
 
-					isSpainShipment := strings.EqualFold(destCode, "ES") || strings.HasPrefix(trackingNumber, "323") || strings.EqualFold(item.DestCountry, "Spain") || strings.EqualFold(item.DestCountry, "España")
+	var cResp cainiaoResponse
+	if err := json.Unmarshal(bodyBytes, &cResp); err != nil {
+		return nil, fmt.Errorf("%w: malformed JSON from Cainiao: %v", models.ErrCarrierTemporarilyUnavailable, err)
+	}
 
-					var events []models.TrackingEvent
-					for _, det := range rawDetails {
-						evTime, rawDate := parseCainiaoTime(det)
-						status, stage := normalizeCainiaoEvent(det)
+	if isCainiaoNotFound(&cResp) {
+		return nil, models.ErrShipmentNotFound
+	}
+	if strings.Contains(strings.ToUpper(cResp.ErrorCode), "RGV") || strings.Contains(strings.ToUpper(cResp.ErrorCode), "CHALLENGE") {
+		return nil, models.ErrCarrierTemporarilyUnavailable
+	}
 
-						desc := det.Desc
-						if strings.HasPrefix(strings.ToLower(opts.Language), "es") && det.StanderdDesc != "" {
-							desc = det.StanderdDesc
-						}
-						if desc == "" {
-							desc = det.StanderdDesc
-						}
-						if desc == "" {
-							desc = "Tracking update"
-						}
+	var items []cainiaoItem
+	if len(cResp.Module) > 0 {
+		items = cResp.Module
+	} else if len(cResp.Data) > 0 {
+		items = cResp.Data
+	}
 
-						// Carrier attribution: in Spain / 323..., local delivery is handled by Correos Express
-						carrierSlug := c.Slug()
-						carrierName := c.Name()
-						carrierIdx := 0
+	if len(items) == 0 {
+		return nil, models.ErrShipmentNotFound
+	}
 
-						actionCode := strings.ToUpper(strings.TrimSpace(det.ActionCode))
-						combinedDesc := strings.ToLower(det.Desc + " " + det.StanderdDesc)
+	item := items[0]
+	var rawDetails []cainiaoDetailItem
+	if len(item.DetailList) > 0 {
+		rawDetails = item.DetailList
+	} else {
+		for _, sec := range item.SectionList {
+			rawDetails = append(rawDetails, sec.DetailList...)
+		}
+	}
 
-						isLocalDelivery := isSpainShipment && (
-							stage == models.StageHandover ||
-							stage == models.StageLastMile ||
-							stage == models.StageDelivery ||
-							status == models.StatusDelivered ||
-							status == models.StatusOutForDelivery ||
-							strings.Contains(combinedDesc, "local delivery company") ||
-							strings.Contains(combinedDesc, "local  delivery company") ||
-							strings.Contains(combinedDesc, "operador logístico") ||
-							strings.Contains(combinedDesc, "en reparto") ||
-							strings.Contains(combinedDesc, "en proceso de entrega") ||
-							strings.Contains(combinedDesc, "entregado") ||
-							strings.Contains(combinedDesc, "package delivered") ||
-							actionCode == "GTMS_ACCEPT" ||
-							actionCode == "GTMS_DELIVERING" ||
-							actionCode == "GTMS_SIGNED")
+	if len(rawDetails) == 0 {
+		return nil, models.ErrShipmentNotFound
+	}
 
-						if isLocalDelivery {
-							carrierSlug = "correosexpress"
-							carrierName = "Correos Express"
-							carrierIdx = 1
-						}
+	originCode := "CN"
+	if strings.EqualFold(item.OriginCountry, "España") || strings.EqualFold(item.OriginCountry, "Spain") || strings.EqualFold(item.OriginCountry, "ES") {
+		originCode = "ES"
+	} else if len(item.OriginCountry) == 2 {
+		originCode = strings.ToUpper(item.OriginCountry)
+	}
 
-						events = append(events, models.TrackingEvent{
-							Date:         evTime,
-							RawDate:      rawDate,
-							Status:       status,
-							Stage:        stage,
-							Description:  desc,
-							CarrierSlug:  carrierSlug,
-							CarrierName:  carrierName,
-							CarrierIndex: carrierIdx,
-						})
-					}
+	destCode := "ES"
+	if strings.EqualFold(item.DestCountry, "China") || strings.EqualFold(item.DestCountry, "CN") {
+		destCode = "CN"
+	} else if strings.EqualFold(item.DestCountry, "España") || strings.EqualFold(item.DestCountry, "Spain") || strings.EqualFold(item.DestCountry, "ES") {
+		destCode = "ES"
+	} else if len(item.DestCountry) == 2 {
+		destCode = strings.ToUpper(item.DestCountry)
+	} else if opts.DestinationCountry != "" {
+		destCode = strings.ToUpper(opts.DestinationCountry)
+	}
 
-					if len(events) > 0 {
+	originName := item.OriginCountry
+	if originName == "" {
+		originName = "China"
+	}
+	destName := item.DestCountry
+	if destName == "" {
+		destName = "Spain"
+	}
 
-						overallStatus, _ := normalizeCainiaoShipmentStatus(item.Status, events)
-						statusText := item.StatusDesc
-						if statusText == "" {
-							if overallStatus == models.StatusDelivered {
-								if strings.HasPrefix(strings.ToLower(opts.Language), "es") {
-									statusText = "Entregado"
-								} else {
-									statusText = "Delivered"
-								}
-							} else if overallStatus == models.StatusOutForDelivery {
-								if strings.HasPrefix(strings.ToLower(opts.Language), "es") {
-									statusText = "En reparto"
-								} else {
-									statusText = "Out for delivery"
-								}
-							} else {
-								if strings.HasPrefix(strings.ToLower(opts.Language), "es") {
-									statusText = "En tránsito"
-								} else {
-									statusText = "In transit"
-								}
-							}
-						}
+	isSpainShipment := strings.EqualFold(destCode, "ES") || strings.HasPrefix(trackingNumber, "323") || strings.EqualFold(item.DestCountry, "Spain") || strings.EqualFold(item.DestCountry, "España")
 
-						progress := 60
-						if overallStatus == models.StatusDelivered {
-							progress = 100
-						} else if overallStatus == models.StatusOutForDelivery {
-							progress = 85
-						}
+	var events []models.TrackingEvent
+	for _, det := range rawDetails {
+		evTime, rawDate := parseCainiaoTime(det)
+		status, stage := normalizeCainiaoEvent(det)
 
-						var deliveredAt *time.Time
-						for _, ev := range events {
-							if ev.Status == models.StatusDelivered {
-								t := ev.Date
-								deliveredAt = &t
-								break
-							}
-						}
+		desc := det.Desc
+		if strings.HasPrefix(strings.ToLower(opts.Language), "es") && det.StanderdDesc != "" {
+			desc = det.StanderdDesc
+		}
+		if desc == "" {
+			desc = det.StanderdDesc
+		}
+		if desc == "" {
+			desc = "Tracking update"
+		}
 
-						shipment := &models.Shipment{
-							TrackingNumber: trackingNumber,
-							Carrier:        c.Info(),
-							Status:         overallStatus,
-							StatusText:     statusText,
-							Progress:       progress,
-							DeliveredAt:    deliveredAt,
-							Origin: models.CountryInfo{
-								Name: originName,
-								Code: originCode,
-							},
-							Destination: models.CountryInfo{
-								Name: destName,
-								Code: destCode,
-							},
-							LastMileTrackingNumber: item.DestMailNo,
-							Events:                 events,
-							UpdatedAt:              time.Now(),
-						}
+		carrierSlug := c.Slug()
+		carrierName := c.Name()
+		carrierIdx := 0
 
-						if isSpainShipment {
-							shipment.LastMileCarrier = &models.CarrierInfo{
-								Slug:        "correosexpress",
-								Name:        "Correos Express",
-								Country:     "ES",
-								CountryName: "Spain",
-								Type:        models.CarrierTypeExpress,
-								Website:     "https://www.correosexpress.com",
-								TrackingURL: "https://www.correosexpress.com/web/correosexpress/consultanos?shippingNumber=%s",
-							}
-							if shipment.LastMileTrackingNumber == "" {
-								shipment.LastMileTrackingNumber = trackingNumber
-							}
-							shipment.AdditionalCarriers = []models.CarrierInfo{*shipment.LastMileCarrier}
-						} else if item.DestCp != "" {
-							shipment.LastMileCarrier = &models.CarrierInfo{
-								Name: item.DestCp,
-								Slug: strings.ToLower(strings.ReplaceAll(item.DestCp, " ", "-")),
-							}
-							shipment.AdditionalCarriers = []models.CarrierInfo{*shipment.LastMileCarrier}
-						}
+		actionCode := strings.ToUpper(strings.TrimSpace(det.ActionCode))
+		combinedDesc := strings.ToLower(det.Desc + " " + det.StanderdDesc)
 
-						return shipment, nil
-					}
-				}
+		isLocalDelivery := isSpainShipment && (stage == models.StageHandover ||
+			stage == models.StageLastMile ||
+			stage == models.StageDelivery ||
+			status == models.StatusDelivered ||
+			status == models.StatusOutForDelivery ||
+			strings.Contains(combinedDesc, "local delivery company") ||
+			strings.Contains(combinedDesc, "local  delivery company") ||
+			strings.Contains(combinedDesc, "operador logístico") ||
+			strings.Contains(combinedDesc, "en reparto") ||
+			strings.Contains(combinedDesc, "en proceso de entrega") ||
+			strings.Contains(combinedDesc, "entregado") ||
+			strings.Contains(combinedDesc, "package delivered") ||
+			actionCode == "GTMS_ACCEPT" ||
+			actionCode == "GTMS_DELIVERING" ||
+			actionCode == "GTMS_SIGNED")
+
+		if isLocalDelivery {
+			carrierSlug = "correosexpress"
+			carrierName = "Correos Express"
+			carrierIdx = 1
+		}
+
+		events = append(events, models.TrackingEvent{
+			Date:         evTime,
+			RawDate:      rawDate,
+			Status:       status,
+			Stage:        stage,
+			Description:  desc,
+			CarrierSlug:  carrierSlug,
+			CarrierName:  carrierName,
+			CarrierIndex: carrierIdx,
+		})
+	}
+
+	overallStatus, _ := normalizeCainiaoShipmentStatus(item.Status, events)
+	statusText := item.StatusDesc
+	if statusText == "" {
+		if overallStatus == models.StatusDelivered {
+			if strings.HasPrefix(strings.ToLower(opts.Language), "es") {
+				statusText = "Entregado"
+			} else {
+				statusText = "Delivered"
+			}
+		} else if overallStatus == models.StatusOutForDelivery {
+			if strings.HasPrefix(strings.ToLower(opts.Language), "es") {
+				statusText = "En reparto"
+			} else {
+				statusText = "Out for delivery"
+			}
+		} else {
+			if strings.HasPrefix(strings.ToLower(opts.Language), "es") {
+				statusText = "En tránsito"
+			} else {
+				statusText = "In transit"
 			}
 		}
 	}
 
-	// Reference tracking number for AliExpress / Correos Express integration testing
-	if trackingNumber == "32300035210642701471403" {
-		return c.generateSimulatedShipment(trackingNumber, opts), nil
+	progress := 60
+	if overallStatus == models.StatusDelivered {
+		progress = 100
+	} else if overallStatus == models.StatusOutForDelivery {
+		progress = 85
 	}
 
-	// If real API failed or returned no data, check AllowSimulated
-	if !opts.AllowSimulated {
-		return nil, models.ErrShipmentNotFound
-	}
-
-	// Resilient fallback: realistic international journey with handover
-	return c.generateSimulatedShipment(trackingNumber, opts), nil
-}
-
-func (c *CainiaoCarrier) generateSimulatedShipment(trackingNumber string, opts models.TrackOptions) *models.Shipment {
-	destCode := "ES"
-	destName := "Spain"
-	if opts.DestinationCountry != "" {
-		destCode = opts.DestinationCountry
-		destName = opts.DestinationCountry
-	}
-
-	correosExpressInfo := models.CarrierInfo{
-		Slug:        "correosexpress",
-		Name:        "Correos Express",
-		Country:     destCode,
-		CountryName: destName,
-		Type:        models.CarrierTypeExpress,
-		Website:     "https://www.correosexpress.com",
-		TrackingURL: "https://www.correosexpress.com/web/correosexpress/consultanos?shippingNumber=%s",
-	}
-
-	if trackingNumber == "32300035210642701471403" {
-		t1, _ := time.Parse(time.RFC3339, "2026-11-03T06:59:48Z")
-		t2, _ := time.Parse(time.RFC3339, "2026-11-03T10:26:53Z")
-		t3, _ := time.Parse(time.RFC3339, "2026-11-03T15:17:42Z")
-		t4, _ := time.Parse(time.RFC3339, "2026-11-03T18:00:45Z")
-		t5, _ := time.Parse(time.RFC3339, "2026-11-04T10:27:25Z")
-		t6, _ := time.Parse(time.RFC3339, "2026-11-04T17:45:05Z")
-
-		descDelivered := "Package delivered"
-		descOut := "EN REPARTO"
-		descHandover := "Received by local delivery company"
-		descLeave := "Leave the warehouse"
-		descOrder := "Order received successfully"
-		descSorting := "Product sorting is completed"
-		statusText := "Delivered"
-
-		if strings.HasPrefix(strings.ToLower(opts.Language), "es") {
-			descDelivered = "Entregado"
-			descOut = "En proceso de entrega"
-			descHandover = "Aceptado por operador logístico"
-			descLeave = "Pedido enviado desde almacén"
-			descOrder = "Tu solicitud de pedido ha sido recibida"
-			descSorting = "Producto recogido en almacén"
-			statusText = "Entregado"
-		}
-
-		events := []models.TrackingEvent{
-			{
-				Date:         t6,
-				RawDate:      "2026-11-04 17:45:05",
-				Status:       models.StatusDelivered,
-				Stage:        models.StageDelivery,
-				Description:  descDelivered,
-				CarrierSlug:  "correosexpress",
-				CarrierName:  "Correos Express",
-				CarrierIndex: 1,
-			},
-			{
-				Date:         t5,
-				RawDate:      "2026-11-04 10:27:25",
-				Status:       models.StatusOutForDelivery,
-				Stage:        models.StageLastMile,
-				Description:  descOut,
-				CarrierSlug:  "correosexpress",
-				CarrierName:  "Correos Express",
-				CarrierIndex: 1,
-			},
-			{
-				Date:         t4,
-				RawDate:      "2026-11-03 18:00:45",
-				Status:       models.StatusInTransit,
-				Stage:        models.StageHandover,
-				Description:  descHandover,
-				Location:     "Coslada Hub, Madrid, Spain",
-				CarrierSlug:  "correosexpress",
-				CarrierName:  "Correos Express",
-				CarrierIndex: 1,
-			},
-			{
-				Date:         t3,
-				RawDate:      "2026-11-03 15:17:42",
-				Status:       models.StatusInTransit,
-				Stage:        models.StageTransit,
-				Description:  descLeave,
-				CarrierSlug:  c.Slug(),
-				CarrierName:  c.Name(),
-				CarrierIndex: 0,
-			},
-			{
-				Date:         t2,
-				RawDate:      "2026-11-03 10:26:53",
-				Status:       models.StatusInTransit,
-				Stage:        models.StageTransit,
-				Description:  descOrder,
-				CarrierSlug:  c.Slug(),
-				CarrierName:  c.Name(),
-				CarrierIndex: 0,
-			},
-			{
-				Date:         t1,
-				RawDate:      "2026-11-03 06:59:48",
-				Status:       models.StatusInTransit,
-				Stage:        models.StageTransit,
-				Description:  descSorting,
-				CarrierSlug:  c.Slug(),
-				CarrierName:  c.Name(),
-				CarrierIndex: 0,
-			},
-		}
-
-		deliveredAt := t6
-		return &models.Shipment{
-			TrackingNumber:         trackingNumber,
-			Carrier:                c.Info(),
-			LastMileTrackingNumber: trackingNumber,
-			LastMileCarrier:        &correosExpressInfo,
-			AdditionalCarriers:     []models.CarrierInfo{correosExpressInfo},
-			Origin: models.CountryInfo{
-				Name: "Spain",
-				Code: "ES",
-			},
-			Destination: models.CountryInfo{
-				Name: "Spain",
-				Code: "ES",
-			},
-			Status:        models.StatusDelivered,
-			StatusText:    statusText,
-			Progress:      100,
-			DaysInTransit: 1,
-			DeliveredAt:   &deliveredAt,
-			Events:        events,
-			UpdatedAt:     time.Now(),
+	var deliveredAt *time.Time
+	for _, ev := range events {
+		if ev.Status == models.StatusDelivered {
+			t := ev.Date
+			deliveredAt = &t
+			break
 		}
 	}
 
-	now := time.Now()
-	// Create realistic timeline for AliExpress -> Spain
-	events := []models.TrackingEvent{
-		{
-			Date:        now.Add(-6 * 24 * time.Hour),
-			Description: "Electronic shipment information received from merchant",
-			Location:    "Shenzhen, China",
-			CarrierSlug: c.Slug(),
-			CarrierName: c.Name(),
-			Status:      models.StatusInfoReceived,
-			Stage:       models.StageCreated,
-		},
-		{
-			Date:        now.Add(-5 * 24 * time.Hour),
-			Description: "Outbound in sorting center",
-			Location:    "Shenzhen International Sorting Center, China",
-			CarrierSlug: c.Slug(),
-			CarrierName: c.Name(),
-			Status:      models.StatusInTransit,
-			Stage:       models.StagePickedUp,
-		},
-		{
-			Date:        now.Add(-4 * 24 * time.Hour),
-			Description: "Export clearance success",
-			Location:    "Shenzhen Bao'an Airport, China",
-			CarrierSlug: c.Slug(),
-			CarrierName: c.Name(),
-			Status:      models.StatusInTransit,
-			Stage:       models.StageCustoms,
-		},
-		{
-			Date:        now.Add(-3 * 24 * time.Hour),
-			Description: "Hand over to airline / Departed from original country",
-			Location:    "Shenzhen Airport, China",
-			CarrierSlug: c.Slug(),
-			CarrierName: c.Name(),
-			Status:      models.StatusInTransit,
-			Stage:       models.StageTransit,
-		},
-		{
-			Date:        now.Add(-2 * 24 * time.Hour),
-			Description: "Arrived at destination country airport / Import clearance started",
-			Location:    "Madrid-Barajas Airport, Spain",
-			CarrierSlug: c.Slug(),
-			CarrierName: c.Name(),
-			Status:      models.StatusInTransit,
-			Stage:       models.StageCustoms,
-		},
-		{
-			Date:        now.Add(-36 * time.Hour),
-			Description: "Import customs clearance completed successfully",
-			Location:    "Madrid-Barajas Airport, Spain",
-			CarrierSlug: c.Slug(),
-			CarrierName: c.Name(),
-			Status:      models.StatusInTransit,
-			Stage:       models.StageCustoms,
-		},
-		{
-			Date:         now.Add(-20 * time.Hour),
-			Description:  "Handed over to local delivery partner for last mile delivery",
-			Location:     "Coslada Hub, Madrid, Spain",
-			CarrierSlug:  "correosexpress",
-			CarrierName:  "Correos Express",
-			CarrierIndex: 1,
-			Status:       models.StatusInTransit,
-			Stage:        models.StageHandover,
-		},
-	}
-
-	// Last-mile carrier handover (Correos Express in Spain, or Correos España)
-	lastMileNum := "6900" + trackingNumber[max(0, len(trackingNumber)-12):]
-	if len(lastMileNum) < 16 {
-		lastMileNum = "6900123456789012"
-	}
-	if strings.HasPrefix(trackingNumber, "323") {
-		lastMileNum = trackingNumber
-	}
-
-	return &models.Shipment{
-		TrackingNumber:         trackingNumber,
-		Carrier:                c.Info(),
-		LastMileTrackingNumber: lastMileNum,
-		LastMileCarrier:        &correosExpressInfo,
-		AdditionalCarriers:     []models.CarrierInfo{correosExpressInfo},
+	shipment := &models.Shipment{
+		TrackingNumber: trackingNumber,
+		Carrier:        c.Info(),
+		Status:         overallStatus,
+		StatusText:     statusText,
+		Progress:       progress,
+		DeliveredAt:    deliveredAt,
 		Origin: models.CountryInfo{
-			Name: "China",
-			Code: "CN",
+			Name: originName,
+			Code: originCode,
 		},
 		Destination: models.CountryInfo{
 			Name: destName,
 			Code: destCode,
 		},
-		Status:        models.StatusInTransit,
-		StatusText:    "In Transit - Handed over to local carrier",
-		Progress:      70,
-		DaysInTransit: 6,
-		Events:        events,
-		UpdatedAt:     time.Now(),
-		FromCache:     false,
+		LastMileTrackingNumber: item.DestMailNo,
+		Events:                 events,
+		UpdatedAt:              time.Now(),
 	}
-}
 
-func max(a, b int) int {
-	if a > b {
-		return a
+	lastMileCarrier := resolveCainiaoLastMileCarrier(item.DestCp, trackingNumber, destCode)
+	if lastMileCarrier != nil {
+		shipment.LastMileCarrier = lastMileCarrier
+		if shipment.LastMileTrackingNumber == "" && strings.HasPrefix(trackingNumber, "323") {
+			shipment.LastMileTrackingNumber = trackingNumber
+		}
+		shipment.AdditionalCarriers = []models.CarrierInfo{*lastMileCarrier}
 	}
-	return b
+
+	return shipment, nil
 }

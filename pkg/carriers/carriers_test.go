@@ -2,6 +2,7 @@ package carriers
 
 import (
 	"context"
+	"net/http"
 	"testing"
 
 	"open-parcels/pkg/models"
@@ -144,6 +145,13 @@ func TestRegistry(t *testing.T) {
 			t.Errorf("expected global carrier %s to be registered", slug)
 		}
 	}
+
+	fixtureData, err := LoadFixture("cainiao_intransit.json")
+	if err != nil {
+		t.Fatalf("failed to load fixture: %v", err)
+	}
+	teardown := SetCainiaoHTTPClientForTest(NewFixtureClient(http.StatusOK, fixtureData, "application/json"))
+	defer teardown()
 
 	shipment, err := cainiao.Track(context.Background(), "LP00561234567890", models.TrackOptions{Language: "en", AllowSimulated: true})
 	if err != nil {

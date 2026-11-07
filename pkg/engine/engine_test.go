@@ -3,12 +3,21 @@ package engine
 import (
 	"context"
 	"errors"
+	"net/http"
 	"testing"
 
+	"open-parcels/pkg/carriers"
 	"open-parcels/pkg/models"
 )
 
 func TestEngineTrackChaining(t *testing.T) {
+	fixtureData, err := carriers.LoadFixture("cainiao_delivered.json")
+	if err != nil {
+		t.Fatalf("failed to load fixture: %v", err)
+	}
+	teardown := carriers.SetCainiaoHTTPClientForTest(carriers.NewFixtureClient(http.StatusOK, fixtureData, "application/json"))
+	defer teardown()
+
 	eng := New()
 
 	// Track Cainiao number with handover to Correos Express
@@ -113,6 +122,13 @@ func TestEngineItalianTrackingAndLocalization(t *testing.T) {
 }
 
 func TestEngineTracking323CainiaoAndCorreosExpress(t *testing.T) {
+	fixtureData, err := carriers.LoadFixture("cainiao_delivered.json")
+	if err != nil {
+		t.Fatalf("failed to load fixture: %v", err)
+	}
+	teardown := carriers.SetCainiaoHTTPClientForTest(carriers.NewFixtureClient(http.StatusOK, fixtureData, "application/json"))
+	defer teardown()
+
 	eng := New()
 
 	// 1. Auto-detection tracking: 32300035210642701471403 with ES language

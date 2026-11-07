@@ -2,21 +2,21 @@ package carriers
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
-	"testing"
 )
 
-// RoundTripFunc allows defining custom http.RoundTripper functions inline in tests.
+// RoundTripFunc allows defining custom http.RoundTripper functions.
 type RoundTripFunc func(req *http.Request) *http.Response
 
 func (f RoundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
 	return f(req), nil
 }
 
-// NewFixtureClient returns an http.Client backed by a mock RoundTripper that serves fixture content.
+// NewFixtureClient returns an http.Client backed by a mock RoundTripper serving fixture content.
 func NewFixtureClient(statusCode int, fixtureContent []byte, contentType string) *http.Client {
 	return &http.Client{
 		Transport: RoundTripFunc(func(req *http.Request) *http.Response {
@@ -35,24 +35,20 @@ func NewFixtureClient(statusCode int, fixtureContent []byte, contentType string)
 	}
 }
 
-// LoadFixture reads a test fixture from testdata/fixtures directory.
-func LoadFixture(t *testing.T, filename string) []byte {
-	t.Helper()
-
-	// Try relative to workspace root or current test package
+// LoadFixture reads a test fixture from testdata/fixtures.
+func LoadFixture(filename string) ([]byte, error) {
 	candidates := []string{
-		filepath.Join("..", "..", "testdata", "fixtures", filename),
 		filepath.Join("testdata", "fixtures", filename),
 		filepath.Join("..", "testdata", "fixtures", filename),
+		filepath.Join("..", "..", "testdata", "fixtures", filename),
 	}
 
 	for _, path := range candidates {
 		data, err := os.ReadFile(path)
 		if err == nil {
-			return data
+			return data, nil
 		}
 	}
 
-	t.Fatalf("could not load fixture %s from any candidate path", filename)
-	return nil
+	return nil, fmt.Errorf("could not find fixture %s in candidate paths: %v", filename, candidates)
 }

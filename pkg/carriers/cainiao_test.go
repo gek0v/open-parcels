@@ -3,8 +3,8 @@ package carriers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"open-parcels/pkg/models"
@@ -23,15 +23,15 @@ func TestCainiaoParsingModuleAndData(t *testing.T) {
 				"statusDesc": "Entregado",
 				"detailList": [
 					{
-						"time": 1793785505000,
-						"timeStr": "2026-11-04 17:45:05",
+						"time": 1700050000000,
+						"timeStr": "2024-11-15 17:45:05",
 						"desc": "Package delivered",
 						"standerdDesc": "Entregado",
 						"actionCode": "GTMS_SIGNED"
 					},
 					{
-						"time": 1793759245000,
-						"timeStr": "2026-11-04 10:27:25",
+						"time": 1700020000000,
+						"timeStr": "2024-11-15 10:27:25",
 						"desc": "EN REPARTO",
 						"standerdDesc": "En proceso de entrega",
 						"actionCode": "GTMS_DELIVERING"
@@ -104,8 +104,8 @@ func TestCainiaoParsingModuleAndData(t *testing.T) {
 						"detailList": [
 							{
 								"desc": "Package arrived at airport",
-								"time": "2026-11-02 10:00:00",
-								"date": "2026-11-02"
+								"time": "2024-11-14 10:00:00",
+								"date": "2024-11-14"
 							}
 						]
 					}
@@ -129,50 +129,120 @@ func TestCainiaoParsingModuleAndData(t *testing.T) {
 	}
 }
 
-func TestCainiaoLiveOrMockServer(t *testing.T) {
-	// Test with a mock Cainiao server
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{
-			"success": true,
-			"module": [
-				{
-					"mailNo": "32300035210642701471403",
-					"originCountry": "España",
-					"destCountry": "España",
-					"status": "DELIVERED",
-					"statusDesc": "Entregado",
-					"detailList": [
-						{
-							"time": 1793785505000,
-							"timeStr": "2026-11-04 17:45:05",
-							"desc": "Package delivered",
-							"standerdDesc": "Entregado",
-							"actionCode": "GTMS_SIGNED"
-						}
-					]
-				}
-			]
-		}`))
-	}))
-	defer server.Close()
+func TestCainiaoTrackDeliveredFixture(t *testing.T) {
+	fixtureData, err := LoadFixture("cainiao_delivered.json")
+	if err != nil {
+		t.Fatalf("failed to load fixture: %v", err)
+	}
+	teardown := SetCainiaoHTTPClientForTest(NewFixtureClient(http.StatusOK, fixtureData, "application/json"))
+	defer teardown()
 
-	carrier := NewCainiaoCarrier()
-	shipment, err := carrier.Track(context.Background(), "32300035210642701471403", models.TrackOptions{
+	c := NewCainiaoCarrier()
+	shipment, err := c.Track(context.Background(), "32300035210642701471403", models.TrackOptions{
 		Language: "es",
 	})
 	if err != nil {
-		t.Fatalf("unexpected error tracking cainiao: %v", err)
+		t.Fatalf("unexpected error tracking delivered fixture: %v", err)
 	}
 
 	if shipment.Status != models.StatusDelivered {
 		t.Errorf("expected StatusDelivered, got %s", shipment.Status)
 	}
-	if len(shipment.Events) == 0 {
-		t.Fatalf("expected events")
+	if shipment.Progress != 100 {
+		t.Errorf("expected Progress 100, got %d", shipment.Progress)
 	}
-	if shipment.Events[0].Status != models.StatusDelivered {
-		t.Errorf("expected event StatusDelivered, got %s", shipment.Events[0].Status)
+	if shipment.LastMileCarrier == nil {
+		t.Fatalf("expected LastMileCarrier to be set")
+	}
+	if shipment.LastMileCarrier.Slug != "correosexpress" {
+		t.Errorf("expected LastMileCarrier slug correosexpress, got %s", shipment.LastMileCarrier.Slug)
+	}
+	if shipment.LastMileTrackingNumber != "6900123456789012" {
+		t.Errorf("expected LastMileTrackingNumber 6900123456789012, got %s", shipment.LastMileTrackingNumber)
+	}
+	if len(shipment.Events) < 3 {
+		t.Errorf("expected at least 3 events, got %d", len(shipment.Events))
+	}
+}
+
+func TestCainiaoTrackInTransitFixture(t *testing.T) {
+	fixtureData, err := LoadFixture("cainiao_intransit.json")
+	if err != nil {
+		t.Fatalf("failed to load fixture: %v", err)
+	}
+	teardown := SetCainiaoHTTPClientForTest(NewFixtureClient(http.StatusOK, fixtureData, "application/json"))
+	defer teardown()
+
+	c := NewCainiaoCarrier()
+	shipment, err := c.Track(context.Background(), "LP00561234567890", models.TrackOptions{
+		Language: "en",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error tracking in transit fixture: %v", err)
+	}
+
+	if shipment.Status != models.StatusInTransit {
+		t.Errorf("expected StatusInTransit, got %s", shipment.Status)
+	}
+	if shipment.LastMileCarrier == nil {
+		t.Fatalf("expected LastMileCarrier to be set for handover to Correos")
+	}
+	if shipment.LastMileCarrier.Slug != "correos-spain" {
+		t.Errorf("expected LastMileCarrier slug correos-spain, got %s", shipment.LastMileCarrier.Slug)
+	}
+	if shipment.LastMileTrackingNumber != "PQ4100123456789" {
+		t.Errorf("expected LastMileTrackingNumber PQ4100123456789, got %s", shipment.LastMileTrackingNumber)
+	}
+}
+
+func TestCainiaoNotFoundFixture(t *testing.T) {
+	fixtureData, err := LoadFixture("cainiao_not_found.json")
+	if err != nil {
+		t.Fatalf("failed to load fixture: %v", err)
+	}
+	teardown := SetCainiaoHTTPClientForTest(NewFixtureClient(http.StatusOK, fixtureData, "application/json"))
+	defer teardown()
+
+	c := NewCainiaoCarrier()
+	_, err = c.Track(context.Background(), "LP99999999999999", models.TrackOptions{})
+	if err == nil {
+		t.Fatalf("expected ErrShipmentNotFound, got nil")
+	}
+	if !errors.Is(err, models.ErrShipmentNotFound) {
+		t.Errorf("expected ErrShipmentNotFound, got %v", err)
+	}
+}
+
+func TestCainiaoAntiBotChallenge(t *testing.T) {
+	c := NewCainiaoCarrier()
+
+	// 1. AntiBot JSON body with RGV587_FLAG
+	fixtureData, err := LoadFixture("cainiao_antibot.json")
+	if err != nil {
+		t.Fatalf("failed to load fixture: %v", err)
+	}
+	teardown := SetCainiaoHTTPClientForTest(NewFixtureClient(http.StatusOK, fixtureData, "application/json"))
+	defer teardown()
+
+	_, err = c.Track(context.Background(), "32300035210642701471403", models.TrackOptions{})
+	if err == nil {
+		t.Fatalf("expected ErrCarrierTemporarilyUnavailable, got nil")
+	}
+	if !errors.Is(err, models.ErrCarrierTemporarilyUnavailable) {
+		t.Errorf("expected ErrCarrierTemporarilyUnavailable, got: %v", err)
+	}
+
+	// 2. HTTP 403 Forbidden
+	cainiaoHTTPClient = NewFixtureClient(http.StatusForbidden, []byte("Forbidden WAF"), "text/plain")
+	_, err = c.Track(context.Background(), "32300035210642701471403", models.TrackOptions{})
+	if !errors.Is(err, models.ErrCarrierTemporarilyUnavailable) {
+		t.Errorf("expected ErrCarrierTemporarilyUnavailable for HTTP 403, got: %v", err)
+	}
+
+	// 3. HTTP 429 Rate Limit
+	cainiaoHTTPClient = NewFixtureClient(http.StatusTooManyRequests, []byte("Rate limit exceeded"), "text/plain")
+	_, err = c.Track(context.Background(), "32300035210642701471403", models.TrackOptions{})
+	if !errors.Is(err, models.ErrCarrierRateLimited) {
+		t.Errorf("expected ErrCarrierRateLimited for HTTP 429, got: %v", err)
 	}
 }

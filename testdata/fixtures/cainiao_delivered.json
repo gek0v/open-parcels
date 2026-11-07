@@ -1,0 +1,51 @@
+{
+  "success": true,
+  "module": [
+    {
+      "mailNo": "32300035210642701471403",
+      "originCountry": "China",
+      "destCountry": "Spain",
+      "destMailNo": "6900123456789012",
+      "destCp": "Correos Express",
+      "status": "DELIVERED",
+      "statusDesc": "Entregado",
+      "detailList": [
+        {
+          "time": 1700050000000,
+          "timeStr": "2024-11-15 17:45:05",
+          "desc": "Package delivered to recipient",
+          "standerdDesc": "Entregado con éxito",
+          "actionCode": "GTMS_SIGNED"
+        },
+        {
+          "time": 1700020000000,
+          "timeStr": "2024-11-15 09:30:00",
+          "desc": "Out for delivery with local carrier",
+          "standerdDesc": "En reparto",
+          "actionCode": "GTMS_DELIVERING"
+        },
+        {
+          "time": 1699950000000,
+          "timeStr": "2024-11-14 14:20:00",
+          "desc": "Received by local delivery company",
+          "standerdDesc": "Aceptado por operador logístico",
+          "actionCode": "GTMS_ACCEPT"
+        },
+        {
+          "time": 1699850000000,
+          "timeStr": "2024-11-13 10:00:00",
+          "desc": "Import customs clearance completed",
+          "standerdDesc": "Despacho de importación completado",
+          "actionCode": "GTMS_CLEARANCE_SUCCESS"
+        },
+        {
+          "time": 1699700000000,
+          "timeStr": "2024-11-11 08:00:00",
+          "desc": "Order dispatched from warehouse",
+          "standerdDesc": "Salida de almacén",
+          "actionCode": "GTMS_OUTBOUND"
+        }
+      ]
+    }
+  ]
+}

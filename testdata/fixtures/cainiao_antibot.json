@@ -1,0 +1,6 @@
+{
+  "success": false,
+  "errorCode": "RGV587_FLAG",
+  "errorMsg": "SEC_CHALLENGE: Suspicious activity detected, verification required",
+  "module": []
+}

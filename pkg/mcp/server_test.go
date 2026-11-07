@@ -8,10 +8,18 @@ import (
 	"strings"
 	"testing"
 
+	"open-parcels/pkg/carriers"
 	"open-parcels/pkg/engine"
 )
 
 func TestMCPServer(t *testing.T) {
+	fixtureData, err := carriers.LoadFixture("cainiao_delivered.json")
+	if err != nil {
+		t.Fatalf("failed to load fixture: %v", err)
+	}
+	teardown := carriers.SetCainiaoHTTPClientForTest(carriers.NewFixtureClient(http.StatusOK, fixtureData, "application/json"))
+	defer teardown()
+
 	eng := engine.New()
 	srv := NewServer(eng)
 
