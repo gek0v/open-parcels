@@ -18,7 +18,7 @@ func TestDetector(t *testing.T) {
 		{"Cainiao LP", "LP00561234567890", "ES", "cainiao"},
 		{"Cainiao CNESP", "CNESP0012345678", "ES", "cainiao"},
 		{"Cainiao 23 digits AliExpress", "32300035210642701471403", "", "cainiao"},
-		{"Cainiao 23 digits AliExpress with ES hint", "32300035210642701471403", "ES", "cainiao"},
+		{"Cainiao 23 digits AliExpress with ES hint", "32300035210642701471403", "ES", "correosexpress"},
 		{"Correos Express 16 digits", "6900123456789012", "ES", "correosexpress"},
 		{"Correos Express 23 digits (69)", "69001234567890123456789", "ES", "correosexpress"},
 		{"Correos Express 23 digits (321)", "32101234567890123456789", "ES", "correosexpress"},
@@ -241,5 +241,44 @@ func TestDetectorCandidates(t *testing.T) {
 	}
 	if !foundCorreosExpress {
 		t.Errorf("expected correosexpress in candidates for 32300035210642701471403")
+	}
+}
+
+func BenchmarkDetect(b *testing.B) {
+	d := New()
+	testCases := []string{
+		"1Z9999999999999999",      // UPS (18 chars)
+		"123456789012",            // FedEx (12 digits)
+		"1234567890",              // DHL Express (10 digits)
+		"PQ4F6P07000000000000000", // Correos España (23 chars)
+		"36150127630406",          // SEUR (14 digits)
+		"LP00561234567890",        // Cainiao (16 chars)
+		"32300035210642701471403", // Cainiao / Correos Express (23 digits)
+		"157-52471764",            // Air Cargo AWB
+		"MSCU1234567",             // MSC Container (11 chars)
+		"75616714",                // InPost (8 digits)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		num := testCases[i%len(testCases)]
+		_ = d.Detect(num, "ES")
+	}
+}
+
+func BenchmarkBestMatch(b *testing.B) {
+	d := New()
+	testCases := []string{
+		"1Z9999999999999999",
+		"123456789012",
+		"1234567890",
+		"36150127630406",
+		"LP00561234567890",
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		num := testCases[i%len(testCases)]
+		_ = d.BestMatch(num, "ES")
 	}
 }

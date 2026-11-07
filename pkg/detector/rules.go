@@ -7,7 +7,11 @@ import (
 )
 
 func (d *Detector) initRules() {
-	d.rules = []PatternRule{
+	d.rules = getCompiledRules()
+}
+
+func buildDefaultRules() []PatternRule {
+	return []PatternRule{
 		// 1. Air Waybill (hyphenated NNN-NNNNNNNN)
 		{
 			CarrierSlug:    "air-cargo",
