@@ -22,6 +22,22 @@ type Carrier interface {
 	Track(ctx context.Context, trackingNumber string, opts models.TrackOptions) (*models.Shipment, error)
 }
 
+// CarrierCapabilities specifies the operational attributes of a carrier driver.
+type CarrierCapabilities struct {
+	RequiresPostalCode      bool `json:"requires_postal_code"`
+	RequiresAuth            bool `json:"requires_auth"`
+	SupportsProofOfDelivery bool `json:"supports_proof_of_delivery"`
+	SupportsLiveAPI         bool `json:"supports_live_api"`
+	SupportsWebScraping     bool `json:"supports_web_scraping"`
+}
+
+// CarrierAdapter is the enriched interface implemented by standard and enterprise carrier integrations.
+type CarrierAdapter interface {
+	Carrier
+	ID() string
+	Capabilities() CarrierCapabilities
+}
+
 // LiveTracker is implemented by carrier drivers that connect to real external APIs/networks.
 type LiveTracker interface {
 	HasLiveTracking() bool
@@ -70,6 +86,13 @@ type AliasCarrier struct {
 }
 
 func (a *AliasCarrier) Slug() string { return a.slug }
+func (a *AliasCarrier) ID() string   { return a.slug }
+func (a *AliasCarrier) Capabilities() CarrierCapabilities {
+	if ca, ok := a.Carrier.(CarrierAdapter); ok {
+		return ca.Capabilities()
+	}
+	return CarrierCapabilities{}
+}
 
 func registerDefaultCarriers(r *Registry) {
 	r.Register(NewCainiaoCarrier())
@@ -273,13 +296,14 @@ func (r *Registry) AllCarriers() map[string]Carrier {
 
 // BaseCarrier provides shared utility methods for carrier implementations.
 type BaseCarrier struct {
-	slug        string
-	name        string
-	country     string
-	countryName string
-	carrierType models.CarrierType
-	website     string
-	urlTemplate string
+	slug         string
+	name         string
+	country      string
+	countryName  string
+	carrierType  models.CarrierType
+	website      string
+	urlTemplate  string
+	capabilities CarrierCapabilities
 }
 
 func NewBaseCarrier(slug, name, country, countryName string, cType models.CarrierType, website, urlTemplate string) BaseCarrier {
@@ -294,12 +318,15 @@ func NewBaseCarrier(slug, name, country, countryName string, cType models.Carrie
 	}
 }
 
-func (b BaseCarrier) Slug() string                   { return b.slug }
-func (b BaseCarrier) Name() string                   { return b.name }
-func (b BaseCarrier) Country() string                { return b.country }
-func (b BaseCarrier) CountryName() string            { return b.countryName }
-func (b BaseCarrier) Type() models.CarrierType       { return b.carrierType }
-func (b BaseCarrier) Website() string                { return b.website }
+func (b BaseCarrier) Slug() string                         { return b.slug }
+func (b BaseCarrier) ID() string                           { return b.slug }
+func (b BaseCarrier) Name() string                         { return b.name }
+func (b BaseCarrier) Country() string                      { return b.country }
+func (b BaseCarrier) CountryName() string                  { return b.countryName }
+func (b BaseCarrier) Type() models.CarrierType             { return b.carrierType }
+func (b BaseCarrier) Website() string                      { return b.website }
+func (b BaseCarrier) Capabilities() CarrierCapabilities    { return b.capabilities }
+func (b *BaseCarrier) SetCapabilities(c CarrierCapabilities) { b.capabilities = c }
 func (b BaseCarrier) TrackingURL(num string) string {
 	if b.urlTemplate == "" {
 		return ""

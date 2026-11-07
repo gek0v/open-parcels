@@ -16,16 +16,20 @@ type CainiaoCarrier struct {
 }
 
 func NewCainiaoCarrier() *CainiaoCarrier {
+	bc := NewBaseCarrier(
+		"cainiao",
+		"Cainiao Global",
+		"CN",
+		"China",
+		models.CarrierTypeCrossBorder,
+		"https://global.cainiao.com",
+		"https://global.cainiao.com/detail.htm?mailNoList=%s",
+	)
+	bc.SetCapabilities(CarrierCapabilities{
+		SupportsLiveAPI: true,
+	})
 	return &CainiaoCarrier{
-		BaseCarrier: NewBaseCarrier(
-			"cainiao",
-			"Cainiao Global",
-			"CN",
-			"China",
-			models.CarrierTypeCrossBorder,
-			"https://global.cainiao.com",
-			"https://global.cainiao.com/detail.htm?mailNoList=%s",
-		),
+		BaseCarrier: bc,
 	}
 }
 

@@ -12,16 +12,21 @@ type InPostSpainCarrier struct {
 }
 
 func NewInPostSpainCarrier() *InPostSpainCarrier {
+	bc := NewBaseCarrier(
+		"inpost-es",
+		"InPost Spain",
+		"ES",
+		"Spain",
+		models.CarrierTypeLogistics,
+		"https://inpost.es",
+		"https://www.inpost.es/seguimiento-del-envio?parcelNumber=%s",
+	)
+	bc.SetCapabilities(CarrierCapabilities{
+		RequiresPostalCode:  true,
+		SupportsWebScraping: true,
+	})
 	return &InPostSpainCarrier{
-		BaseCarrier: NewBaseCarrier(
-			"inpost-es",
-			"InPost Spain",
-			"ES",
-			"Spain",
-			models.CarrierTypeLogistics,
-			"https://inpost.es",
-			"https://www.inpost.es/seguimiento-del-envio?parcelNumber=%s",
-		),
+		BaseCarrier: bc,
 	}
 }
 

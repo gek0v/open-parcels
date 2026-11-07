@@ -25,16 +25,21 @@ type InPostCarrier struct {
 }
 
 func NewInPostCarrier() *InPostCarrier {
+	bc := NewBaseCarrier(
+		"inpost",
+		"InPost / Mondial Relay",
+		"GLOBAL",
+		"Global",
+		models.CarrierTypeLogistics,
+		"https://inpost.es",
+		"https://www.inpost.es/seguimiento-del-envio?parcelNumber=%s",
+	)
+	bc.SetCapabilities(CarrierCapabilities{
+		RequiresPostalCode:  true,
+		SupportsWebScraping: true,
+	})
 	return &InPostCarrier{
-		BaseCarrier: NewBaseCarrier(
-			"inpost",
-			"InPost / Mondial Relay",
-			"GLOBAL",
-			"Global",
-			models.CarrierTypeLogistics,
-			"https://inpost.es",
-			"https://www.inpost.es/seguimiento-del-envio?parcelNumber=%s",
-		),
+		BaseCarrier: bc,
 	}
 }
 
