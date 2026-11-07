@@ -1,0 +1,32 @@
+name: Live Integration Tests
+
+on:
+  schedule:
+    # Run weekly on Sunday at midnight UTC
+    - cron: '0 0 * * 0'
+  workflow_dispatch:
+    inputs:
+      carrier:
+        description: 'Optional carrier filter to test (regex pattern for -run)'
+        required: false
+        default: '.*'
+
+jobs:
+  integration:
+    name: Live Network Tracking Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache: true
+
+      - name: Verify Module Dependencies
+        run: go mod verify
+
+      - name: Run Live Integration Tests
+        run: go test -v -race -tags=integration -run "${{ github.event.inputs.carrier || '.*' }}" ./...
