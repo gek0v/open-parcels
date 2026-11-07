@@ -14,6 +14,11 @@ import (
 	"open-parcels/pkg/models"
 )
 
+type cachedRequest struct {
+	response  *models.ParcelsAppResponse
+	expiresAt time.Time
+}
+
 // Server is the HTTP REST and MCP server daemon.
 type Server struct {
 	engine     *engine.Engine
@@ -23,7 +28,7 @@ type Server struct {
 	httpServer *http.Server
 
 	mu       sync.RWMutex
-	requests map[string]*models.ParcelsAppResponse
+	requests map[string]*cachedRequest
 }
 
 // Config configures the Server.
@@ -44,10 +49,33 @@ func New(cfg Config) *Server {
 		mcpServer: mcp.NewServer(eng),
 		port:      cfg.Port,
 		enableMCP: cfg.EnableMCP,
-		requests:  make(map[string]*models.ParcelsAppResponse),
+		requests:  make(map[string]*cachedRequest),
 	}
 
 	return s
+}
+
+func (s *Server) setRequest(reqID string, resp *models.ParcelsAppResponse, ttl time.Duration) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.requests[reqID] = &cachedRequest{
+		response:  resp,
+		expiresAt: time.Now().Add(ttl),
+	}
+}
+
+func (s *Server) getRequest(reqID string) (*models.ParcelsAppResponse, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	cached, found := s.requests[reqID]
+	if !found {
+		return nil, false
+	}
+	if time.Now().After(cached.expiresAt) {
+		delete(s.requests, reqID)
+		return nil, false
+	}
+	return cached.response, true
 }
 
 // Start launches the HTTP server and blocks until ctx is canceled or an error occurs.
