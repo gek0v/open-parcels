@@ -30,39 +30,77 @@ go build -o open-parcels .
 Adding a new carrier involves three simple steps:
 
 ### Step 1: Implement the Carrier Adapter in `pkg/carriers/`
-Create `pkg/carriers/<carrier_slug>.go`:
+Create `pkg/carriers/<carrier_slug>.go` adhering to the enriched `CarrierAdapter` and `LiveTracker` contracts:
 
 ```go
 package carriers
 
 import (
 	"context"
+	"fmt"
+	"net/http"
 	"time"
 
 	"open-parcels/pkg/models"
 )
+
+var myCarrierHTTPClient = NewCarrierHTTPClient(DefaultRequestTimeout)
+
+// SetMyCarrierHTTPClientForTest overrides the HTTP client for deterministic offline tests.
+func SetMyCarrierHTTPClientForTest(client *http.Client) func() {
+	orig := myCarrierHTTPClient
+	myCarrierHTTPClient = client
+	return func() { myCarrierHTTPClient = orig }
+}
 
 type MyCarrier struct {
 	BaseCarrier
 }
 
 func NewMyCarrier() *MyCarrier {
-	return &MyCarrier{
-		BaseCarrier: NewBaseCarrier(
-			"my-carrier",
-			"My Carrier Name",
-			"ES",
-			"Spain",
-			models.CarrierTypeExpress,
-			"https://www.mycarrier.com",
-			"https://www.mycarrier.com/track/%s",
-		),
-	}
+	bc := NewBaseCarrier(
+		"my-carrier",
+		"My Carrier Name",
+		"ES",
+		"Spain",
+		models.CarrierTypeExpress,
+		"https://www.mycarrier.com",
+		"https://www.mycarrier.com/track/%s",
+	)
+	bc.SetCapabilities(CarrierCapabilities{
+		SupportsLiveAPI: true,
+	})
+	return &MyCarrier{BaseCarrier: bc}
+}
+
+func (c *MyCarrier) HasLiveTracking() bool {
+	return true
 }
 
 func (c *MyCarrier) Track(ctx context.Context, trackingNumber string, opts models.TrackOptions) (*models.Shipment, error) {
-	// Attempt real HTTP request or generate simulated lifecycle
-    // ...
+	// 1. Perform network request via the centralized HTTP client
+	req, err := NewCarrierRequest(http.MethodGet, fmt.Sprintf("https://api.mycarrier.com/v1/track/%s", trackingNumber))
+	if err != nil {
+		return nil, err
+	}
+	resp, err := myCarrierHTTPClient.Do(req.WithContext(ctx))
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", models.ErrCarrierTemporarilyUnavailable, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, models.ErrShipmentNotFound
+	}
+
+	// 2. Parse response and normalize to *models.Shipment
+	// (Under no circumstances return silent simulated mocks when AllowSimulated is false)
+	return &models.Shipment{
+		TrackingNumber: trackingNumber,
+		Carrier:        c.Info(),
+		Status:         models.StatusInTransit,
+		UpdatedAt:      time.Now(),
+	}, nil
 }
 ```
 
@@ -73,7 +111,7 @@ r.Register(NewMyCarrier())
 ```
 
 ### Step 3: Add Detection Rules in `pkg/detector/rules.go`
-Add a pattern rule with priority and confidence:
+Add a pattern rule with priority, confidence base, and regex:
 ```go
 {
     CarrierSlug:    "my-carrier",
@@ -87,6 +125,61 @@ Add a pattern rule with priority and confidence:
     Description:    "My Carrier parcel barcode",
 },
 ```
+
+---
+
+## 3. Testing Methodology: Golden Fixtures & Integration Tags
+
+To prevent flaky tests and keep CI execution under 5 seconds without internet dependencies:
+
+### 1. Deterministic Unit Tests with Golden Fixtures
+1. Save sanitized actual JSON/HTML payloads from the carrier under `testdata/fixtures/<carrier_slug>_<status>.json`.
+2. In your unit test `pkg/carriers/<carrier_slug>_test.go`, load the fixture using `LoadFixture` and inject a mock `http.RoundTripper` using `NewFixtureClient`:
+
+```go
+func TestMyCarrierDeliveredFixture(t *testing.T) {
+	fixtureData, err := LoadFixture("mycarrier_delivered.json")
+	if err != nil {
+		t.Fatalf("failed to load fixture: %v", err)
+	}
+	teardown := SetMyCarrierHTTPClientForTest(NewFixtureClient(http.StatusOK, fixtureData, "application/json"))
+	defer teardown()
+
+	c := NewMyCarrier()
+	shipment, err := c.Track(context.Background(), "MY1234567890", models.TrackOptions{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if shipment.Status != models.StatusDelivered {
+		t.Errorf("expected StatusDelivered, got %s", shipment.Status)
+	}
+}
+```
+
+### 2. Live Integration Tests
+Any test performing real external network calls must be placed in a separate file `pkg/carriers/<carrier_slug>_live_test.go` with the build tag:
+
+```go
+//go:build integration
+
+package carriers
+// ...
+```
+
+Live tests will run exclusively during scheduled weekly CI or via `go test -tags=integration ./...`.
+
+---
+
+## 4. Code Standards and Anti-Mock Governance
+
+1. **No Silent Mocks**: Never return simulated shipments with `time.Now()` unless the caller explicitly passed `AllowSimulated: true`.
+2. **Canonical Errors**:
+   - `models.ErrShipmentNotFound` for missing tracking codes.
+   - `models.ErrPostalCodeRequired` for missing postal codes.
+   - `models.ErrCarrierRateLimited` for HTTP 429.
+   - `models.ErrCarrierTemporarilyUnavailable` for WAF/captcha challenges or service downtime.
+3. **No Hardcoded Guides**: Never hardcode static delivery dates or tracking guides in production drivers.
+4. **Race Free**: Ensure all code passes `go test -v -race ./...` without data races.
 
 ### Step 4: Add Unit Tests
 Add test assertions to:

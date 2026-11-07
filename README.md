@@ -13,24 +13,30 @@
 ## 🚀 Características Principales
 
 1. **Detección Automática de Transportistas (Carrier Auto-Detection Engine)**:
-   - Identificación inteligente basada en expresiones regulares, longitudes fijas, prefijos y validadores de suma de comprobación matemática (**UPU S10 Modulo 11**, **UPS 1Z Modulo 10**, **IATA AWB Modulo 7**, **ISO 6346 para contenedores marítimos**).
-   - Cobertura de **más de 1.500 operadores** organizados en 17 catálogos regionales (Asia, Europa, América, MENA, Ocean Freight, etc.).
-   - Puntuación de confianza (0.0 a 1.0) y refuerzo heurístico mediante pista de país de destino.
+   - Identificación inteligente basada en expresiones regulares ultra-optimizadas (< 20 µs), longitudes fijas, prefijos y validadores de suma de comprobación matemática (**UPU S10 Modulo 11**, **UPS 1Z Modulo 10**, **IATA AWB Modulo 7**, **ISO 6346 para contenedores marítimos**).
+   - Catálogo de **más de 1.500 operadores** en 17 grupos regionales con pre-filtrado por longitud y charset.
+   - Puntuación de confianza (0.0 a 1.0) y refuerzo heurístico mediante pista de país de destino (+0.35).
 
-2. **Encadenamiento y Fusión Multitransportista (Multi-Carrier Journey & Event Merging)**:
+2. **Adaptadores de Red Reales e Integraciones B2B**:
+   - Conexión real con APIs públicas y portales de seguimiento (e.g. **Cainiao Global**, **InPost / Mondial Relay**, **Correos Express**, **Correos España**, **SEUR**, **GLS Spain**).
+   - Soporte B2B corporativo con autenticación API Key y flujos OAuth2 Client Credentials con caché en memoria (e.g. **DHL Express / Paket**, **UPS**, **FedEx**).
+   - Consulta el estado de cada operador en la **[Matriz de Estado de Transportistas](docs/CARRIERS.md)**.
+   - 📢 *¡Llamamiento abierto a la comunidad!* Revisa nuestra **[Guía de Desarrollo de Adaptadores](docs/CARRIER_GUIDE.md)** y ayúdanos a transformar transportistas del catálogo en adaptadores de red reales.
+
+3. **Encadenamiento y Fusión Multitransportista (Multi-Carrier Journey & Event Merging)**:
    - Rastreabilidad del ciclo de vida completo: tramo internacional + transferencia aduanera + última milla local (ej. *Cainiao ➔ Correos Express*, *YunExpress ➔ Correos España*, *SpeedPAK ➔ Local Courier*).
    - Fusión cronológica descendente de hitos de ambos operadores en una única línea de tiempo continua.
-   - Deduplicación automática de hitos equivalentes dentro de ventanas temporales concurrentes de 2 horas.
+   - Deduplicación automática de hitos equivalentes o reintentos de entrega sucesivos.
 
-3. **Máquina de Estados y Normalización Universal**:
+4. **Máquina de Estados y Normalización Universal**:
    - Estados canónicos normalizados: `pending`, `info_received`, `in_transit`, `out_for_delivery`, `delivered`, `failed_attempt`, `exception`, `expired`.
-   - Estimación y cálculo de progreso porcentual del envío (0% a 100%) basado en fases reales (aduana, vuelo, entrega).
-   - Soporte bilingüe en descripciones de estado (`es` y `en`).
+   - Erradicación total de mocks silenciosos: gestión estricta de errores canónicos (`ErrShipmentNotFound`, `ErrPostalCodeRequired`, `ErrCarrierNotImplemented`, `ErrCarrierRateLimited`).
+   - Estimación y cálculo de progreso porcentual del envío (0% a 100%) y soporte bilingüe (`es` y `en`).
 
-4. **Múltiples Interfaces de Consumo**:
+5. **Múltiples Interfaces de Consumo**:
    - **CLI en Go**: Salida formateada en terminal con tarjetas ANSI, barras de progreso y línea de tiempo enriquecida, además de modo `--json`.
-   - **REST API Daemon**: Servidor HTTP de alto rendimiento con endpoints nativos `/api/v1/track` y compatibilidad 100% con la API v4 de ParcelsApp (`POST /trackings`, `GET /trackings/:request_id`).
-   - **Servidor MCP (Model Context Protocol)**: Compatible con Claude Desktop, Cursor y agentes autónomos mediante transporte `stdio` y endpoint HTTP streamable `/mcp`.
+   - **REST API Daemon**: Servidor HTTP de alto rendimiento con endpoints nativos `/api/v1/track`, compatibilidad 100% con la API v4 de ParcelsApp (`POST /trackings`, `GET /trackings/:request_id`), sondeo asíncrono y despacho automático de Webhooks.
+   - **Servidor MCP (Model Context Protocol)**: Compatible con Claude Desktop, Cursor y agentes autónomos mediante transporte `stdio` y endpoint HTTP streamable `/mcp`, con herramientas de diagnóstico (`check_carrier_status`) y metadato `is_live_data`.
 
 ---
 
@@ -39,8 +45,9 @@
 * 🏛️ **[Arquitectura del Sistema](docs/ARCHITECTURE.md)**: Modelos de dominio, diseño de dos niveles, motor de deduplicación y algoritmos de progreso.
 * 🌐 **[Referencia de la REST API](docs/API.md)**: Guía completa de endpoints, contratos JSON y compatibilidad ParcelsApp v4.
 * 🤖 **[Integración MCP para IA](docs/MCP.md)**: Configuración en Claude Desktop, Cursor, herramientas y schemas JSON-RPC.
-* 📦 **[Catálogo y Cobertura de Transportistas](docs/CARRIERS.md)**: Desglose de los 17 grupos regionales y reglas de detección.
-* 🤝 **[Guía de Contribución](CONTRIBUTING.md)**: Cómo implementar nuevos adaptadores de transportistas y correr los tests.
+* 📦 **[Catálogo y Matriz de Estado de Transportistas](docs/CARRIERS.md)**: Estado de integración (Live API vs Enterprise Auth vs Catalog Only).
+* 🛠️ **[Guía de Desarrollo de Adaptadores](docs/CARRIER_GUIDE.md)**: Plantilla obligatoria y arquitectura para crear nuevos adaptadores reales.
+* 🤝 **[Guía de Contribución](CONTRIBUTING.md)**: Cómo colaborar con el proyecto, grabar fixtures y correr la suite de tests offline.
 * 🔒 **[Política de Seguridad](SECURITY.md)**: Reporte y divulgación responsable de vulnerabilidades.
 
 ---
