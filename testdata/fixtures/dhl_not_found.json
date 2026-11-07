@@ -1,0 +1,5 @@
+{
+  "title": "No shipments found",
+  "status": 404,
+  "detail": "No shipments found for given trackingNumber 0000000000"
+}

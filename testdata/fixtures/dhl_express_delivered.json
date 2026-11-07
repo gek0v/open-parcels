@@ -1,0 +1,64 @@
+{
+  "shipments": [
+    {
+      "id": "1234567890",
+      "service": "express",
+      "origin": {
+        "address": {
+          "addressLocality": "Frankfurt",
+          "countryCode": "DE"
+        }
+      },
+      "destination": {
+        "address": {
+          "addressLocality": "Madrid",
+          "countryCode": "ES"
+        }
+      },
+      "status": {
+        "timestamp": "2024-11-15T15:30:00Z",
+        "statusCode": "delivered",
+        "status": "DELIVERED",
+        "description": "Shipment delivered to recipient"
+      },
+      "events": [
+        {
+          "timestamp": "2024-11-15T15:30:00Z",
+          "statusCode": "delivered",
+          "status": "DELIVERED",
+          "description": "Shipment delivered to recipient",
+          "location": {
+            "address": {
+              "addressLocality": "Madrid",
+              "countryCode": "ES"
+            }
+          }
+        },
+        {
+          "timestamp": "2024-11-15T08:30:00Z",
+          "statusCode": "transit",
+          "status": "WITH_DELIVERY_COURIER",
+          "description": "With delivery courier",
+          "location": {
+            "address": {
+              "addressLocality": "Madrid",
+              "countryCode": "ES"
+            }
+          }
+        },
+        {
+          "timestamp": "2024-11-14T21:00:00Z",
+          "statusCode": "transit",
+          "status": "PROCESSED_AT_SORTING_CENTER",
+          "description": "Processed at Leipzig Hub",
+          "location": {
+            "address": {
+              "addressLocality": "Leipzig",
+              "countryCode": "DE"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
