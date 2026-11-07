@@ -1,0 +1,52 @@
+{
+  "shipments": [
+    {
+      "id": "JJD0000123456789012",
+      "service": "parcel-de",
+      "origin": {
+        "address": {
+          "addressLocality": "Bonn",
+          "countryCode": "DE"
+        }
+      },
+      "destination": {
+        "address": {
+          "addressLocality": "Köln",
+          "countryCode": "DE"
+        }
+      },
+      "status": {
+        "timestamp": "2024-11-15T09:00:00Z",
+        "statusCode": "transit",
+        "status": "OUT_FOR_DELIVERY",
+        "description": "The shipment has been loaded onto the delivery vehicle"
+      },
+      "events": [
+        {
+          "timestamp": "2024-11-15T09:00:00Z",
+          "statusCode": "transit",
+          "status": "OUT_FOR_DELIVERY",
+          "description": "The shipment has been loaded onto the delivery vehicle",
+          "location": {
+            "address": {
+              "addressLocality": "Köln",
+              "countryCode": "DE"
+            }
+          }
+        },
+        {
+          "timestamp": "2024-11-14T18:00:00Z",
+          "statusCode": "pre-transit",
+          "status": "INSTRUCTION_RECEIVED",
+          "description": "The instruction data for this shipment have been provided by the sender",
+          "location": {
+            "address": {
+              "addressLocality": "Bonn",
+              "countryCode": "DE"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
