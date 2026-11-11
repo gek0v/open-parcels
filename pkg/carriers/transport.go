@@ -115,6 +115,7 @@ func NewCarrierHTTPClient(timeout time.Duration) *http.Client {
 		MaxIdleConnsPerHost: 20,
 		IdleConnTimeout:     60 * time.Second,
 		DisableCompression: false,
+		ForceAttemptHTTP2:  true,
 	}
 
 	proxyStr := ResolveProxyURL()

@@ -16,8 +16,14 @@ import (
 	"open-parcels/pkg/models"
 )
 
-var inpostHTTPClient = &http.Client{
-	Timeout: 10 * time.Second,
+var defaultInPostHTTPClient = NewCarrierHTTPClient(DefaultRequestTimeout)
+var inpostHTTPClient = defaultInPostHTTPClient
+
+// SetInPostHTTPClientForTest overrides the HTTP client for InPost in deterministic tests.
+func SetInPostHTTPClientForTest(client *http.Client) func() {
+	orig := inpostHTTPClient
+	inpostHTTPClient = client
+	return func() { inpostHTTPClient = orig }
 }
 
 type InPostCarrier struct {
@@ -125,7 +131,10 @@ func trackInPostShared(
 		return simulatedFn(trackingNumber, opts), nil
 	}
 
-	if errors.Is(err, models.ErrMissingPostalCode) {
+	if errors.Is(err, models.ErrMissingPostalCode) || errors.Is(err, models.ErrPostalCodeRequired) {
+		return nil, err
+	}
+	if errors.Is(err, models.ErrCarrierTemporarilyUnavailable) || errors.Is(err, models.ErrCarrierRateLimited) {
 		return nil, err
 	}
 
@@ -144,23 +153,29 @@ func fetchInPostLive(ctx context.Context, carrier Carrier, trackingNumber, posta
 		return nil, err
 	}
 
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
+	req.Header.Set("User-Agent", ResolveUserAgent())
 	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
 	req.Header.Set("Accept-Language", "es-ES,es;q=0.9,en;q=0.8")
 
 	resp, err := inpostHTTPClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %v", models.ErrCarrierTemporarilyUnavailable, err)
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode == http.StatusNotFound {
 		return nil, models.ErrShipmentNotFound
+	}
+	if resp.StatusCode == http.StatusTooManyRequests {
+		return nil, models.ErrCarrierRateLimited
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("%w: HTTP status %d", models.ErrCarrierTemporarilyUnavailable, resp.StatusCode)
 	}
 
 	bodyBytes, err := io.ReadAll(io.LimitReader(resp.Body, 4*1024*1024))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %v", models.ErrCarrierTemporarilyUnavailable, err)
 	}
 	htmlContent := string(bodyBytes)
 
@@ -179,7 +194,13 @@ func fetchInPostLive(ctx context.Context, carrier Carrier, trackingNumber, posta
 	}
 
 	statusVal, ok := unwrapAstroInt(rawData["trackingDetailsStatus"])
-	if !ok || statusVal != 200 {
+	if !ok {
+		return nil, models.ErrShipmentNotFound
+	}
+	if statusVal == http.StatusConflict {
+		return nil, models.ErrPostalCodeRequired
+	}
+	if statusVal != http.StatusOK {
 		return nil, models.ErrShipmentNotFound
 	}
 
@@ -196,6 +217,7 @@ func fetchInPostLive(ctx context.Context, carrier Carrier, trackingNumber, posta
 
 	var events []models.TrackingEvent
 	var latestMilestoneName string
+	var latestMilestoneDate time.Time
 
 	for _, mItem := range milestonesList {
 		mMap := unwrapAstroMap(mItem)
@@ -208,7 +230,14 @@ func fetchInPostLive(ctx context.Context, carrier Carrier, trackingNumber, posta
 		mDateStr := unwrapAstroString(mMap["date"])
 
 		if mName != "" {
-			latestMilestoneName = mName
+			if mDate, err := parseInPostDate(mDateStr); err == nil {
+				if latestMilestoneName == "" || mDate.After(latestMilestoneDate) {
+					latestMilestoneName = mName
+					latestMilestoneDate = mDate
+				}
+			} else if latestMilestoneName == "" {
+				latestMilestoneName = mName
+			}
 		}
 
 		eventsRaw := mMap["events"]
@@ -266,7 +295,7 @@ func fetchInPostLive(ctx context.Context, carrier Carrier, trackingNumber, posta
 					evDate = time.Now()
 				}
 
-				evStatus, evStage := normalizeInPostStatus(evName, mType, evDesc)
+				evStatus, evStage := normalizeInPostEventStatus(evCode, evName, mType, evDesc)
 
 				events = append(events, models.TrackingEvent{
 					Date:        evDate,
@@ -337,6 +366,38 @@ func fetchInPostLive(ctx context.Context, carrier Carrier, trackingNumber, posta
 
 	origin := extractInPostOrigin(events)
 	destination := resolveInPostDestination(carrier, postalCode, opts)
+	if destCountry := unwrapAstroString(rawData["country"]); destCountry != "" && (destination.Code == "" || destination.Name == "Unknown") {
+		if strings.EqualFold(destCountry, "ES") {
+			destination = models.CountryInfo{Name: "Spain", Code: "ES"}
+		} else {
+			destination = models.CountryInfo{Name: destCountry, Code: strings.ToUpper(destCountry)}
+		}
+	}
+
+	// Enrich origin, destination city, and event locations via InPost ShipX IT proxy when running live
+	if origin.Name == "Unknown" && (inpostHTTPClient == defaultInPostHTTPClient || inpostItalyHTTPClient != defaultInPostItalyHTTPClient) {
+		enrichCtx, enrichCancel := context.WithTimeout(ctx, 3*time.Second)
+		defer enrichCancel()
+		if itShipment, err := fetchInPostItalyLive(enrichCtx, carrier, trackingNumber, opts); err == nil && itShipment != nil {
+			if itShipment.Origin.Name != "" && itShipment.Origin.Name != "Unknown" {
+				origin = itShipment.Origin
+			}
+			if itShipment.Destination.Name != "" && itShipment.Destination.Name != "Unknown" && itShipment.Destination.Code == destination.Code {
+				destination = itShipment.Destination
+			}
+			for i := range events {
+				if events[i].Location != "" {
+					continue
+				}
+				for _, itEv := range itShipment.Events {
+					if itEv.Location != "" && ((events[i].EventCode != "" && itEv.EventCode == events[i].EventCode) || itEv.Date.Equal(events[i].Date)) {
+						events[i].Location = itEv.Location
+						break
+					}
+				}
+			}
+		}
+	}
 
 	return &models.Shipment{
 		TrackingNumber: trackingNumber,
@@ -360,18 +421,29 @@ func extractInPostProps(htmlContent string) (string, error) {
 		return "", fmt.Errorf("trackingDetailsStatus not found in html")
 	}
 
-	propsStart := strings.LastIndex(htmlContent[:idx], `props="`)
-	if propsStart == -1 {
+	prefix := htmlContent[:idx]
+	propsDouble := strings.LastIndex(prefix, `props="`)
+	propsSingle := strings.LastIndex(prefix, `props='`)
+
+	var rawProps string
+	if propsDouble != -1 && (propsSingle == -1 || propsDouble > propsSingle) {
+		start := propsDouble + len(`props="`)
+		end := strings.Index(htmlContent[start:], `"`)
+		if end == -1 {
+			return "", fmt.Errorf("props attribute end not found")
+		}
+		rawProps = htmlContent[start : start+end]
+	} else if propsSingle != -1 {
+		start := propsSingle + len(`props='`)
+		end := strings.Index(htmlContent[start:], `'`)
+		if end == -1 {
+			return "", fmt.Errorf("props attribute end not found")
+		}
+		rawProps = htmlContent[start : start+end]
+	} else {
 		return "", fmt.Errorf("props attribute start not found")
 	}
-	propsStart += len(`props="`)
 
-	propsEnd := strings.Index(htmlContent[propsStart:], `"`)
-	if propsEnd == -1 {
-		return "", fmt.Errorf("props attribute end not found")
-	}
-
-	rawProps := htmlContent[propsStart : propsStart+propsEnd]
 	return html.UnescapeString(rawProps), nil
 }
 
@@ -432,53 +504,172 @@ func parseInPostDate(dateStr string) (time.Time, error) {
 }
 
 func normalizeInPostStatus(name, typeStr, desc string) (models.Status, models.Stage) {
-	combined := strings.ToLower(name + " " + typeStr + " " + desc)
+	return normalizeInPostEventStatus("", name, typeStr, desc)
+}
 
+func normalizeInPostEventStatus(code, name, typeStr, desc string) (models.Status, models.Stage) {
+	upperCode := strings.ToUpper(strings.TrimSpace(code))
+	upperType := strings.ToUpper(strings.TrimSpace(typeStr))
+	lower := strings.ToLower(strings.TrimSpace(name + " " + desc))
+
+	// 1. Official InPost event code mapping when available
+	if upperCode != "" {
+		switch {
+		case upperCode == "EOL.9004":
+			return models.StatusException, models.StageException
+		case strings.HasPrefix(upperCode, "EOL."):
+			return models.StatusDelivered, models.StageDelivery
+		case strings.HasPrefix(upperCode, "RTS."):
+			return models.StatusException, models.StageException
+		case strings.HasPrefix(upperCode, "LMD.9"):
+			return models.StatusFailedAttempt, models.StageException
+		case strings.HasPrefix(upperCode, "LMD."):
+			if upperType == "DELIVERED" || isInPostDeliveredText(lower) {
+				return models.StatusDelivered, models.StageDelivery
+			}
+			return models.StatusOutForDelivery, models.StageLastMile
+		case strings.HasPrefix(upperCode, "MMD."):
+			return models.StatusInTransit, models.StageTransit
+		case upperCode == "FMD.1001":
+			return models.StatusInfoReceived, models.StageCreated
+		case upperCode == "FMD.9001":
+			return models.StatusException, models.StageException
+		case strings.HasPrefix(upperCode, "FMD."):
+			return models.StatusInTransit, models.StagePickedUp
+		case strings.HasPrefix(upperCode, "CRE."), strings.HasPrefix(upperCode, "FUL."):
+			return models.StatusInfoReceived, models.StageCreated
+		}
+	}
+
+	// 2. Official InPost milestone type enum mapping
+	switch upperType {
+	case "DELIVERED":
+		return models.StatusDelivered, models.StageDelivery
+	case "AWAITING_COLLECTION", "IN_TRANSIT_LAST_MILE":
+		return models.StatusOutForDelivery, models.StageLastMile
+	case "RETURN":
+		return models.StatusException, models.StageException
+	case "NOT_DELIVERED":
+		return models.StatusFailedAttempt, models.StageException
+	case "IN_TRANSIT":
+		if isInPostCourierPickupText(lower) {
+			return models.StatusInTransit, models.StagePickedUp
+		}
+		return models.StatusInTransit, models.StageTransit
+	case "AT_THE_ORIGIN":
+		if isInPostCourierPickupText(lower) {
+			return models.StatusInTransit, models.StagePickedUp
+		}
+		return models.StatusInfoReceived, models.StageCreated
+	}
+
+	// 3. Keyword fallback when milestone type/code are absent
 	switch {
-	case strings.Contains(combined, "entregado") ||
-		strings.Contains(combined, "delivered") ||
-		strings.Contains(combined, "recogido por"):
+	case isInPostDeliveredText(lower):
 		return models.StatusDelivered, models.StageDelivery
 
-	case strings.Contains(combined, "disponible") ||
-		strings.Contains(combined, "punto pack") ||
-		strings.Contains(combined, "locker") ||
-		strings.Contains(combined, "reparto") ||
-		strings.Contains(combined, "out_for_delivery") ||
-		strings.Contains(combined, "available_for_pickup") ||
-		strings.Contains(combined, "ready_for_pickup"):
+	case isInPostCourierPickupText(lower):
+		return models.StatusInTransit, models.StagePickedUp
+
+	case isInPostOutForDeliveryText(lower):
 		return models.StatusOutForDelivery, models.StageLastMile
 
-	case strings.Contains(combined, "tránsito") ||
-		strings.Contains(combined, "transito") ||
-		strings.Contains(combined, "in_transit") ||
-		strings.Contains(combined, "en ruta") ||
-		strings.Contains(combined, "en camino") ||
-		strings.Contains(combined, "clasificación") ||
-		strings.Contains(combined, "hub") ||
-		strings.Contains(combined, "depot") ||
-		strings.Contains(combined, "sorting"):
+	case isInPostTransitText(lower):
 		return models.StatusInTransit, models.StageTransit
 
-	case strings.Contains(combined, "incidencia") ||
-		strings.Contains(combined, "fallido") ||
-		strings.Contains(combined, "exception") ||
-		strings.Contains(combined, "devuelto") ||
-		strings.Contains(combined, "error"):
+	case isInPostExceptionText(lower):
 		return models.StatusException, models.StageException
 
-	case strings.Contains(combined, "preparación") ||
-		strings.Contains(combined, "preparacion") ||
-		strings.Contains(combined, "at_the_origin") ||
-		strings.Contains(combined, "registrado informáticamente") ||
-		strings.Contains(combined, "info received") ||
-		strings.Contains(combined, "cre.") ||
-		strings.Contains(combined, "created"):
+	case isInPostOriginText(lower):
 		return models.StatusInfoReceived, models.StageCreated
 
 	default:
 		return models.StatusInfoReceived, models.StageCreated
 	}
+}
+
+func isInPostCourierPickupText(s string) bool {
+	if strings.Contains(s, "listo para") ||
+		strings.Contains(s, "será recogido") ||
+		strings.Contains(s, "sera recogido") {
+		return false
+	}
+	return strings.Contains(s, "recogido por el mensajero") ||
+		strings.Contains(s, "recogido por mensajero") ||
+		strings.Contains(s, "recogido por el repartidor") ||
+		strings.Contains(s, "collected by the courier") ||
+		strings.Contains(s, "collected by courier")
+}
+
+func isInPostDeliveredText(s string) bool {
+	if strings.Contains(s, "no entregado") ||
+		strings.Contains(s, "not delivered") ||
+		strings.Contains(s, "undelivered") ||
+		strings.Contains(s, "listo para") ||
+		strings.Contains(s, "será") ||
+		strings.Contains(s, "sera") ||
+		strings.Contains(s, "mensajero") ||
+		strings.Contains(s, "courier") {
+		return false
+	}
+	return strings.Contains(s, "entregado") ||
+		strings.Contains(s, "delivered") ||
+		strings.Contains(s, "recogido por el cliente") ||
+		strings.Contains(s, "recogido por el destinatario") ||
+		strings.Contains(s, "recogido por cliente") ||
+		strings.Contains(s, "recogido por destinatario") ||
+		strings.Contains(s, "collected by customer") ||
+		strings.Contains(s, "collected by recipient")
+}
+
+func isInPostOutForDeliveryText(s string) bool {
+	return strings.Contains(s, "disponible") ||
+		strings.Contains(s, "punto pack") ||
+		strings.Contains(s, "locker") ||
+		strings.Contains(s, "reparto") ||
+		strings.Contains(s, "out_for_delivery") ||
+		strings.Contains(s, "awaiting_collection") ||
+		strings.Contains(s, "available_for_pickup") ||
+		strings.Contains(s, "ready_for_pickup") ||
+		strings.Contains(s, "ready for pickup")
+}
+
+func isInPostTransitText(s string) bool {
+	return strings.Contains(s, "tránsito") ||
+		strings.Contains(s, "transito") ||
+		strings.Contains(s, "in_transit") ||
+		strings.Contains(s, "en ruta") ||
+		strings.Contains(s, "en camino") ||
+		strings.Contains(s, "clasificación") ||
+		strings.Contains(s, "centro logístico") ||
+		strings.Contains(s, "centro logistico") ||
+		strings.Contains(s, "logistics centre") ||
+		strings.Contains(s, "hub") ||
+		strings.Contains(s, "depot") ||
+		strings.Contains(s, "sorting")
+}
+
+func isInPostExceptionText(s string) bool {
+	return strings.Contains(s, "incidencia") ||
+		strings.Contains(s, "fallido") ||
+		strings.Contains(s, "exception") ||
+		strings.Contains(s, "devuelto") ||
+		strings.Contains(s, "return") ||
+		strings.Contains(s, "error")
+}
+
+func isInPostOriginText(s string) bool {
+	return strings.Contains(s, "preparación") ||
+		strings.Contains(s, "preparacion") ||
+		strings.Contains(s, "at_the_origin") ||
+		strings.Contains(s, "registrado informáticamente") ||
+		strings.Contains(s, "registrado informaticamente") ||
+		strings.Contains(s, "info received") ||
+		strings.Contains(s, "shipment created") ||
+		strings.Contains(s, "cre.") ||
+		strings.Contains(s, "created") ||
+		strings.Contains(s, "listo para ser recogido") ||
+		strings.Contains(s, "será recogido")
 }
 
 func inpostProgress(status models.Status) int {
