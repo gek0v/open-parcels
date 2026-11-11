@@ -437,7 +437,9 @@ func normalizeInPostStatus(name, typeStr, desc string) (models.Status, models.St
 	switch {
 	case strings.Contains(combined, "entregado") ||
 		strings.Contains(combined, "delivered") ||
-		strings.Contains(combined, "recogido por"):
+		strings.Contains(combined, "recogido por el destinatario") ||
+		strings.Contains(combined, "recogido por el cliente") ||
+		strings.Contains(combined, "retiré par le destinataire"):
 		return models.StatusDelivered, models.StageDelivery
 
 	case strings.Contains(combined, "disponible") ||
@@ -449,15 +451,32 @@ func normalizeInPostStatus(name, typeStr, desc string) (models.Status, models.St
 		strings.Contains(combined, "ready_for_pickup"):
 		return models.StatusOutForDelivery, models.StageLastMile
 
+	case strings.Contains(combined, "será recogido") ||
+		strings.Contains(combined, "sera recogido") ||
+		strings.Contains(combined, "listo para ser recogido") ||
+		strings.Contains(combined, "preparación") ||
+		strings.Contains(combined, "preparacion") ||
+		strings.Contains(combined, "registrado informáticamente") ||
+		strings.Contains(combined, "registrado informaticamente") ||
+		strings.Contains(combined, "info received") ||
+		strings.Contains(combined, "cre.") ||
+		strings.Contains(combined, "created"):
+		return models.StatusInfoReceived, models.StageCreated
+
 	case strings.Contains(combined, "tránsito") ||
 		strings.Contains(combined, "transito") ||
 		strings.Contains(combined, "in_transit") ||
 		strings.Contains(combined, "en ruta") ||
 		strings.Contains(combined, "en camino") ||
 		strings.Contains(combined, "clasificación") ||
+		strings.Contains(combined, "clasificacion") ||
 		strings.Contains(combined, "hub") ||
 		strings.Contains(combined, "depot") ||
-		strings.Contains(combined, "sorting"):
+		strings.Contains(combined, "sorting") ||
+		strings.Contains(combined, "recogido por el mensajero") ||
+		strings.Contains(combined, "recogido por el repartidor") ||
+		strings.Contains(combined, "centro logístico") ||
+		strings.Contains(combined, "centro logistico"):
 		return models.StatusInTransit, models.StageTransit
 
 	case strings.Contains(combined, "incidencia") ||
@@ -471,6 +490,10 @@ func normalizeInPostStatus(name, typeStr, desc string) (models.Status, models.St
 		strings.Contains(combined, "preparacion") ||
 		strings.Contains(combined, "at_the_origin") ||
 		strings.Contains(combined, "registrado informáticamente") ||
+		strings.Contains(combined, "registrado informaticamente") ||
+		strings.Contains(combined, "será recogido") ||
+		strings.Contains(combined, "sera recogido") ||
+		strings.Contains(combined, "listo para ser recogido") ||
 		strings.Contains(combined, "info received") ||
 		strings.Contains(combined, "cre.") ||
 		strings.Contains(combined, "created"):

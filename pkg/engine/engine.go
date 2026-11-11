@@ -54,9 +54,22 @@ func (e *Engine) Track(ctx context.Context, trackingNumber string, opts models.T
 		primaryCarrier = c
 		carrierInfo = c.Info()
 	} else {
-		best := e.detector.BestMatch(cleanNumber, opts.DestinationCountry)
-		if best == nil {
+		candidates := e.detector.Detect(cleanNumber, opts.DestinationCountry)
+		if len(candidates) == 0 {
 			return nil, fmt.Errorf("%w: could not automatically detect carrier for tracking number: %s", models.ErrShipmentNotFound, cleanNumber)
+		}
+
+		var best *models.DetectResult
+		if !opts.AllowSimulated {
+			for i := range candidates {
+				if c, ok := e.registry.Get(candidates[i].Carrier.Slug); ok && carriers.HasLiveTracking(c) {
+					best = &candidates[i]
+					break
+				}
+			}
+		}
+		if best == nil {
+			best = &candidates[0]
 		}
 		c, ok := e.registry.Get(best.Carrier.Slug)
 		if !ok {
