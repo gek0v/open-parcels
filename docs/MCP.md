@@ -63,6 +63,13 @@ open-parcels serve --port 8080 --mcp
 ```
 Then point any streamable HTTP JSON-RPC client to `http://localhost:8080/mcp`.
 
+**Authentication & Rate Limiting:**
+If authentication is configured via `OPEN_PARCELS_API_KEY`, `OPEN_PARCELS_API_KEYS`, or `--api-key`, HTTP requests to `/mcp` must include either:
+- `Authorization: Bearer <token>`
+- `X-API-Key: <token>`
+
+Unauthenticated or invalid requests return `401 Unauthorized`. Configured rate limits (`OPEN_PARCELS_RATE_LIMIT` / `--rate-limit`) also protect `/mcp` and return `429 Too Many Requests` with a `Retry-After` header when exceeded.
+
 ---
 
 ## 3. Available Tools & Schemas

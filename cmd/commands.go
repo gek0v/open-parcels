@@ -75,6 +75,14 @@ Flags for 'track':
   --mock, --allow-simulated Allow simulated/mock fallback tracking data for dev/testing
   --json              Output raw JSON response instead of visual terminal UI
 
+Flags for 'serve':
+  --port, -p          Port to listen on (default: 8080)
+  --mcp               Enable MCP streamable HTTP endpoint at /mcp (default: true)
+  --db                Path to SQLite database file (or OPEN_PARCELS_DB_PATH)
+  --api-key, -k       API key or comma-separated keys for Bearer / X-API-Key auth
+  --rate-limit        Rate limit per client (e.g. '10', '10/s', '100/m')
+  --rate-burst        Max burst requests for rate limiter
+
 Examples:
   open-parcels track LP00561234567890 --lang es
   open-parcels track 9400111206213785678901 --json
@@ -229,7 +237,8 @@ func normalizeArgsWithPositional(args []string) ([]string, string) {
 				flagName := strings.TrimLeft(arg, "-")
 				if flagName == "c" || flagName == "carrier" || flagName == "l" || flagName == "lang" ||
 					flagName == "country" || flagName == "p" || flagName == "port" || flagName == "q" || flagName == "query" ||
-					flagName == "z" || flagName == "postal-code" {
+					flagName == "z" || flagName == "postal-code" || flagName == "k" || flagName == "api-key" ||
+					flagName == "db" || flagName == "rate-limit" || flagName == "rate-burst" {
 					i++
 					flags = append(flags, args[i])
 				}

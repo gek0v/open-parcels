@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 
 	"open-parcels/pkg/carriers"
 	"open-parcels/pkg/engine"
@@ -18,23 +19,45 @@ import (
 
 // Server implements the Model Context Protocol (MCP) server.
 type Server struct {
-	engine *engine.Engine
-	tools  []Tool
+	engine  *engine.Engine
+	tools   []Tool
+	mu      sync.RWMutex
+	apiKeys []string
 }
 
 // NewServer creates a new MCP server.
 func NewServer(eng *engine.Engine) *Server {
 	s := &Server{
-		engine: eng,
+		engine:  eng,
+		apiKeys: LoadAPIKeysFromEnv(),
 	}
 	s.initTools()
 	return s
 }
 
+// SetAPIKeys configures API keys for authenticating HTTP requests.
+func (s *Server) SetAPIKeys(keys []string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.apiKeys = ParseAPIKeys(keys)
+}
+
+// APIKeys returns a copy of the configured API keys.
+func (s *Server) APIKeys() []string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if len(s.apiKeys) == 0 {
+		return nil
+	}
+	out := make([]string, len(s.apiKeys))
+	copy(out, s.apiKeys)
+	return out
+}
+
 func (s *Server) initTools() {
 	s.tools = []Tool{
 		{
-			Name: "track_shipment",
+			Name:        "track_shipment",
 			Description: "Track a shipment/parcel with automatic multi-carrier detection, international-to-local handover chaining (e.g. Cainiao/AliExpress to Correos Express), and unified chronological event merging.",
 			InputSchema: InputSchema{
 				Type: "object",
@@ -68,7 +91,7 @@ func (s *Server) initTools() {
 			},
 		},
 		{
-			Name: "detect_carrier",
+			Name:        "detect_carrier",
 			Description: "Identify candidate delivery carriers for a tracking number with confidence scoring and regex/format validation.",
 			InputSchema: InputSchema{
 				Type: "object",
@@ -86,7 +109,7 @@ func (s *Server) initTools() {
 			},
 		},
 		{
-			Name: "list_carriers",
+			Name:        "list_carriers",
 			Description: "List all supported logistics carriers, tracking slugs, countries, and service types.",
 			InputSchema: InputSchema{
 				Type: "object",
@@ -99,7 +122,7 @@ func (s *Server) initTools() {
 			},
 		},
 		{
-			Name: "check_carrier_status",
+			Name:        "check_carrier_status",
 			Description: "Inspect the operational status, integration mode (live_api, public_scraper, or not_implemented), and capabilities of a carrier.",
 			InputSchema: InputSchema{
 				Type: "object",
@@ -113,7 +136,7 @@ func (s *Server) initTools() {
 			},
 		},
 		{
-			Name: "estimate_delivery",
+			Name:        "estimate_delivery",
 			Description: "Estimate shipment delivery progress, transit time, and status based on tracked milestones.",
 			InputSchema: InputSchema{
 				Type: "object",
@@ -182,6 +205,18 @@ func sendStdioResponse(resp JSONRPCResponse) {
 
 // HandleHTTP handles JSON-RPC 2.0 requests over HTTP.
 func (s *Server) HandleHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if keys := s.APIKeys(); len(keys) > 0 {
+		if !ValidateAPIKey(ExtractToken(r), keys) {
+			WriteUnauthorized(w)
+			return
+		}
+	}
+
 	var req JSONRPCRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		w.Header().Set("Content-Type", "application/json")

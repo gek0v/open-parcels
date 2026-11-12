@@ -279,3 +279,59 @@ Common error codes:
 - `NO_SHIPMENTS` (400): All submitted shipment items were invalid.
 - `TRACKING_FAILED` (404): Carrier could not be detected or lookup failed.
 - `REQUEST_NOT_FOUND` (404): Tracking request record expired or does not exist.
+- `UNAUTHORIZED` (401): Missing or invalid Bearer/API key credential.
+- `TOO_MANY_REQUESTS` (429): Client exceeded configured rate limit.
+
+---
+
+## 5. Authentication & Rate Limiting
+
+### 5.1 Optional API Key Authentication
+
+By default, the server runs in open mode with no authentication required. When one or more API keys are configured, all endpoints except `/health` (kept open for Kubernetes/Docker readiness probes) require valid credentials.
+
+**Configuration:**
+- Environment variables:
+  - `OPEN_PARCELS_API_KEY`: Single API key.
+  - `OPEN_PARCELS_API_KEYS`: Comma-separated list of valid API keys.
+- CLI flag: `--api-key <key1,key2>` (or `-k`).
+
+**Sending Credentials:**
+Requests to `/api/v1/*`, `/trackings*`, or `/mcp` can provide a key via either header (validated using constant-time comparison):
+- `Authorization: Bearer <token>`
+- `X-API-Key: <token>`
+
+```bash
+curl -H "Authorization: Bearer my-secret-key" http://localhost:8080/api/v1/carriers
+curl -H "X-API-Key: my-secret-key" http://localhost:8080/api/v1/track?number=LP00561234567890
+```
+
+Missing or invalid credentials return `401 Unauthorized` with a standard JSON error envelope:
+```json
+{
+  "error": {
+    "code": "UNAUTHORIZED",
+    "message": "Invalid or missing API key."
+  }
+}
+```
+
+### 5.2 Rate Limiting
+
+Token-bucket rate limiting can be enabled per client identity (API key when authenticated, or client IP address otherwise). Inactive buckets are periodically evicted to prevent memory leaks.
+
+**Configuration:**
+- Environment variables:
+  - `OPEN_PARCELS_RATE_LIMIT`: Request rate (e.g., `10`, `10/s`, `120/m`, `3600/h`).
+  - `OPEN_PARCELS_RATE_BURST`: Maximum burst allowance (defaults to ceiling of requests/sec).
+- CLI flags: `--rate-limit <rate>` and `--rate-burst <n>`.
+
+When the limit is exceeded, the server responds with `429 Too Many Requests` and a `Retry-After` header (in seconds):
+```json
+{
+  "error": {
+    "code": "TOO_MANY_REQUESTS",
+    "message": "Rate limit exceeded. Try again later."
+  }
+}
+```
