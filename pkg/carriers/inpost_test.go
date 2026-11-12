@@ -15,8 +15,8 @@ func TestInPostMissingPostalCode(t *testing.T) {
 		AllowSimulated: false,
 		PostalCode:     "",
 	})
-	if !errors.Is(err, models.ErrMissingPostalCode) {
-		t.Fatalf("expected ErrMissingPostalCode, got: %v", err)
+	if !errors.Is(err, models.ErrPostalCodeRequired) {
+		t.Fatalf("expected ErrPostalCodeRequired, got: %v", err)
 	}
 
 	cSpain := NewInPostSpainCarrier()
@@ -24,8 +24,8 @@ func TestInPostMissingPostalCode(t *testing.T) {
 		AllowSimulated: false,
 		PostalCode:     "",
 	})
-	if !errors.Is(errSpain, models.ErrMissingPostalCode) {
-		t.Fatalf("expected ErrMissingPostalCode for inpost-es, got: %v", errSpain)
+	if !errors.Is(errSpain, models.ErrPostalCodeRequired) {
+		t.Fatalf("expected ErrPostalCodeRequired for inpost-es, got: %v", errSpain)
 	}
 }
 

@@ -1,10 +1,10 @@
 package mcp
 
 import (
-	"errors"
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -322,6 +322,9 @@ func (s *Server) executeTool(ctx context.Context, name string, args map[string]a
 			if errors.Is(err, models.ErrScraperSchemaChanged) {
 				return errorResult(fmt.Sprintf("[SCRAPER_ERROR] Scraper schema changed or unexpected portal format: %v", err))
 			}
+			if errors.Is(err, models.ErrPostalCodeRequired) {
+				return errorResult(fmt.Sprintf("Postal code is required for this carrier: %v", err))
+			}
 			return errorResult(fmt.Sprintf("Failed to track package: %v", err))
 		}
 
@@ -459,6 +462,9 @@ func (s *Server) executeTool(ctx context.Context, name string, args map[string]a
 			}
 			if errors.Is(err, models.ErrScraperSchemaChanged) {
 				return errorResult(fmt.Sprintf("[SCRAPER_ERROR] Scraper schema changed: %v", err))
+			}
+			if errors.Is(err, models.ErrPostalCodeRequired) {
+				return errorResult(fmt.Sprintf("Postal code is required for this carrier: %v", err))
 			}
 			return errorResult(fmt.Sprintf("Failed to retrieve shipment for estimate: %v", err))
 		}

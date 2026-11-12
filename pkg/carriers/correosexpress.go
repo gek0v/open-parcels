@@ -89,7 +89,7 @@ func parseCorreosExpressDate(fechaStr, horaStr string) time.Time {
 	}
 
 	for _, layout := range layouts {
-		if t, err := time.ParseInLocation(layout, combined, time.UTC); err == nil {
+		if t, err := ParseLocalTimeWithZone(layout, combined, "Europe/Madrid"); err == nil {
 			return t
 		}
 	}

@@ -265,7 +265,7 @@ func classifyTrackError(err error) (string, string) {
 	} else if errors.Is(err, models.ErrScraperSchemaChanged) {
 		code = "SCRAPER_ERROR"
 		suggestion = "The carrier website structure or API schema changed. An adapter update may be required."
-	} else if errors.Is(err, models.ErrMissingPostalCode) || strings.Contains(strings.ToLower(err.Error()), "postal code") {
+	} else if errors.Is(err, models.ErrPostalCodeRequired) || strings.Contains(strings.ToLower(err.Error()), "postal code") {
 		code = "MISSING_POSTAL_CODE"
 		suggestion = "This carrier requires a destination postal code. Pass --postal-code <CP> (or -z <CP>)."
 	} else if errors.Is(err, models.ErrCarrierNotImplemented) || strings.Contains(strings.ToLower(err.Error()), "not implemented") {
@@ -280,4 +280,3 @@ func classifyTrackError(err error) (string, string) {
 	}
 	return code, suggestion
 }
-

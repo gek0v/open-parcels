@@ -112,7 +112,7 @@ func trackInPostShared(
 	postalCode := strings.TrimSpace(opts.PostalCode)
 	if postalCode == "" {
 		if !opts.AllowSimulated {
-			return nil, models.ErrMissingPostalCode
+			return nil, fmt.Errorf("%w: InPost tracking requires destination postal code (--postal-code <CP>)", models.ErrPostalCodeRequired)
 		}
 		if simulatedFn != nil {
 			return simulatedFn(trackingNumber, opts), nil
@@ -447,7 +447,7 @@ func parseInPostDate(dateStr string) (time.Time, error) {
 		"2006-01-02",
 	}
 	for _, f := range formats {
-		if t, err := time.Parse(f, dateStr); err == nil {
+		if t, err := ParseLocalTimeWithZone(f, dateStr, "Europe/Madrid"); err == nil {
 			return t, nil
 		}
 	}
