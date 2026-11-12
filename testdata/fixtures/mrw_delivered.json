@@ -1,0 +1,35 @@
+{
+  "numeroEnvio": "028001234567",
+  "trackingNumber": "028001234567",
+  "estado": "ENTREGADO",
+  "descripcionEstado": "Env?o entregado al destinatario",
+  "origen": "Madrid Central",
+  "destino": "Barcelona Diagonal",
+  "fechaEntrega": "15/11/2024 14:30:00",
+  "eventos": [
+    {
+      "fecha": "15/11/2024 14:30:00",
+      "estado": "ENTREGADO",
+      "descripcion": "Env?o entregado al destinatario en el domicilio",
+      "ubicacion": "Barcelona"
+    },
+    {
+      "fecha": "15/11/2024 08:30:00",
+      "estado": "EN REPARTO",
+      "descripcion": "Env?o en furgoneta de reparto para entrega hoy",
+      "ubicacion": "Barcelona"
+    },
+    {
+      "fecha": "14/11/2024 22:15:00",
+      "estado": "EN TR?NSITO",
+      "descripcion": "En tr?nsito interurbano - Plataforma log?stica central",
+      "ubicacion": "Coslada Hub, Madrid"
+    },
+    {
+      "fecha": "14/11/2024 18:00:00",
+      "estado": "RECOGIDO",
+      "descripcion": "Env?o recogido en origen por franquicia MRW",
+      "ubicacion": "Madrid Central"
+    }
+  ]
+}

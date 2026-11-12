@@ -1,0 +1,75 @@
+{
+  "success": true,
+  "code": "200",
+  "message": "success",
+  "data": [
+    {
+      "trackingNumber": "YT2401234567890123",
+      "waybillNumber": "YT2401234567890123",
+      "lastMileTrackingNumber": "PQ4F6P07000000000000000",
+      "lastMileCarrier": "Correos Spain",
+      "lastMileCarrierSlug": "correos-spain",
+      "status": "Delivered",
+      "statusDescription": "Delivered to recipient mailbox",
+      "originCountry": "CN",
+      "originCountryName": "China",
+      "destinationCountry": "ES",
+      "destinationCountryName": "Spain",
+      "events": [
+        {
+          "date": "2024-11-15 14:20:00",
+          "status": "Delivered",
+          "stage": "delivery",
+          "description": "Delivered, in or at the mailbox",
+          "location": "Madrid, Spain",
+          "carrier": "Correos Spain",
+          "carrierSlug": "correos-spain"
+        },
+        {
+          "date": "2024-11-15 08:30:00",
+          "status": "Out for delivery",
+          "stage": "last_mile",
+          "description": "Out for delivery with local courier",
+          "location": "Madrid, Spain",
+          "carrier": "Correos Spain",
+          "carrierSlug": "correos-spain"
+        },
+        {
+          "date": "2024-11-14 09:10:00",
+          "status": "In Transit",
+          "stage": "handover",
+          "description": "Handed over to local delivery carrier (Correos Spain)",
+          "location": "Madrid Airport, Spain"
+        },
+        {
+          "date": "2024-11-13 18:30:00",
+          "status": "In Transit",
+          "stage": "customs",
+          "description": "Customs clearance completed at destination",
+          "location": "Madrid-Barajas Airport, Spain"
+        },
+        {
+          "date": "2024-11-11 11:00:00",
+          "status": "In Transit",
+          "stage": "transit",
+          "description": "Departed on international flight",
+          "location": "Hong Kong International Airport, China"
+        },
+        {
+          "date": "2024-11-09 16:45:00",
+          "status": "In Transit",
+          "stage": "picked_up",
+          "description": "Package arrived at sorting facility",
+          "location": "Dongguan Hub, China"
+        },
+        {
+          "date": "2024-11-08 10:00:00",
+          "status": "Info Received",
+          "stage": "created",
+          "description": "Shipment information received",
+          "location": "Shenzhen, China"
+        }
+      ]
+    }
+  ]
+}

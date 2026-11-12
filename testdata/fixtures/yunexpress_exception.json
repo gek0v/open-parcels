@@ -1,0 +1,23 @@
+{
+  "success": true,
+  "code": "200",
+  "message": "success",
+  "data": [
+    {
+      "trackingNumber": "YT2405556667778889",
+      "status": "Exception",
+      "statusDescription": "Customs inspection held",
+      "originCountry": "CN",
+      "destinationCountry": "ES",
+      "events": [
+        {
+          "date": "2024-11-14 14:00:00",
+          "status": "Exception",
+          "stage": "exception",
+          "description": "Held by customs for inspection",
+          "location": "Madrid-Barajas, Spain"
+        }
+      ]
+    }
+  ]
+}

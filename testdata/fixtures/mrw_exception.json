@@ -1,0 +1,21 @@
+{
+  "numeroEnvio": "028005556667",
+  "estado": "INCIDENCIA",
+  "descripcionEstado": "Destinatario ausente durante el reparto",
+  "origen": "Zaragoza",
+  "destino": "Madrid",
+  "eventos": [
+    {
+      "fecha": "15/11/2024 16:20:00",
+      "estado": "INCIDENCIA",
+      "descripcion": "Destinatario ausente, se deja aviso de paso",
+      "ubicacion": "Madrid"
+    },
+    {
+      "fecha": "15/11/2024 09:15:00",
+      "estado": "EN REPARTO",
+      "descripcion": "Env?o en reparto con mensajero",
+      "ubicacion": "Madrid"
+    }
+  ]
+}
