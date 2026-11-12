@@ -230,3 +230,61 @@ func TestMCPServer(t *testing.T) {
 		t.Fatalf("expected 200 OK for MCP HTTP, got %d", httpRec.Code)
 	}
 }
+
+func TestMCPToolWAFBlockedAndScraperError(t *testing.T) {
+	srv := NewServer(engine.New())
+	ctx := context.Background()
+
+	// 1. WAF 403 -> [CARRIER_BLOCKED]
+	wafFixture, err := carriers.LoadFixture("inpost_waf_blocked.html")
+	if err != nil {
+		t.Fatalf("failed to load waf fixture: %v", err)
+	}
+	teardownWAF := carriers.SetInPostHTTPClientForTest(carriers.NewFixtureClient(http.StatusForbidden, wafFixture, "text/html"))
+	reqWAF := JSONRPCRequest{
+		JSONRPC: "2.0",
+		ID:      101,
+		Method:  "tools/call",
+		Params: map[string]any{
+			"name": "track_shipment",
+			"arguments": map[string]any{
+				"tracking_number": "75616714",
+				"carrier_hint":    "inpost",
+				"postal_code":     "47140",
+			},
+		},
+	}
+	respWAF := srv.handleRequest(ctx, reqWAF)
+	teardownWAF()
+	resWAF := respWAF.Result.(ToolCallResult)
+	if !resWAF.IsError || len(resWAF.Content) == 0 || !strings.Contains(resWAF.Content[0].Text, "CARRIER_BLOCKED") {
+		t.Errorf("expected [CARRIER_BLOCKED] error result, got: %+v", resWAF)
+	}
+
+	// 2. Broken schema -> [SCRAPER_ERROR]
+	brokenFixture, err := carriers.LoadFixture("inpost_broken_schema.html")
+	if err != nil {
+		t.Fatalf("failed to load broken schema fixture: %v", err)
+	}
+	teardownBroken := carriers.SetInPostHTTPClientForTest(carriers.NewFixtureClient(http.StatusOK, brokenFixture, "text/html"))
+	reqBroken := JSONRPCRequest{
+		JSONRPC: "2.0",
+		ID:      102,
+		Method:  "tools/call",
+		Params: map[string]any{
+			"name": "track_shipment",
+			"arguments": map[string]any{
+				"tracking_number": "75616714",
+				"carrier_hint":    "inpost",
+				"postal_code":     "47140",
+			},
+		},
+	}
+	respBroken := srv.handleRequest(ctx, reqBroken)
+	teardownBroken()
+	resBroken := respBroken.Result.(ToolCallResult)
+	if !resBroken.IsError || len(resBroken.Content) == 0 || !strings.Contains(resBroken.Content[0].Text, "SCRAPER_ERROR") {
+		t.Errorf("expected [SCRAPER_ERROR] error result, got: %+v", resBroken)
+	}
+}
+

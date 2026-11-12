@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"errors"
 	"bufio"
 	"context"
 	"encoding/json"
@@ -280,6 +281,12 @@ func (s *Server) executeTool(ctx context.Context, name string, args map[string]a
 			Language:           lang,
 		})
 		if err != nil {
+			if errors.Is(err, models.ErrCarrierBlocked) {
+				return errorResult(fmt.Sprintf("[CARRIER_BLOCKED] Carrier portal blocked request: %v", err))
+			}
+			if errors.Is(err, models.ErrScraperSchemaChanged) {
+				return errorResult(fmt.Sprintf("[SCRAPER_ERROR] Scraper schema changed or unexpected portal format: %v", err))
+			}
 			return errorResult(fmt.Sprintf("Failed to track package: %v", err))
 		}
 
@@ -412,6 +419,12 @@ func (s *Server) executeTool(ctx context.Context, name string, args map[string]a
 			AllowSimulated: allowSimulated,
 		})
 		if err != nil {
+			if errors.Is(err, models.ErrCarrierBlocked) {
+				return errorResult(fmt.Sprintf("[CARRIER_BLOCKED] Carrier portal blocked request: %v", err))
+			}
+			if errors.Is(err, models.ErrScraperSchemaChanged) {
+				return errorResult(fmt.Sprintf("[SCRAPER_ERROR] Scraper schema changed: %v", err))
+			}
 			return errorResult(fmt.Sprintf("Failed to retrieve shipment for estimate: %v", err))
 		}
 

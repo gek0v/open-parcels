@@ -3,7 +3,6 @@ package carriers
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"html"
 	"io"
@@ -16,8 +15,13 @@ import (
 	"open-parcels/pkg/models"
 )
 
-var inpostHTTPClient = &http.Client{
-	Timeout: 10 * time.Second,
+var inpostHTTPClient = NewCarrierHTTPClient(DefaultRequestTimeout)
+
+// SetInPostHTTPClientForTest overrides the HTTP client for InPost in deterministic tests.
+func SetInPostHTTPClientForTest(client *http.Client) func() {
+	orig := inpostHTTPClient
+	inpostHTTPClient = client
+	return func() { inpostHTTPClient = orig }
 }
 
 type InPostCarrier struct {
@@ -125,7 +129,7 @@ func trackInPostShared(
 		return simulatedFn(trackingNumber, opts), nil
 	}
 
-	if errors.Is(err, models.ErrMissingPostalCode) {
+	if err != nil {
 		return nil, err
 	}
 
@@ -139,29 +143,33 @@ func fetchInPostLive(ctx context.Context, carrier Carrier, trackingNumber, posta
 		url.QueryEscape(postalCode),
 	)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, targetURL, nil)
+	req, err := NewCarrierRequest(http.MethodGet, targetURL)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %v", models.ErrCarrierTemporarilyUnavailable, err)
 	}
-
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
+	req = req.WithContext(ctx)
 	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
 	req.Header.Set("Accept-Language", "es-ES,es;q=0.9,en;q=0.8")
 
 	resp, err := inpostHTTPClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %v", models.ErrCarrierTemporarilyUnavailable, err)
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, models.ErrShipmentNotFound
-	}
-
 	bodyBytes, err := io.ReadAll(io.LimitReader(resp.Body, 4*1024*1024))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: failed to read response body: %v", models.ErrCarrierTemporarilyUnavailable, err)
 	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, classifyScraperHTTPStatus(resp.StatusCode, bodyBytes, resp.Header, "InPost")
+	}
+
+	if isWAFChallenge(resp.StatusCode, bodyBytes, resp.Header) {
+		return nil, fmt.Errorf("%w: WAF or anti-bot challenge detected in InPost response", models.ErrCarrierBlocked)
+	}
+
 	htmlContent := string(bodyBytes)
 
 	if strings.Contains(htmlContent, "Paquete no encontrado") || strings.Contains(htmlContent, "paquete no encontrado") {
@@ -170,26 +178,41 @@ func fetchInPostLive(ctx context.Context, carrier Carrier, trackingNumber, posta
 
 	propsJSON, err := extractInPostProps(htmlContent)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %v", models.ErrScraperSchemaChanged, err)
 	}
 
 	var rawData map[string]any
 	if err := json.Unmarshal([]byte(propsJSON), &rawData); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal InPost props: %w", err)
+		return nil, fmt.Errorf("%w: failed to unmarshal InPost props: %v", models.ErrScraperSchemaChanged, err)
 	}
 
 	statusVal, ok := unwrapAstroInt(rawData["trackingDetailsStatus"])
-	if !ok || statusVal != 200 {
+	if !ok {
+		return nil, fmt.Errorf("%w: missing or invalid trackingDetailsStatus in InPost props", models.ErrScraperSchemaChanged)
+	}
+	if statusVal == http.StatusForbidden {
+		return nil, fmt.Errorf("%w: InPost trackingDetailsStatus 403", models.ErrCarrierBlocked)
+	}
+	if statusVal == http.StatusTooManyRequests {
+		return nil, fmt.Errorf("%w: %w: InPost trackingDetailsStatus 429", models.ErrCarrierRateLimited, models.ErrCarrierBlocked)
+	}
+	if statusVal != http.StatusOK {
 		return nil, models.ErrShipmentNotFound
 	}
 
 	tdMap := unwrapAstroMap(rawData["trackingDetails"])
 	if tdMap == nil {
-		return nil, models.ErrShipmentNotFound
+		return nil, fmt.Errorf("%w: missing or invalid trackingDetails in InPost props", models.ErrScraperSchemaChanged)
 	}
 
-	milestonesRaw := tdMap["milestones"]
+	milestonesRaw, hasMilestones := tdMap["milestones"]
+	if !hasMilestones {
+		return nil, fmt.Errorf("%w: missing milestones field in InPost trackingDetails", models.ErrScraperSchemaChanged)
+	}
 	milestonesList := unwrapAstroList(milestonesRaw)
+	if milestonesList == nil {
+		return nil, fmt.Errorf("%w: invalid milestones structure in InPost trackingDetails", models.ErrScraperSchemaChanged)
+	}
 	if len(milestonesList) == 0 {
 		return nil, models.ErrShipmentNotFound
 	}
