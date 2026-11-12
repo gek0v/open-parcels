@@ -102,7 +102,10 @@ func registerDefaultCarriers(r *Registry) {
 	r.Register(correosExpress)
 	r.RegisterAlias("correos-express", correosExpress)
 
-	r.Register(NewCTTExpressCarrier())
+	ctt := NewCTTExpressCarrier()
+	r.Register(ctt)
+	r.RegisterAlias("ctt", ctt)
+	r.RegisterAlias("cttexpress", ctt)
 	r.Register(NewDHLExpressCarrier())
 
 	dhlParcel := NewDHLParcelCarrier()
@@ -134,7 +137,9 @@ func registerDefaultCarriers(r *Registry) {
 	r.Register(NewSEURCarrier())
 	r.Register(NewUPSCarrier())
 	r.Register(NewUSPSCarrier())
-	r.Register(NewYunExpressCarrier())
+	yun := NewYunExpressCarrier()
+	r.Register(yun)
+	r.RegisterAlias("yuntrack", yun)
 	r.Register(NewRoyalMailCarrier())
 	r.Register(NewColissimoCarrier())
 	r.Register(NewAirCargoCarrier())
@@ -219,7 +224,9 @@ func registerDefaultCarriers(r *Registry) {
 	r.Register(NewEnvialiaCarrier())
 	r.Register(NewInstapackCarrier())
 	r.Register(NewMBESpainCarrier())
-	r.Register(NewNacexCarrier())
+	nacex := NewNacexCarrier()
+	r.Register(nacex)
+	r.RegisterAlias("nacex", nacex)
 	r.Register(NewOntimeCarrier())
 	r.Register(NewPacklinkCarrier())
 	r.Register(NewRedurSpainCarrier())
@@ -318,14 +325,14 @@ func NewBaseCarrier(slug, name, country, countryName string, cType models.Carrie
 	}
 }
 
-func (b BaseCarrier) Slug() string                         { return b.slug }
-func (b BaseCarrier) ID() string                           { return b.slug }
-func (b BaseCarrier) Name() string                         { return b.name }
-func (b BaseCarrier) Country() string                      { return b.country }
-func (b BaseCarrier) CountryName() string                  { return b.countryName }
-func (b BaseCarrier) Type() models.CarrierType             { return b.carrierType }
-func (b BaseCarrier) Website() string                      { return b.website }
-func (b BaseCarrier) Capabilities() CarrierCapabilities    { return b.capabilities }
+func (b BaseCarrier) Slug() string                           { return b.slug }
+func (b BaseCarrier) ID() string                             { return b.slug }
+func (b BaseCarrier) Name() string                           { return b.name }
+func (b BaseCarrier) Country() string                        { return b.country }
+func (b BaseCarrier) CountryName() string                    { return b.countryName }
+func (b BaseCarrier) Type() models.CarrierType               { return b.carrierType }
+func (b BaseCarrier) Website() string                        { return b.website }
+func (b BaseCarrier) Capabilities() CarrierCapabilities      { return b.capabilities }
 func (b *BaseCarrier) SetCapabilities(c CarrierCapabilities) { b.capabilities = c }
 func (b BaseCarrier) TrackingURL(num string) string {
 	if b.urlTemplate == "" {

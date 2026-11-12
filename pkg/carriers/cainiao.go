@@ -91,13 +91,18 @@ type cainiaoResponse struct {
 }
 
 func parseCainiaoTime(det cainiaoDetailItem) (time.Time, string) {
+	zone := "Asia/Shanghai"
+	if det.TimeZone != "" {
+		zone = det.TimeZone
+	}
+
 	if det.TimeStr != "" {
 		for _, layout := range []string{
 			"2006-01-02 15:04:05",
 			"2006-01-02 15:04",
 			time.RFC3339,
 		} {
-			if t, err := time.Parse(layout, det.TimeStr); err == nil {
+			if t, err := ParseLocalTimeWithZone(layout, det.TimeStr, zone); err == nil {
 				return t, det.TimeStr
 			}
 		}
@@ -107,7 +112,7 @@ func parseCainiaoTime(det cainiaoDetailItem) (time.Time, string) {
 		switch v := det.Time.(type) {
 		case float64:
 			if v > 0 {
-				t := time.UnixMilli(int64(v))
+				t := time.UnixMilli(int64(v)).UTC()
 				return t, t.Format("2006-01-02 15:04:05")
 			}
 		case string:
@@ -117,7 +122,7 @@ func parseCainiaoTime(det cainiaoDetailItem) (time.Time, string) {
 					"2006-01-02 15:04",
 					time.RFC3339,
 				} {
-					if t, err := time.Parse(layout, v); err == nil {
+					if t, err := ParseLocalTimeWithZone(layout, v, zone); err == nil {
 						return t, v
 					}
 				}
@@ -126,7 +131,7 @@ func parseCainiaoTime(det cainiaoDetailItem) (time.Time, string) {
 	}
 
 	if det.Date != "" {
-		if t, err := time.Parse("2006-01-02", det.Date); err == nil {
+		if t, err := ParseLocalTimeWithZone("2006-01-02", det.Date, zone); err == nil {
 			return t, det.Date
 		}
 	}
@@ -298,10 +303,10 @@ func (c *CainiaoCarrier) Track(ctx context.Context, trackingNumber string, opts 
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusTooManyRequests {
-		return nil, models.ErrCarrierRateLimited
+		return nil, fmt.Errorf("%w: %w: Cainiao returned HTTP 429", models.ErrCarrierRateLimited, models.ErrCarrierBlocked)
 	}
 	if resp.StatusCode == http.StatusForbidden {
-		return nil, models.ErrCarrierTemporarilyUnavailable
+		return nil, fmt.Errorf("%w: %w: Cainiao returned HTTP 403", models.ErrCarrierBlocked, models.ErrCarrierTemporarilyUnavailable)
 	}
 	if resp.StatusCode == http.StatusNotFound {
 		return nil, models.ErrShipmentNotFound
@@ -313,20 +318,32 @@ func (c *CainiaoCarrier) Track(ctx context.Context, trackingNumber string, opts 
 	}
 	bodyStr := string(bodyBytes)
 
-	if isCainiaoAntiBot(resp.StatusCode, bodyStr) {
-		return nil, models.ErrCarrierTemporarilyUnavailable
+	if resp.StatusCode != http.StatusOK {
+		return nil, classifyScraperHTTPStatus(resp.StatusCode, bodyBytes, resp.Header, "Cainiao")
+	}
+
+	if isCainiaoAntiBot(resp.StatusCode, bodyStr) || isWAFChallenge(resp.StatusCode, bodyBytes, resp.Header) {
+		return nil, fmt.Errorf("%w: %w: Cainiao anti-bot challenge detected", models.ErrCarrierBlocked, models.ErrCarrierTemporarilyUnavailable)
+	}
+
+	var rawMap map[string]any
+	if err := json.Unmarshal(bodyBytes, &rawMap); err != nil {
+		return nil, fmt.Errorf("%w: %w: malformed JSON from Cainiao: %v", models.ErrScraperSchemaChanged, models.ErrCarrierTemporarilyUnavailable, err)
+	}
+	if !hasAnyJSONKey(rawMap, "module", "data", "success", "errorCode", "errorMsg") {
+		return nil, fmt.Errorf("%w: unexpected JSON schema from Cainiao", models.ErrScraperSchemaChanged)
 	}
 
 	var cResp cainiaoResponse
 	if err := json.Unmarshal(bodyBytes, &cResp); err != nil {
-		return nil, fmt.Errorf("%w: malformed JSON from Cainiao: %v", models.ErrCarrierTemporarilyUnavailable, err)
+		return nil, fmt.Errorf("%w: %w: malformed JSON from Cainiao: %v", models.ErrScraperSchemaChanged, models.ErrCarrierTemporarilyUnavailable, err)
 	}
 
 	if isCainiaoNotFound(&cResp) {
 		return nil, models.ErrShipmentNotFound
 	}
 	if strings.Contains(strings.ToUpper(cResp.ErrorCode), "RGV") || strings.Contains(strings.ToUpper(cResp.ErrorCode), "CHALLENGE") {
-		return nil, models.ErrCarrierTemporarilyUnavailable
+		return nil, fmt.Errorf("%w: %w: Cainiao challenge error code %s", models.ErrCarrierBlocked, models.ErrCarrierTemporarilyUnavailable, cResp.ErrorCode)
 	}
 
 	var items []cainiaoItem

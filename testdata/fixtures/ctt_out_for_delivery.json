@@ -1,0 +1,25 @@
+{
+  "shipmentCode": "0009876543210987654321",
+  "status": "OUT_FOR_DELIVERY",
+  "statusDescription": "En reparto para entrega",
+  "origin": {
+    "name": "Barcelona"
+  },
+  "destination": {
+    "name": "Valencia"
+  },
+  "events": [
+    {
+      "date": "2024-11-15T09:10:00Z",
+      "status": "OUT_FOR_DELIVERY",
+      "description": "El env?o se encuentra en ruta de entrega",
+      "location": "Valencia"
+    },
+    {
+      "date": "2024-11-14T23:00:00Z",
+      "status": "IN_TRANSIT",
+      "description": "Recepcionado en plataforma de distribuci?n",
+      "location": "Valencia Plataforma"
+    }
+  ]
+}

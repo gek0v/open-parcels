@@ -1,0 +1,34 @@
+name: Carrier Scraper Canary Checks
+
+on:
+  schedule:
+    # Run daily at 06:00 UTC to detect upstream scraper/WAF breakage early
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      carrier:
+        description: 'Optional carrier test filter (regex pattern for -run)'
+        required: false
+        default: '.*'
+
+jobs:
+  canary:
+    name: Public Carrier Canary Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache: true
+
+      - name: Verify Module Dependencies
+        run: go mod verify
+
+      - name: Run Carrier Integration Canary Checks
+        env:
+          OPEN_PARCELS_PROXY: ${{ secrets.OPEN_PARCELS_PROXY }}
+        run: go test -v -race -tags=integration -run "${{ github.event.inputs.carrier || '.*' }}" ./pkg/carriers/...

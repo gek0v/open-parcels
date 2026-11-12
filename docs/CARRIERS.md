@@ -24,6 +24,10 @@ Para máxima transparencia técnica con la comunidad y usuarios de producción, 
 | **Correos España** | `correos-spain` | 🇪🇸 España | 🟢 **Live API / Verified** | Ninguna (Localizador web) | ✅ Sí (Oficina / Fecha límite) |
 | **SEUR** | `seur` | 🇪🇸 España | 🟢 **Live API / Verified** | Código postal (`-z`) | — |
 | **GLS Spain** | `asm-gls-spain` | 🇪🇸 España | 🟢 **Live API / Verified** | Código postal (`-z`) | — |
+| **MRW Spain** | `mrw-spain`, `mrw` | 🇪🇸 España | 🟢 **Live API / Verified** | Ninguna (Localizador web) | — |
+| **Nacex Spain** | `nacex-spain`, `nacex` | 🇪🇸 España | 🟢 **Live API / Verified** | Ninguna (Localizador web) | — |
+| **CTT Express** | `ctt-express`, `cttexpress` | 🇪🇸 España | 🟢 **Live API / Verified** | Ninguna (API pública / Web) | — |
+| **YunExpress** | `yunexpress`, `yuntrack` | 🇨🇳 Global | 🟢 **Live API / Verified** | Ninguna (API pública) | ✅ Sí (Correos, CTT, GLS) |
 | **DHL Express** | `dhl-express` | 🌐 Global | 🟡 **Enterprise Auth** | `DHL_API_KEY` | — |
 | **DHL Parcel / Paket** | `dhl-parcel` | 🇩🇪 Alemania | 🟡 **Enterprise Auth** | `DHL_API_KEY` | — |
 | **UPS** | `ups` | 🇺🇸 Global | 🟡 **Enterprise Auth** | `UPS_CLIENT_ID` + `UPS_CLIENT_SECRET` | — |
@@ -32,8 +36,6 @@ Para máxima transparencia técnica con la comunidad y usuarios de producción, 
 | **Royal Mail** | `royalmail` | 🇬🇧 UK | ⚪ *Catalog Only* | Pendiente de adaptador | — |
 | **Colissimo / La Poste** | `colissimo` | 🇫🇷 Francia | ⚪ *Catalog Only* | Pendiente de adaptador | — |
 | **PostNL** | `postnl` | 🇳🇱 Países Bajos | ⚪ *Catalog Only* | Pendiente de adaptador | — |
-| **MRW** | `mrw-spain` | 🇪🇸 España | ⚪ *Catalog Only* | Pendiente de adaptador | — |
-| **Nacex** | `nacex-spain` | 🇪🇸 España | ⚪ *Catalog Only* | Pendiente de adaptador | — |
 | **Paack** | `paack` | 🇪🇸 España | ⚪ *Catalog Only* | Pendiente de adaptador | — |
 | **+1.500 Transportistas** | *(ver catálogos)* | 🌍 Global | ⚪ *Catalog Only* | [¡Ayúdanos a implementarlos!](../CONTRIBUTING.md) | — |
 

@@ -1,12 +1,12 @@
 package server
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -70,6 +70,13 @@ func (s *Server) handleTrackV1(w http.ResponseWriter, r *http.Request) {
 		if strings.EqualFold(mockVal, "true") || mockVal == "1" {
 			opts.AllowSimulated = true
 		}
+		refreshVal := r.URL.Query().Get("force_refresh")
+		if refreshVal == "" {
+			refreshVal = r.URL.Query().Get("refresh")
+		}
+		if strings.EqualFold(refreshVal, "true") || refreshVal == "1" {
+			opts.ForceRefresh = true
+		}
 	} else if r.Method == http.MethodPost {
 		var req struct {
 			TrackingNumber     string `json:"tracking_number"`
@@ -79,6 +86,7 @@ func (s *Server) handleTrackV1(w http.ResponseWriter, r *http.Request) {
 			PostalCode         string `json:"postal_code,omitempty"`
 			AllowSimulated     bool   `json:"allow_simulated,omitempty"`
 			Mock               bool   `json:"mock,omitempty"`
+			ForceRefresh       bool   `json:"force_refresh,omitempty"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			writeError(w, http.StatusBadRequest, "INVALID_JSON", "Failed to parse JSON body.")
@@ -90,6 +98,7 @@ func (s *Server) handleTrackV1(w http.ResponseWriter, r *http.Request) {
 		opts.DestinationCountry = req.DestinationCountry
 		opts.PostalCode = req.PostalCode
 		opts.AllowSimulated = req.AllowSimulated || req.Mock
+		opts.ForceRefresh = req.ForceRefresh
 	} else {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
@@ -97,7 +106,7 @@ func (s *Server) handleTrackV1(w http.ResponseWriter, r *http.Request) {
 
 	shipment, err := s.engine.Track(r.Context(), trackingNumber, opts)
 	if err != nil {
-		if errors.Is(err, models.ErrPostalCodeRequired) || errors.Is(err, models.ErrMissingPostalCode) {
+		if errors.Is(err, models.ErrPostalCodeRequired) {
 			writeError(w, http.StatusUnprocessableEntity, "POSTAL_CODE_REQUIRED", err.Error())
 			return
 		}
@@ -111,6 +120,14 @@ func (s *Server) handleTrackV1(w http.ResponseWriter, r *http.Request) {
 		}
 		if errors.Is(err, models.ErrCarrierRateLimited) {
 			writeError(w, http.StatusTooManyRequests, "CARRIER_RATE_LIMITED", err.Error())
+			return
+		}
+		if errors.Is(err, models.ErrCarrierBlocked) {
+			writeError(w, http.StatusServiceUnavailable, "CARRIER_BLOCKED", err.Error())
+			return
+		}
+		if errors.Is(err, models.ErrScraperSchemaChanged) {
+			writeError(w, http.StatusBadGateway, "SCRAPER_ERROR", err.Error())
 			return
 		}
 		if errors.Is(err, models.ErrCarrierTemporarilyUnavailable) {
@@ -142,6 +159,16 @@ func (s *Server) handleParcelsAppTrackings(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	if req.WebhookURL == "" {
+		req.WebhookURL = strings.TrimSpace(r.URL.Query().Get("webhook_url"))
+	}
+	if req.WebhookSecret == "" {
+		req.WebhookSecret = strings.TrimSpace(r.URL.Query().Get("webhook_secret"))
+	}
+	if req.WebhookSecret == "" {
+		req.WebhookSecret = strings.TrimSpace(os.Getenv(EnvWebhookSecret))
+	}
+
 	reqID := fmt.Sprintf("req_%d", time.Now().UnixNano())
 	isAsync := strings.EqualFold(r.URL.Query().Get("async"), "true") || strings.TrimSpace(req.WebhookURL) != ""
 
@@ -156,7 +183,11 @@ func (s *Server) handleParcelsAppTrackings(w http.ResponseWriter, r *http.Reques
 		}
 
 		s.setRequest(reqID, initialResp, 1*time.Hour)
-		go s.processAsyncTrackings(reqID, req)
+		s.wg.Add(1)
+		go func() {
+			defer s.wg.Done()
+			s.processAsyncTrackings(reqID, req)
+		}()
 
 		writeJSON(w, http.StatusOK, initialResp)
 		return
@@ -184,12 +215,13 @@ func (s *Server) handleParcelsAppTrackings(w http.ResponseWriter, r *http.Reques
 			Email:              shp.Email,
 			Phone:              shp.Phone,
 			AdditionalFields:   shp.AdditionalFields,
+			ForceRefresh:       shp.ForceRefresh,
 		}
 
 		shipment, err := s.engine.Track(r.Context(), shp.TrackingNumber, opts)
 		if err != nil {
 			errCode := "TRACKING_FAILED"
-			if errors.Is(err, models.ErrPostalCodeRequired) || errors.Is(err, models.ErrMissingPostalCode) {
+			if errors.Is(err, models.ErrPostalCodeRequired) {
 				errCode = "POSTAL_CODE_REQUIRED"
 			} else if errors.Is(err, models.ErrShipmentNotFound) {
 				errCode = "SHIPMENT_NOT_FOUND"
@@ -197,6 +229,12 @@ func (s *Server) handleParcelsAppTrackings(w http.ResponseWriter, r *http.Reques
 				errCode = "CARRIER_NOT_IMPLEMENTED"
 			} else if errors.Is(err, models.ErrCarrierRateLimited) {
 				errCode = "CARRIER_RATE_LIMITED"
+			} else if errors.Is(err, models.ErrCarrierBlocked) {
+				errCode = "CARRIER_BLOCKED"
+			} else if errors.Is(err, models.ErrScraperSchemaChanged) {
+				errCode = "SCRAPER_ERROR"
+			} else if errors.Is(err, models.ErrCarrierTemporarilyUnavailable) {
+				errCode = "CARRIER_UNAVAILABLE"
 			}
 			rejected = append(rejected, models.ParcelsAppRejected{
 				Index:          idx,
@@ -265,12 +303,13 @@ func (s *Server) processAsyncTrackings(reqID string, req models.ParcelsAppTracki
 			Email:              shp.Email,
 			Phone:              shp.Phone,
 			AdditionalFields:   shp.AdditionalFields,
+			ForceRefresh:       shp.ForceRefresh,
 		}
 
 		shipment, err := s.engine.Track(ctx, shp.TrackingNumber, opts)
 		if err != nil {
 			errCode := "TRACKING_FAILED"
-			if errors.Is(err, models.ErrPostalCodeRequired) || errors.Is(err, models.ErrMissingPostalCode) {
+			if errors.Is(err, models.ErrPostalCodeRequired) {
 				errCode = "POSTAL_CODE_REQUIRED"
 			} else if errors.Is(err, models.ErrShipmentNotFound) {
 				errCode = "SHIPMENT_NOT_FOUND"
@@ -278,6 +317,12 @@ func (s *Server) processAsyncTrackings(reqID string, req models.ParcelsAppTracki
 				errCode = "CARRIER_NOT_IMPLEMENTED"
 			} else if errors.Is(err, models.ErrCarrierRateLimited) {
 				errCode = "CARRIER_RATE_LIMITED"
+			} else if errors.Is(err, models.ErrCarrierBlocked) {
+				errCode = "CARRIER_BLOCKED"
+			} else if errors.Is(err, models.ErrScraperSchemaChanged) {
+				errCode = "SCRAPER_ERROR"
+			} else if errors.Is(err, models.ErrCarrierTemporarilyUnavailable) {
+				errCode = "CARRIER_UNAVAILABLE"
 			}
 			rejected = append(rejected, models.ParcelsAppRejected{
 				Index:          idx,
@@ -306,30 +351,20 @@ func (s *Server) processAsyncTrackings(reqID string, req models.ParcelsAppTracki
 	s.setRequest(reqID, finalResp, 1*time.Hour)
 
 	if req.WebhookURL != "" {
-		sendWebhookCallback(req.WebhookURL, finalResp)
+		webhookCtx, webhookCancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer webhookCancel()
+		_ = s.webhookDispatcher.Dispatch(webhookCtx, req.WebhookURL, req.WebhookSecret, reqID, finalResp)
 	}
 }
 
 func sendWebhookCallback(webhookURL string, payload *models.ParcelsAppResponse) {
-	data, err := json.Marshal(payload)
-	if err != nil {
-		return
+	reqID := ""
+	if payload != nil {
+		reqID = payload.RequestID
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, webhookURL, bytes.NewReader(data))
-	if err != nil {
-		return
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("User-Agent", "open-parcels-server/1.0")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err == nil {
-		_ = resp.Body.Close()
-	}
+	_ = defaultWebhookDispatcher.Dispatch(ctx, webhookURL, "", reqID, payload)
 }
 
 // handleParcelsAppGetTracking implements GET /trackings/{request_id}.

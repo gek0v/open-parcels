@@ -3,26 +3,61 @@ package engine
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
 	"open-parcels/pkg/carriers"
 	"open-parcels/pkg/detector"
 	"open-parcels/pkg/models"
+	"open-parcels/pkg/storage"
 )
 
 // Engine is the central multi-carrier parcel tracking and journey merging orchestrator.
 type Engine struct {
 	detector *detector.Detector
 	registry *carriers.Registry
+	store    storage.Store
 }
 
 // New creates an initialized Engine instance.
 func New() *Engine {
-	return &Engine{
+	eng := &Engine{
 		detector: detector.New(),
 		registry: carriers.GetRegistry(),
 	}
+	if dbPath := os.Getenv(storage.EnvDBPath); dbPath != "" {
+		if st, err := storage.NewStore(dbPath); err == nil {
+			eng.SetStore(st)
+		}
+	}
+	return eng
+}
+
+// NewWithStore creates an Engine backed by a persistent Store.
+func NewWithStore(store storage.Store) *Engine {
+	eng := New()
+	eng.SetStore(store)
+	return eng
+}
+
+// WithStore sets the storage backend on the Engine.
+func (e *Engine) WithStore(store storage.Store) *Engine {
+	e.SetStore(store)
+	return e
+}
+
+// SetStore attaches a storage backend to the Engine.
+func (e *Engine) SetStore(store storage.Store) {
+	e.store = store
+	if store != nil {
+		carriers.SetGlobalOAuthStore(store)
+	}
+}
+
+// Store returns the attached storage backend, or nil if none is configured.
+func (e *Engine) Store() storage.Store {
+	return e.store
 }
 
 // Detector returns the underlying carrier detector engine.
@@ -54,9 +89,22 @@ func (e *Engine) Track(ctx context.Context, trackingNumber string, opts models.T
 		primaryCarrier = c
 		carrierInfo = c.Info()
 	} else {
-		best := e.detector.BestMatch(cleanNumber, opts.DestinationCountry)
-		if best == nil {
+		candidates := e.detector.Detect(cleanNumber, opts.DestinationCountry)
+		if len(candidates) == 0 {
 			return nil, fmt.Errorf("%w: could not automatically detect carrier for tracking number: %s", models.ErrShipmentNotFound, cleanNumber)
+		}
+
+		var best *models.DetectResult
+		if !opts.AllowSimulated {
+			for i := range candidates {
+				if c, ok := e.registry.Get(candidates[i].Carrier.Slug); ok && carriers.HasLiveTracking(c) {
+					best = &candidates[i]
+					break
+				}
+			}
+		}
+		if best == nil {
+			best = &candidates[0]
 		}
 		c, ok := e.registry.Get(best.Carrier.Slug)
 		if !ok {
@@ -72,17 +120,28 @@ func (e *Engine) Track(ctx context.Context, trackingNumber string, opts models.T
 		return nil, fmt.Errorf("%w: carrier %s does not have an active live tracking adapter", models.ErrCarrierNotImplemented, primaryCarrier.Name())
 	}
 
+	// Cache lookup after carrier resolution so live-tracking checks and canonical carrier slug are respected
+	if !opts.ForceRefresh && e.store != nil {
+		cached, found, err := e.store.GetShipment(ctx, primaryCarrier.Slug(), cleanNumber, opts.PostalCode)
+		if err == nil && found && cached != nil {
+			cached.FromCache = true
+			if opts.Language != "" {
+				cached.StatusText = LocalizedStatusText(cached.Status, opts.Language)
+			}
+			return cached, nil
+		}
+	}
+
 	// 2. Track primary carrier
 	primaryShipment, err := primaryCarrier.Track(ctx, cleanNumber, opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed tracking with primary carrier %s: %w", primaryCarrier.Name(), err)
 	}
 
-	finalShipment := primaryShipment
-	finalShipment.Carrier = carrierInfo
+	primaryShipment.Carrier = carrierInfo
 
 	// 3. Multi-carrier chaining: Check if last-mile carrier is present
-	var secondaryEvents []models.TrackingEvent
+	var secShipment *models.Shipment
 	if primaryShipment.LastMileCarrier != nil && primaryShipment.LastMileTrackingNumber != "" {
 		secSlug := primaryShipment.LastMileCarrier.Slug
 		if secCarrier, ok := e.registry.Get(secSlug); ok {
@@ -95,25 +154,16 @@ func (e *Engine) Track(ctx context.Context, trackingNumber string, opts models.T
 				secOpts.DestinationCountry = primaryShipment.LastMileCarrier.Country
 			}
 
-			secShipment, err := secCarrier.Track(secCtx, primaryShipment.LastMileTrackingNumber, secOpts)
-			if err == nil && secShipment != nil && len(secShipment.Events) > 0 {
-				secondaryEvents = secShipment.Events
-				hasCarrier := false
-				for _, ac := range finalShipment.AdditionalCarriers {
-					if strings.EqualFold(ac.Slug, secCarrier.Slug()) {
-						hasCarrier = true
-						break
-					}
-				}
-				if !hasCarrier {
-					finalShipment.AdditionalCarriers = append(finalShipment.AdditionalCarriers, secCarrier.Info())
-				}
-				if secShipment.Destination.Name != "" && finalShipment.Destination.Name == "" {
-					finalShipment.Destination = secShipment.Destination
-				}
+			sShipment, err := secCarrier.Track(secCtx, primaryShipment.LastMileTrackingNumber, secOpts)
+			if err == nil && sShipment != nil && len(sShipment.Events) > 0 {
+				sShipment.Carrier = secCarrier.Info()
+				secShipment = sShipment
 			}
 		}
 	}
+
+	// 4. Merge primary and secondary shipments into a unified chronological timeline
+	finalShipment := MergeShipments(primaryShipment, secShipment)
 
 	// Ensure LastMileCarrier is in AdditionalCarriers
 	if finalShipment.LastMileCarrier != nil {
@@ -129,37 +179,7 @@ func (e *Engine) Track(ctx context.Context, trackingNumber string, opts models.T
 		}
 	}
 
-	// 4. Merge events into a single unified timeline
-	mergedEvents := MergeEvents(primaryShipment.Events, secondaryEvents)
-	finalShipment.Events = mergedEvents
-
-	// 5. Derive unified status and normalize
-	finalShipment.Status = DeriveOverallStatus(mergedEvents)
-
-	// Check if delivered in events or primary shipment
-	for _, ev := range mergedEvents {
-		if ev.Status == models.StatusDelivered {
-			if finalShipment.DeliveredAt == nil {
-				d := ev.Date
-				finalShipment.DeliveredAt = &d
-			}
-			break
-		}
-	}
-	if primaryShipment.Status == models.StatusDelivered || finalShipment.DeliveredAt != nil {
-		finalShipment.Status = models.StatusDelivered
-	}
-
 	finalShipment.StatusText = LocalizedStatusText(finalShipment.Status, opts.Language)
-
-	// 6. Calculate progress percentage and transit days
-	if finalShipment.Status == models.StatusDelivered {
-		finalShipment.Progress = 100
-	} else {
-		finalShipment.Progress = CalculateProgress(finalShipment.Status, mergedEvents)
-	}
-	finalShipment.DaysInTransit = CalculateDaysInTransit(mergedEvents, finalShipment.DeliveredAt)
-	finalShipment.UpdatedAt = time.Now()
 
 	// 7. Multi-carrier Journey: Ensure both Cainiao Global and Correos Express are represented for 323... guides
 	if strings.HasPrefix(cleanNumber, "323") && len(cleanNumber) == 23 {
@@ -213,6 +233,16 @@ func (e *Engine) Track(ctx context.Context, trackingNumber string, opts models.T
 				}
 			}
 		}
+	}
+
+	// Cache successful shipment with smart TTL based on status (never cache transient errors)
+	if e.store != nil && finalShipment != nil && finalShipment.Error == "" && finalShipment.Status != "" {
+		ttl := SmartTTL(finalShipment.Status)
+		carrierSlug := finalShipment.Carrier.Slug
+		if carrierSlug == "" && primaryCarrier != nil {
+			carrierSlug = primaryCarrier.Slug()
+		}
+		_ = e.store.SetShipment(ctx, carrierSlug, cleanNumber, opts.PostalCode, finalShipment, ttl)
 	}
 
 	return finalShipment, nil

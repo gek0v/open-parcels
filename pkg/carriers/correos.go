@@ -96,7 +96,7 @@ func parseCorreosDate(dateStr string) time.Time {
 	}
 
 	for _, layout := range layouts {
-		if t, err := time.ParseInLocation(layout, clean, time.UTC); err == nil {
+		if t, err := ParseLocalTimeWithZone(layout, clean, "Europe/Madrid"); err == nil {
 			return t
 		}
 	}
@@ -140,28 +140,37 @@ func (c *CorreosSpainCarrier) fetchLive(ctx context.Context, trackingNumber, lan
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == http.StatusNotFound {
-		return nil, models.ErrShipmentNotFound
-	}
-	if resp.StatusCode == http.StatusTooManyRequests {
-		return nil, models.ErrCarrierRateLimited
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("%w: HTTP status %d", models.ErrCarrierTemporarilyUnavailable, resp.StatusCode)
-	}
-
 	bodyBytes, err := io.ReadAll(io.LimitReader(resp.Body, 4*1024*1024))
 	if err != nil {
 		return nil, fmt.Errorf("%w: failed to read response body: %v", models.ErrCarrierTemporarilyUnavailable, err)
 	}
 
+	if resp.StatusCode != http.StatusOK {
+		return nil, classifyScraperHTTPStatus(resp.StatusCode, bodyBytes, resp.Header, "Correos Espa?a")
+	}
+
+	if isWAFChallenge(resp.StatusCode, bodyBytes, resp.Header) {
+		return nil, fmt.Errorf("%w: WAF or anti-bot challenge detected from Correos Espa?a", models.ErrCarrierBlocked)
+	}
+
+	var rawMap map[string]any
+	if err := json.Unmarshal(bodyBytes, &rawMap); err != nil {
+		return nil, fmt.Errorf("%w: unexpected non-JSON or malformed response from Correos: %v", models.ErrScraperSchemaChanged, err)
+	}
+	if !hasAnyJSONKey(rawMap, "shipment", "error", "code") {
+		return nil, fmt.Errorf("%w: unexpected JSON schema from Correos", models.ErrScraperSchemaChanged)
+	}
+
 	var cResp correosResponse
 	if err := json.Unmarshal(bodyBytes, &cResp); err != nil {
-		return nil, fmt.Errorf("%w: malformed JSON from Correos: %v", models.ErrCarrierTemporarilyUnavailable, err)
+		return nil, fmt.Errorf("%w: malformed JSON from Correos: %v", models.ErrScraperSchemaChanged, err)
 	}
 
 	if cResp.Shipment == nil {
 		return nil, models.ErrShipmentNotFound
+	}
+	if cResp.Shipment.ShipmentCode == "" && cResp.Shipment.Status == "" && cResp.Shipment.StatusDescription == "" && len(cResp.Shipment.Events) == 0 {
+		return nil, fmt.Errorf("%w: empty or unrecognized shipment payload from Correos", models.ErrScraperSchemaChanged)
 	}
 
 	return &cResp, nil

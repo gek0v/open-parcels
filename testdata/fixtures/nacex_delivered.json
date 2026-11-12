@@ -1,0 +1,36 @@
+{
+  "albaran": "NCX123456789",
+  "agenciaOrigen": "2801 - Madrid",
+  "agenciaDestino": "0801 - Barcelona",
+  "origen": "Madrid",
+  "destino": "Barcelona",
+  "estado": "ENTREGADO",
+  "descripcionEstado": "Env?o entregado al destinatario",
+  "fechaEntrega": "15/11/2024 12:45:00",
+  "eventos": [
+    {
+      "fecha": "15/11/2024 12:45:00",
+      "estado": "ENTREGADO",
+      "descripcion": "Entrega confirmada y firmada por destinatario",
+      "agencia": "0801 - Barcelona"
+    },
+    {
+      "fecha": "15/11/2024 08:30:00",
+      "estado": "EN REPARTO",
+      "descripcion": "Paquete en ruta de reparto con conductor",
+      "agencia": "0801 - Barcelona"
+    },
+    {
+      "fecha": "14/11/2024 21:00:00",
+      "estado": "EN TR?NSITO",
+      "descripcion": "En tr?nsito - Clasificado en plataforma central",
+      "agencia": "Coslada Central"
+    },
+    {
+      "fecha": "14/11/2024 17:15:00",
+      "estado": "RECOGIDO",
+      "descripcion": "Env?o recogido en origen",
+      "agencia": "2801 - Madrid"
+    }
+  ]
+}

@@ -230,3 +230,209 @@ func TestMCPServer(t *testing.T) {
 		t.Fatalf("expected 200 OK for MCP HTTP, got %d", httpRec.Code)
 	}
 }
+
+func TestMCPToolWAFBlockedAndScraperError(t *testing.T) {
+	srv := NewServer(engine.New())
+	ctx := context.Background()
+
+	// 1. WAF 403 -> [CARRIER_BLOCKED]
+	wafFixture, err := carriers.LoadFixture("inpost_waf_blocked.html")
+	if err != nil {
+		t.Fatalf("failed to load waf fixture: %v", err)
+	}
+	teardownWAF := carriers.SetInPostHTTPClientForTest(carriers.NewFixtureClient(http.StatusForbidden, wafFixture, "text/html"))
+	reqWAF := JSONRPCRequest{
+		JSONRPC: "2.0",
+		ID:      101,
+		Method:  "tools/call",
+		Params: map[string]any{
+			"name": "track_shipment",
+			"arguments": map[string]any{
+				"tracking_number": "75616714",
+				"carrier_hint":    "inpost",
+				"postal_code":     "47140",
+			},
+		},
+	}
+	respWAF := srv.handleRequest(ctx, reqWAF)
+	teardownWAF()
+	resWAF := respWAF.Result.(ToolCallResult)
+	if !resWAF.IsError || len(resWAF.Content) == 0 || !strings.Contains(resWAF.Content[0].Text, "CARRIER_BLOCKED") {
+		t.Errorf("expected [CARRIER_BLOCKED] error result, got: %+v", resWAF)
+	}
+
+	// 2. Broken schema -> [SCRAPER_ERROR]
+	brokenFixture, err := carriers.LoadFixture("inpost_broken_schema.html")
+	if err != nil {
+		t.Fatalf("failed to load broken schema fixture: %v", err)
+	}
+	teardownBroken := carriers.SetInPostHTTPClientForTest(carriers.NewFixtureClient(http.StatusOK, brokenFixture, "text/html"))
+	reqBroken := JSONRPCRequest{
+		JSONRPC: "2.0",
+		ID:      102,
+		Method:  "tools/call",
+		Params: map[string]any{
+			"name": "track_shipment",
+			"arguments": map[string]any{
+				"tracking_number": "75616714",
+				"carrier_hint":    "inpost",
+				"postal_code":     "47140",
+			},
+		},
+	}
+	respBroken := srv.handleRequest(ctx, reqBroken)
+	teardownBroken()
+	resBroken := respBroken.Result.(ToolCallResult)
+	if !resBroken.IsError || len(resBroken.Content) == 0 || !strings.Contains(resBroken.Content[0].Text, "SCRAPER_ERROR") {
+		t.Errorf("expected [SCRAPER_ERROR] error result, got: %+v", resBroken)
+	}
+}
+
+func TestMCPHTTPAuthentication(t *testing.T) {
+	eng := engine.New()
+	srv := NewServer(eng)
+
+	initPayload, _ := json.Marshal(JSONRPCRequest{
+		JSONRPC: "2.0",
+		ID:      1,
+		Method:  "ping",
+	})
+
+	// 1. Open mode without API keys configured -> 200 OK
+	reqOpen := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(string(initPayload)))
+	recOpen := httptest.NewRecorder()
+	srv.HandleHTTP(recOpen, reqOpen)
+	if recOpen.Code != http.StatusOK {
+		t.Fatalf("open mode: expected 200 OK, got %d", recOpen.Code)
+	}
+
+	// 2. Enable API keys
+	srv.SetAPIKeys([]string{"mcp-secret-1", "mcp-secret-2"})
+
+	// Missing credentials -> 401 Unauthorized
+	reqNoAuth := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(string(initPayload)))
+	recNoAuth := httptest.NewRecorder()
+	srv.HandleHTTP(recNoAuth, reqNoAuth)
+	if recNoAuth.Code != http.StatusUnauthorized {
+		t.Fatalf("no auth: expected 401 Unauthorized, got %d", recNoAuth.Code)
+	}
+
+	var errResp struct {
+		Error struct {
+			Code    string `json:"code"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal(recNoAuth.Body.Bytes(), &errResp); err != nil {
+		t.Fatalf("expected valid JSON error response, got err: %v", err)
+	}
+	if errResp.Error.Code != "UNAUTHORIZED" {
+		t.Errorf("expected error code UNAUTHORIZED, got %s", errResp.Error.Code)
+	}
+
+	// Wrong Bearer token -> 401 Unauthorized
+	reqBadBearer := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(string(initPayload)))
+	reqBadBearer.Header.Set("Authorization", "Bearer wrong-token")
+	recBadBearer := httptest.NewRecorder()
+	srv.HandleHTTP(recBadBearer, reqBadBearer)
+	if recBadBearer.Code != http.StatusUnauthorized {
+		t.Fatalf("bad bearer: expected 401 Unauthorized, got %d", recBadBearer.Code)
+	}
+
+	// Wrong X-API-Key -> 401 Unauthorized
+	reqBadKey := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(string(initPayload)))
+	reqBadKey.Header.Set("X-API-Key", "wrong-key")
+	recBadKey := httptest.NewRecorder()
+	srv.HandleHTTP(recBadKey, reqBadKey)
+	if recBadKey.Code != http.StatusUnauthorized {
+		t.Fatalf("bad x-api-key: expected 401 Unauthorized, got %d", recBadKey.Code)
+	}
+
+	// Valid Bearer token -> 200 OK
+	reqGoodBearer := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(string(initPayload)))
+	reqGoodBearer.Header.Set("Authorization", "Bearer mcp-secret-1")
+	recGoodBearer := httptest.NewRecorder()
+	srv.HandleHTTP(recGoodBearer, reqGoodBearer)
+	if recGoodBearer.Code != http.StatusOK {
+		t.Fatalf("good bearer: expected 200 OK, got %d: %s", recGoodBearer.Code, recGoodBearer.Body.String())
+	}
+
+	// Valid case-insensitive bearer -> 200 OK
+	reqLowerBearer := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(string(initPayload)))
+	reqLowerBearer.Header.Set("Authorization", "bearer mcp-secret-1")
+	recLowerBearer := httptest.NewRecorder()
+	srv.HandleHTTP(recLowerBearer, reqLowerBearer)
+	if recLowerBearer.Code != http.StatusOK {
+		t.Fatalf("lowercase bearer: expected 200 OK, got %d", recLowerBearer.Code)
+	}
+
+	// Valid X-API-Key -> 200 OK
+	reqGoodKey := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(string(initPayload)))
+	reqGoodKey.Header.Set("X-API-Key", "mcp-secret-2")
+	recGoodKey := httptest.NewRecorder()
+	srv.HandleHTTP(recGoodKey, reqGoodKey)
+	if recGoodKey.Code != http.StatusOK {
+		t.Fatalf("good x-api-key: expected 200 OK, got %d: %s", recGoodKey.Code, recGoodKey.Body.String())
+	}
+}
+
+func TestMCPEnvAPIKeys(t *testing.T) {
+	t.Setenv("OPEN_PARCELS_API_KEY", "env-single-key")
+	t.Setenv("OPEN_PARCELS_API_KEYS", "env-multi-1, env-multi-2")
+
+	srv := NewServer(engine.New())
+	initPayload, _ := json.Marshal(JSONRPCRequest{
+		JSONRPC: "2.0",
+		ID:      1,
+		Method:  "ping",
+	})
+
+	for _, key := range []string{"env-single-key", "env-multi-1", "env-multi-2"} {
+		req := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(string(initPayload)))
+		req.Header.Set("X-API-Key", key)
+		rec := httptest.NewRecorder()
+		srv.HandleHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Errorf("expected 200 OK for env key %q, got %d", key, rec.Code)
+		}
+	}
+
+	reqNoAuth := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(string(initPayload)))
+	recNoAuth := httptest.NewRecorder()
+	srv.HandleHTTP(recNoAuth, reqNoAuth)
+	if recNoAuth.Code != http.StatusUnauthorized {
+		t.Errorf("expected 401 Unauthorized without key when env set, got %d", recNoAuth.Code)
+	}
+}
+
+func TestMCPAuthMiddleware(t *testing.T) {
+	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	})
+
+	// Open mode
+	openHandler := AuthMiddleware(nil, inner)
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	rec := httptest.NewRecorder()
+	openHandler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200 in open mode middleware, got %d", rec.Code)
+	}
+
+	// Protected mode
+	protectedHandler := AuthMiddleware([]string{"mw-secret"}, inner)
+	recFail := httptest.NewRecorder()
+	protectedHandler.ServeHTTP(recFail, req)
+	if recFail.Code != http.StatusUnauthorized {
+		t.Errorf("expected 401 in protected middleware, got %d", recFail.Code)
+	}
+
+	reqOk := httptest.NewRequest(http.MethodGet, "/test", nil)
+	reqOk.Header.Set("Authorization", "Bearer mw-secret")
+	recOk := httptest.NewRecorder()
+	protectedHandler.ServeHTTP(recOk, reqOk)
+	if recOk.Code != http.StatusOK {
+		t.Errorf("expected 200 with valid key in protected middleware, got %d", recOk.Code)
+	}
+}

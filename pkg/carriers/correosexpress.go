@@ -89,7 +89,7 @@ func parseCorreosExpressDate(fechaStr, horaStr string) time.Time {
 	}
 
 	for _, layout := range layouts {
-		if t, err := time.ParseInLocation(layout, combined, time.UTC); err == nil {
+		if t, err := ParseLocalTimeWithZone(layout, combined, "Europe/Madrid"); err == nil {
 			return t
 		}
 	}
@@ -131,24 +131,30 @@ func (c *CorreosExpressCarrier) fetchLive(ctx context.Context, trackingNumber st
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == http.StatusNotFound {
-		return nil, models.ErrShipmentNotFound
-	}
-	if resp.StatusCode == http.StatusTooManyRequests {
-		return nil, models.ErrCarrierRateLimited
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("%w: HTTP status %d", models.ErrCarrierTemporarilyUnavailable, resp.StatusCode)
-	}
-
 	bodyBytes, err := io.ReadAll(io.LimitReader(resp.Body, 4*1024*1024))
 	if err != nil {
 		return nil, fmt.Errorf("%w: failed to read response body: %v", models.ErrCarrierTemporarilyUnavailable, err)
 	}
 
+	if resp.StatusCode != http.StatusOK {
+		return nil, classifyScraperHTTPStatus(resp.StatusCode, bodyBytes, resp.Header, "Correos Express")
+	}
+
+	if isWAFChallenge(resp.StatusCode, bodyBytes, resp.Header) {
+		return nil, fmt.Errorf("%w: WAF or anti-bot challenge detected from Correos Express", models.ErrCarrierBlocked)
+	}
+
+	var rawMap map[string]any
+	if err := json.Unmarshal(bodyBytes, &rawMap); err != nil {
+		return nil, fmt.Errorf("%w: unexpected non-JSON or malformed response from Correos Express: %v", models.ErrScraperSchemaChanged, err)
+	}
+	if !hasAnyJSONKey(rawMap, "codigoError", "codEnvio", "estado", "posicion") {
+		return nil, fmt.Errorf("%w: unexpected JSON schema from Correos Express", models.ErrScraperSchemaChanged)
+	}
+
 	var ceResp correosExpressResponse
 	if err := json.Unmarshal(bodyBytes, &ceResp); err != nil {
-		return nil, fmt.Errorf("%w: malformed JSON from Correos Express: %v", models.ErrCarrierTemporarilyUnavailable, err)
+		return nil, fmt.Errorf("%w: malformed JSON from Correos Express: %v", models.ErrScraperSchemaChanged, err)
 	}
 
 	if ceResp.CodigoError != "" && ceResp.CodigoError != "0" {

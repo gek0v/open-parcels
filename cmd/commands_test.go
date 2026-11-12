@@ -1,8 +1,12 @@
 package cmd
 
 import (
+	"errors"
+	"fmt"
 	"reflect"
 	"testing"
+
+	"open-parcels/pkg/models"
 )
 
 func TestNormalizeArgsWithPositional(t *testing.T) {
@@ -63,5 +67,60 @@ func TestNormalizeArgsWithPositional(t *testing.T) {
 				t.Errorf("flags mismatch: expected %v, got %v", tt.expectedFlags, flags)
 			}
 		})
+	}
+}
+
+func TestClassifyTrackError(t *testing.T) {
+	tests := []struct {
+		name         string
+		err          error
+		expectedCode string
+	}{
+		{"carrier blocked", fmt.Errorf("wrapped: %w", models.ErrCarrierBlocked), "CARRIER_BLOCKED"},
+		{"scraper schema changed", fmt.Errorf("wrapped: %w", models.ErrScraperSchemaChanged), "SCRAPER_ERROR"},
+		{"rate limited", models.ErrCarrierRateLimited, "CARRIER_RATE_LIMITED"},
+		{"missing postal code", models.ErrPostalCodeRequired, "MISSING_POSTAL_CODE"},
+		{"not implemented", models.ErrCarrierNotImplemented, "NOT_IMPLEMENTED"},
+		{"not found", models.ErrShipmentNotFound, "NOT_FOUND"},
+		{"unknown fallback", errors.New("unexpected failure"), "NOT_FOUND"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			code, suggestion := classifyTrackError(tt.err)
+			if code != tt.expectedCode {
+				t.Errorf("expected code %s, got %s", tt.expectedCode, code)
+			}
+			if suggestion == "" {
+				t.Errorf("expected non-empty suggestion")
+			}
+		})
+	}
+}
+
+func TestParseServeFlags(t *testing.T) {
+	cfg, err := parseServeFlags([]string{"--port", "9090", "--mcp=false", "--api-key", "k1,k2", "--rate-limit", "120/m", "--rate-burst", "10"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Port != 9090 {
+		t.Errorf("expected port 9090, got %d", cfg.Port)
+	}
+	if cfg.EnableMCP {
+		t.Errorf("expected EnableMCP false")
+	}
+	if cfg.APIKey != "k1,k2" {
+		t.Errorf("expected APIKey 'k1,k2', got %q", cfg.APIKey)
+	}
+	if cfg.RateLimit != 2.0 {
+		t.Errorf("expected RateLimit 2.0, got %v", cfg.RateLimit)
+	}
+	if cfg.RateBurst != 10 {
+		t.Errorf("expected RateBurst 10, got %d", cfg.RateBurst)
+	}
+
+	_, err = parseServeFlags([]string{"--rate-limit", "invalid"})
+	if err == nil {
+		t.Errorf("expected error for invalid rate-limit flag")
 	}
 }

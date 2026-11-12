@@ -15,8 +15,8 @@ func TestInPostMissingPostalCode(t *testing.T) {
 		AllowSimulated: false,
 		PostalCode:     "",
 	})
-	if !errors.Is(err, models.ErrMissingPostalCode) {
-		t.Fatalf("expected ErrMissingPostalCode, got: %v", err)
+	if !errors.Is(err, models.ErrPostalCodeRequired) {
+		t.Fatalf("expected ErrPostalCodeRequired, got: %v", err)
 	}
 
 	cSpain := NewInPostSpainCarrier()
@@ -24,8 +24,8 @@ func TestInPostMissingPostalCode(t *testing.T) {
 		AllowSimulated: false,
 		PostalCode:     "",
 	})
-	if !errors.Is(errSpain, models.ErrMissingPostalCode) {
-		t.Fatalf("expected ErrMissingPostalCode for inpost-es, got: %v", errSpain)
+	if !errors.Is(errSpain, models.ErrPostalCodeRequired) {
+		t.Fatalf("expected ErrPostalCodeRequired for inpost-es, got: %v", errSpain)
 	}
 }
 
@@ -142,6 +142,55 @@ func TestInPostOriginAndDestinationDetermination(t *testing.T) {
 	destSpainCarrier := resolveInPostDestination(cSpain, "", models.TrackOptions{})
 	if destSpainCarrier.Name != "Spain" || destSpainCarrier.Code != "ES" {
 		t.Errorf("expected Spain / ES for inpost-es, got %+v", destSpainCarrier)
+	}
+}
+
+func TestInPostWAFBlockedFixture(t *testing.T) {
+	fixtureData, err := LoadFixture("inpost_waf_blocked.html")
+	if err != nil {
+		t.Fatalf("failed to load fixture: %v", err)
+	}
+
+	// 1. WAF challenge with HTTP 403
+	teardown403 := SetInPostHTTPClientForTest(NewFixtureClient(http.StatusForbidden, fixtureData, "text/html"))
+	c := NewInPostCarrier()
+	_, err = c.Track(context.Background(), "75616714", models.TrackOptions{PostalCode: "47140"})
+	teardown403()
+	if err == nil {
+		t.Fatalf("expected ErrCarrierBlocked for WAF 403, got nil")
+	}
+	if !errors.Is(err, models.ErrCarrierBlocked) {
+		t.Errorf("expected ErrCarrierBlocked for WAF 403, got: %v", err)
+	}
+
+	// 2. WAF challenge page served with HTTP 200
+	teardown200 := SetInPostHTTPClientForTest(NewFixtureClient(http.StatusOK, fixtureData, "text/html"))
+	_, err = c.Track(context.Background(), "75616714", models.TrackOptions{PostalCode: "47140"})
+	teardown200()
+	if err == nil {
+		t.Fatalf("expected ErrCarrierBlocked for Cloudflare challenge body, got nil")
+	}
+	if !errors.Is(err, models.ErrCarrierBlocked) {
+		t.Errorf("expected ErrCarrierBlocked for Cloudflare challenge body, got: %v", err)
+	}
+}
+
+func TestInPostBrokenSchemaFixture(t *testing.T) {
+	fixtureData, err := LoadFixture("inpost_broken_schema.html")
+	if err != nil {
+		t.Fatalf("failed to load fixture: %v", err)
+	}
+
+	teardown := SetInPostHTTPClientForTest(NewFixtureClient(http.StatusOK, fixtureData, "text/html"))
+	defer teardown()
+
+	c := NewInPostCarrier()
+	_, err = c.Track(context.Background(), "75616714", models.TrackOptions{PostalCode: "47140"})
+	if err == nil {
+		t.Fatalf("expected ErrScraperSchemaChanged, got nil")
+	}
+	if !errors.Is(err, models.ErrScraperSchemaChanged) {
+		t.Errorf("expected ErrScraperSchemaChanged, got: %v", err)
 	}
 }
 

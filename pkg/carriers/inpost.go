@@ -3,7 +3,6 @@ package carriers
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"html"
 	"io"
@@ -114,7 +113,7 @@ func trackInPostShared(
 	postalCode := strings.TrimSpace(opts.PostalCode)
 	if postalCode == "" {
 		if !opts.AllowSimulated {
-			return nil, models.ErrMissingPostalCode
+			return nil, fmt.Errorf("%w: InPost tracking requires destination postal code (--postal-code <CP>)", models.ErrPostalCodeRequired)
 		}
 		if simulatedFn != nil {
 			return simulatedFn(trackingNumber, opts), nil
@@ -131,10 +130,7 @@ func trackInPostShared(
 		return simulatedFn(trackingNumber, opts), nil
 	}
 
-	if errors.Is(err, models.ErrMissingPostalCode) || errors.Is(err, models.ErrPostalCodeRequired) {
-		return nil, err
-	}
-	if errors.Is(err, models.ErrCarrierTemporarilyUnavailable) || errors.Is(err, models.ErrCarrierRateLimited) {
+	if err != nil {
 		return nil, err
 	}
 
@@ -148,11 +144,11 @@ func fetchInPostLive(ctx context.Context, carrier Carrier, trackingNumber, posta
 		url.QueryEscape(postalCode),
 	)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, targetURL, nil)
+	req, err := NewCarrierRequest(http.MethodGet, targetURL)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %v", models.ErrCarrierTemporarilyUnavailable, err)
 	}
-
+	req = req.WithContext(ctx)
 	req.Header.Set("User-Agent", ResolveUserAgent())
 	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
 	req.Header.Set("Accept-Language", "es-ES,es;q=0.9,en;q=0.8")
@@ -163,20 +159,19 @@ func fetchInPostLive(ctx context.Context, carrier Carrier, trackingNumber, posta
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == http.StatusNotFound {
-		return nil, models.ErrShipmentNotFound
-	}
-	if resp.StatusCode == http.StatusTooManyRequests {
-		return nil, models.ErrCarrierRateLimited
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("%w: HTTP status %d", models.ErrCarrierTemporarilyUnavailable, resp.StatusCode)
-	}
-
 	bodyBytes, err := io.ReadAll(io.LimitReader(resp.Body, 4*1024*1024))
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", models.ErrCarrierTemporarilyUnavailable, err)
+		return nil, fmt.Errorf("%w: failed to read response body: %v", models.ErrCarrierTemporarilyUnavailable, err)
 	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, classifyScraperHTTPStatus(resp.StatusCode, bodyBytes, resp.Header, "InPost")
+	}
+
+	if isWAFChallenge(resp.StatusCode, bodyBytes, resp.Header) {
+		return nil, fmt.Errorf("%w: WAF or anti-bot challenge detected in InPost response", models.ErrCarrierBlocked)
+	}
+
 	htmlContent := string(bodyBytes)
 
 	if strings.Contains(htmlContent, "Paquete no encontrado") || strings.Contains(htmlContent, "paquete no encontrado") {
@@ -185,17 +180,23 @@ func fetchInPostLive(ctx context.Context, carrier Carrier, trackingNumber, posta
 
 	propsJSON, err := extractInPostProps(htmlContent)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %v", models.ErrScraperSchemaChanged, err)
 	}
 
 	var rawData map[string]any
 	if err := json.Unmarshal([]byte(propsJSON), &rawData); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal InPost props: %w", err)
+		return nil, fmt.Errorf("%w: failed to unmarshal InPost props: %v", models.ErrScraperSchemaChanged, err)
 	}
 
 	statusVal, ok := unwrapAstroInt(rawData["trackingDetailsStatus"])
 	if !ok {
-		return nil, models.ErrShipmentNotFound
+		return nil, fmt.Errorf("%w: missing or invalid trackingDetailsStatus in InPost props", models.ErrScraperSchemaChanged)
+	}
+	if statusVal == http.StatusForbidden {
+		return nil, fmt.Errorf("%w: InPost trackingDetailsStatus 403", models.ErrCarrierBlocked)
+	}
+	if statusVal == http.StatusTooManyRequests {
+		return nil, fmt.Errorf("%w: %w: InPost trackingDetailsStatus 429", models.ErrCarrierRateLimited, models.ErrCarrierBlocked)
 	}
 	if statusVal == http.StatusConflict {
 		return nil, models.ErrPostalCodeRequired
@@ -206,11 +207,17 @@ func fetchInPostLive(ctx context.Context, carrier Carrier, trackingNumber, posta
 
 	tdMap := unwrapAstroMap(rawData["trackingDetails"])
 	if tdMap == nil {
-		return nil, models.ErrShipmentNotFound
+		return nil, fmt.Errorf("%w: missing or invalid trackingDetails in InPost props", models.ErrScraperSchemaChanged)
 	}
 
-	milestonesRaw := tdMap["milestones"]
+	milestonesRaw, hasMilestones := tdMap["milestones"]
+	if !hasMilestones {
+		return nil, fmt.Errorf("%w: missing milestones field in InPost trackingDetails", models.ErrScraperSchemaChanged)
+	}
 	milestonesList := unwrapAstroList(milestonesRaw)
+	if milestonesList == nil {
+		return nil, fmt.Errorf("%w: invalid milestones structure in InPost trackingDetails", models.ErrScraperSchemaChanged)
+	}
 	if len(milestonesList) == 0 {
 		return nil, models.ErrShipmentNotFound
 	}
@@ -496,7 +503,7 @@ func parseInPostDate(dateStr string) (time.Time, error) {
 		"2006-01-02",
 	}
 	for _, f := range formats {
-		if t, err := time.Parse(f, dateStr); err == nil {
+		if t, err := ParseLocalTimeWithZone(f, dateStr, "Europe/Madrid"); err == nil {
 			return t, nil
 		}
 	}

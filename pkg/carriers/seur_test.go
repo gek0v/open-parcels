@@ -99,3 +99,28 @@ func TestSEURRateLimitAndUnavailable(t *testing.T) {
 		t.Errorf("expected ErrCarrierTemporarilyUnavailable, got: %v", err)
 	}
 }
+
+func TestSEURWAFBlockedAndBrokenSchema(t *testing.T) {
+	c := NewSEURCarrier()
+
+	// 1. HTTP 403 WAF Blocked
+	teardown403 := SetSEURHTTPClientForTest(NewFixtureClient(http.StatusForbidden, []byte("Access Denied - Firewall"), "text/html"))
+	_, err := c.Track(context.Background(), "36150127630406", models.TrackOptions{PostalCode: "08001"})
+	teardown403()
+	if !errors.Is(err, models.ErrCarrierBlocked) {
+		t.Errorf("expected ErrCarrierBlocked for HTTP 403, got: %v", err)
+	}
+
+	// 2. Broken schema fixture
+	brokenFixture, err := LoadFixture("seur_broken_schema.json")
+	if err != nil {
+		t.Fatalf("failed to load fixture: %v", err)
+	}
+	teardownSchema := SetSEURHTTPClientForTest(NewFixtureClient(http.StatusOK, brokenFixture, "application/json"))
+	_, err = c.Track(context.Background(), "36150127630406", models.TrackOptions{PostalCode: "08001"})
+	teardownSchema()
+	if !errors.Is(err, models.ErrScraperSchemaChanged) {
+		t.Errorf("expected ErrScraperSchemaChanged for broken schema fixture, got: %v", err)
+	}
+}
+

@@ -1,0 +1,40 @@
+{
+  "shipmentCode": "0001234567890123456789",
+  "status": "DELIVERED",
+  "statusDescription": "Env?o entregado al destinatario",
+  "deliveryDate": "2024-11-15T16:20:00Z",
+  "origin": {
+    "name": "Madrid",
+    "country": "ES"
+  },
+  "destination": {
+    "name": "Sevilla",
+    "country": "ES"
+  },
+  "events": [
+    {
+      "date": "2024-11-15T16:20:00Z",
+      "status": "DELIVERED",
+      "description": "Env?o entregado al destinatario en el domicilio",
+      "location": "Sevilla"
+    },
+    {
+      "date": "2024-11-15T08:30:00Z",
+      "status": "OUT_FOR_DELIVERY",
+      "description": "En reparto - Asignado a transportista",
+      "location": "Sevilla"
+    },
+    {
+      "date": "2024-11-14T21:40:00Z",
+      "status": "IN_TRANSIT",
+      "description": "En tr?nsito en centro de distribuci?n central",
+      "location": "Madrid Plataforma"
+    },
+    {
+      "date": "2024-11-14T15:10:00Z",
+      "status": "PRE_REGISTERED",
+      "description": "Env?o pre-registrado telem?ticamente",
+      "location": "Madrid"
+    }
+  ]
+}
