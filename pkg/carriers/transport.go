@@ -92,19 +92,68 @@ func ResolveUserAgent() string {
 	return DefaultCarrierUserAgent
 }
 
-// ResolveProxyURL returns the proxy URL configured in OPEN_PARCELS_PROXY_URL, HTTP_PROXY, or HTTPS_PROXY.
+// ResolveProxyURL returns the proxy URL configured in OPEN_PARCELS_PROXY, OPEN_PARCELS_PROXY_URL, HTTPS_PROXY, or HTTP_PROXY.
 func ResolveProxyURL() string {
-	if proxy := os.Getenv("OPEN_PARCELS_PROXY_URL"); proxy != "" {
-		return proxy
+	for _, key := range []string{
+		"OPEN_PARCELS_PROXY",
+		"OPEN_PARCELS_PROXY_URL",
+		"HTTPS_PROXY",
+		"https_proxy",
+		"HTTP_PROXY",
+		"http_proxy",
+	} {
+		if proxy := strings.TrimSpace(os.Getenv(key)); proxy != "" {
+			return proxy
+		}
 	}
-	if proxy := os.Getenv("HTTPS_PROXY"); proxy != "" {
-		return proxy
-	}
-	return os.Getenv("HTTP_PROXY")
+	return ""
 }
 
-// NewCarrierHTTPClient builds a properly configured http.Client with proxy support, TLS settings, and timeout.
+// ResolveProxy resolves the proxy URL for an outgoing HTTP request.
+// Supports http://, https://, socks5://, and socks5h:// URLs configured via
+// OPEN_PARCELS_PROXY / OPEN_PARCELS_PROXY_URL, falling back to HTTP(S)_PROXY or http.ProxyFromEnvironment.
+func ResolveProxy(req *http.Request) (*url.URL, error) {
+	for _, key := range []string{"OPEN_PARCELS_PROXY", "OPEN_PARCELS_PROXY_URL"} {
+		if proxyStr := strings.TrimSpace(os.Getenv(key)); proxyStr != "" {
+			if !strings.Contains(proxyStr, "://") {
+				proxyStr = "http://" + proxyStr
+			}
+			return url.Parse(proxyStr)
+		}
+	}
+
+	if req != nil && req.URL != nil && strings.EqualFold(req.URL.Scheme, "https") {
+		for _, k := range []string{"HTTPS_PROXY", "https_proxy"} {
+			if p := strings.TrimSpace(os.Getenv(k)); p != "" {
+				if !strings.Contains(p, "://") {
+					p = "http://" + p
+				}
+				return url.Parse(p)
+			}
+		}
+	}
+	for _, k := range []string{"HTTP_PROXY", "http_proxy"} {
+		if p := strings.TrimSpace(os.Getenv(k)); p != "" {
+			if !strings.Contains(p, "://") {
+				p = "http://" + p
+			}
+			return url.Parse(p)
+		}
+	}
+
+	return http.ProxyFromEnvironment(req)
+}
+
+// NewCarrierHTTPClient builds a properly configured http.Client with HTTP/HTTPS/SOCKS5 proxy support, TLS settings, and timeout.
 func NewCarrierHTTPClient(timeout time.Duration) *http.Client {
+	return NewCarrierHTTPClientWithConfig(TransportConfig{
+		Timeout: timeout,
+	})
+}
+
+// NewCarrierHTTPClientWithConfig builds a configured http.Client from TransportConfig.
+func NewCarrierHTTPClientWithConfig(cfg TransportConfig) *http.Client {
+	timeout := cfg.Timeout
 	if timeout <= 0 {
 		timeout = DefaultRequestTimeout
 	}
@@ -115,15 +164,16 @@ func NewCarrierHTTPClient(timeout time.Duration) *http.Client {
 		MaxIdleConnsPerHost: 20,
 		IdleConnTimeout:     60 * time.Second,
 		DisableCompression: false,
+		Proxy:               ResolveProxy,
 	}
 
-	proxyStr := ResolveProxyURL()
-	if proxyStr != "" {
+	if proxyStr := strings.TrimSpace(cfg.ProxyURL); proxyStr != "" {
+		if !strings.Contains(proxyStr, "://") {
+			proxyStr = "http://" + proxyStr
+		}
 		if parsedURL, err := url.Parse(proxyStr); err == nil {
 			transport.Proxy = http.ProxyURL(parsedURL)
 		}
-	} else {
-		transport.Proxy = http.ProxyFromEnvironment
 	}
 
 	return &http.Client{

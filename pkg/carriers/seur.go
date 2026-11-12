@@ -124,24 +124,30 @@ func (c *SEURCarrier) fetchLive(ctx context.Context, trackingNumber, postalCode 
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == http.StatusNotFound {
-		return nil, models.ErrShipmentNotFound
-	}
-	if resp.StatusCode == http.StatusTooManyRequests {
-		return nil, models.ErrCarrierRateLimited
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("%w: HTTP status %d", models.ErrCarrierTemporarilyUnavailable, resp.StatusCode)
-	}
-
 	bodyBytes, err := io.ReadAll(io.LimitReader(resp.Body, 4*1024*1024))
 	if err != nil {
 		return nil, fmt.Errorf("%w: failed to read response body: %v", models.ErrCarrierTemporarilyUnavailable, err)
 	}
 
+	if resp.StatusCode != http.StatusOK {
+		return nil, classifyScraperHTTPStatus(resp.StatusCode, bodyBytes, resp.Header, "SEUR")
+	}
+
+	if isWAFChallenge(resp.StatusCode, bodyBytes, resp.Header) {
+		return nil, fmt.Errorf("%w: WAF or anti-bot challenge detected from SEUR", models.ErrCarrierBlocked)
+	}
+
+	var rawMap map[string]any
+	if err := json.Unmarshal(bodyBytes, &rawMap); err != nil {
+		return nil, fmt.Errorf("%w: unexpected non-JSON or malformed response from SEUR: %v", models.ErrScraperSchemaChanged, err)
+	}
+	if !hasAnyJSONKey(rawMap, "codigoSeguimiento", "estado", "eventos") {
+		return nil, fmt.Errorf("%w: unexpected JSON schema from SEUR", models.ErrScraperSchemaChanged)
+	}
+
 	var sResp seurResponse
 	if err := json.Unmarshal(bodyBytes, &sResp); err != nil {
-		return nil, fmt.Errorf("%w: malformed JSON from SEUR: %v", models.ErrCarrierTemporarilyUnavailable, err)
+		return nil, fmt.Errorf("%w: malformed JSON from SEUR: %v", models.ErrScraperSchemaChanged, err)
 	}
 
 	if sResp.Estado == "NO_ENCONTRADO" || (len(sResp.Eventos) == 0 && sResp.Estado == "") {

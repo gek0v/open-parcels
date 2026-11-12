@@ -413,3 +413,106 @@ func TestParcelsAppTTLExpiration(t *testing.T) {
 		t.Errorf("expected 404 for expired record, got %d", rec.Code)
 	}
 }
+
+func TestTrackV1WAFBlockedAndScraperSchemaChanged(t *testing.T) {
+	srv := setupTestServer()
+
+	// 1. WAF 403 -> 503 CARRIER_BLOCKED
+	wafFixture, err := carriers.LoadFixture("inpost_waf_blocked.html")
+	if err != nil {
+		t.Fatalf("failed to load waf fixture: %v", err)
+	}
+	teardownWAF := carriers.SetInPostHTTPClientForTest(carriers.NewFixtureClient(http.StatusForbidden, wafFixture, "text/html"))
+
+	reqWAF := httptest.NewRequest(http.MethodGet, "/api/v1/track?number=75616714&carrier=inpost&postal_code=47140", nil)
+	recWAF := httptest.NewRecorder()
+	srv.handleTrackV1(recWAF, reqWAF)
+	teardownWAF()
+
+	if recWAF.Code != http.StatusServiceUnavailable {
+		t.Errorf("expected 503 Service Unavailable for WAF block, got %d: %s", recWAF.Code, recWAF.Body.String())
+	}
+	var errRespWAF map[string]any
+	if err := json.Unmarshal(recWAF.Body.Bytes(), &errRespWAF); err != nil {
+		t.Fatalf("invalid json error response: %v", err)
+	}
+	if errObj, ok := errRespWAF["error"].(map[string]any); !ok || errObj["code"] != "CARRIER_BLOCKED" {
+		t.Errorf("expected code CARRIER_BLOCKED, got %v", errRespWAF)
+	}
+
+	// 2. Broken HTML schema -> 502 SCRAPER_ERROR
+	brokenFixture, err := carriers.LoadFixture("inpost_broken_schema.html")
+	if err != nil {
+		t.Fatalf("failed to load broken schema fixture: %v", err)
+	}
+	teardownBroken := carriers.SetInPostHTTPClientForTest(carriers.NewFixtureClient(http.StatusOK, brokenFixture, "text/html"))
+
+	reqBroken := httptest.NewRequest(http.MethodGet, "/api/v1/track?number=75616714&carrier=inpost&postal_code=47140", nil)
+	recBroken := httptest.NewRecorder()
+	srv.handleTrackV1(recBroken, reqBroken)
+	teardownBroken()
+
+	if recBroken.Code != http.StatusBadGateway {
+		t.Errorf("expected 502 Bad Gateway for scraper schema change, got %d: %s", recBroken.Code, recBroken.Body.String())
+	}
+	var errRespBroken map[string]any
+	if err := json.Unmarshal(recBroken.Body.Bytes(), &errRespBroken); err != nil {
+		t.Fatalf("invalid json error response: %v", err)
+	}
+	if errObj, ok := errRespBroken["error"].(map[string]any); !ok || errObj["code"] != "SCRAPER_ERROR" {
+		t.Errorf("expected code SCRAPER_ERROR, got %v", errRespBroken)
+	}
+}
+
+func TestParcelsAppWAFBlockedAndScraperError(t *testing.T) {
+	srv := setupTestServer()
+
+	// 1. Blocked via WAF 403
+	teardownCorreosWAF := carriers.SetCorreosHTTPClientForTest(carriers.NewFixtureClient(http.StatusForbidden, []byte("WAF Blocked"), "text/html"))
+	payload := models.ParcelsAppTrackingRequest{
+		Language: "es",
+		Shipments: []models.ParcelsAppShipmentIn{
+			{TrackingNumber: "PQ4F6P07000000000000000", CarrierHint: "correos-spain"},
+		},
+	}
+	body, _ := json.Marshal(payload)
+	req := httptest.NewRequest(http.MethodPost, "/trackings", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+	srv.handleParcelsAppTrackings(rec, req)
+	teardownCorreosWAF()
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 when all shipments rejected, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var res map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &res); err != nil {
+		t.Fatalf("invalid json: %v", err)
+	}
+	errMap := res["error"].(map[string]any)
+	rejected := errMap["rejected"].([]any)
+	if len(rejected) != 1 || rejected[0].(map[string]any)["code"] != "CARRIER_BLOCKED" {
+		t.Errorf("expected rejected item with CARRIER_BLOCKED, got %v", rejected)
+	}
+
+	// 2. Broken schema
+	brokenFixture, err := carriers.LoadFixture("correos_broken_schema.json")
+	if err != nil {
+		t.Fatalf("failed to load fixture: %v", err)
+	}
+	teardownCorreosSchema := carriers.SetCorreosHTTPClientForTest(carriers.NewFixtureClient(http.StatusOK, brokenFixture, "application/json"))
+	req2 := httptest.NewRequest(http.MethodPost, "/trackings", bytes.NewReader(body))
+	rec2 := httptest.NewRecorder()
+	srv.handleParcelsAppTrackings(rec2, req2)
+	teardownCorreosSchema()
+
+	var res2 map[string]any
+	if err := json.Unmarshal(rec2.Body.Bytes(), &res2); err != nil {
+		t.Fatalf("invalid json: %v", err)
+	}
+	errMap2 := res2["error"].(map[string]any)
+	rejected2 := errMap2["rejected"].([]any)
+	if len(rejected2) != 1 || rejected2[0].(map[string]any)["code"] != "SCRAPER_ERROR" {
+		t.Errorf("expected rejected item with SCRAPER_ERROR, got %v", rejected2)
+	}
+}
+

@@ -21,4 +21,10 @@ var (
 
 	// ErrCarrierTemporarilyUnavailable indicates the carrier service is down, throttled or returned a WAF challenge.
 	ErrCarrierTemporarilyUnavailable = errors.New("carrier temporarily unavailable")
+
+	// ErrScraperSchemaChanged indicates the carrier portal HTML/JSON structure changed and expected fields could not be parsed.
+	ErrScraperSchemaChanged = errors.New("scraper schema changed")
+
+	// ErrCarrierBlocked indicates the carrier portal blocked the request via WAF, CAPTCHA, or HTTP 403/429.
+	ErrCarrierBlocked = errors.New("carrier blocked request")
 )

@@ -113,6 +113,14 @@ func (s *Server) handleTrackV1(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusTooManyRequests, "CARRIER_RATE_LIMITED", err.Error())
 			return
 		}
+		if errors.Is(err, models.ErrCarrierBlocked) {
+			writeError(w, http.StatusServiceUnavailable, "CARRIER_BLOCKED", err.Error())
+			return
+		}
+		if errors.Is(err, models.ErrScraperSchemaChanged) {
+			writeError(w, http.StatusBadGateway, "SCRAPER_ERROR", err.Error())
+			return
+		}
 		if errors.Is(err, models.ErrCarrierTemporarilyUnavailable) {
 			writeError(w, http.StatusBadGateway, "CARRIER_UNAVAILABLE", err.Error())
 			return
@@ -197,6 +205,12 @@ func (s *Server) handleParcelsAppTrackings(w http.ResponseWriter, r *http.Reques
 				errCode = "CARRIER_NOT_IMPLEMENTED"
 			} else if errors.Is(err, models.ErrCarrierRateLimited) {
 				errCode = "CARRIER_RATE_LIMITED"
+			} else if errors.Is(err, models.ErrCarrierBlocked) {
+				errCode = "CARRIER_BLOCKED"
+			} else if errors.Is(err, models.ErrScraperSchemaChanged) {
+				errCode = "SCRAPER_ERROR"
+			} else if errors.Is(err, models.ErrCarrierTemporarilyUnavailable) {
+				errCode = "CARRIER_UNAVAILABLE"
 			}
 			rejected = append(rejected, models.ParcelsAppRejected{
 				Index:          idx,
@@ -278,6 +292,12 @@ func (s *Server) processAsyncTrackings(reqID string, req models.ParcelsAppTracki
 				errCode = "CARRIER_NOT_IMPLEMENTED"
 			} else if errors.Is(err, models.ErrCarrierRateLimited) {
 				errCode = "CARRIER_RATE_LIMITED"
+			} else if errors.Is(err, models.ErrCarrierBlocked) {
+				errCode = "CARRIER_BLOCKED"
+			} else if errors.Is(err, models.ErrScraperSchemaChanged) {
+				errCode = "SCRAPER_ERROR"
+			} else if errors.Is(err, models.ErrCarrierTemporarilyUnavailable) {
+				errCode = "CARRIER_UNAVAILABLE"
 			}
 			rejected = append(rejected, models.ParcelsAppRejected{
 				Index:          idx,

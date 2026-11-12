@@ -131,18 +131,7 @@ func runTrack(args []string) {
 	})
 
 	if err != nil {
-		code := "NOT_FOUND"
-		suggestion := "Check the tracking number or pass --mock to allow simulated test data."
-		if errors.Is(err, models.ErrMissingPostalCode) || strings.Contains(strings.ToLower(err.Error()), "postal code") {
-			code = "MISSING_POSTAL_CODE"
-			suggestion = "This carrier requires a destination postal code. Pass --postal-code <CP> (or -z <CP>)."
-		} else if errors.Is(err, models.ErrCarrierNotImplemented) || strings.Contains(strings.ToLower(err.Error()), "not implemented") {
-			code = "NOT_IMPLEMENTED"
-			suggestion = "Live API tracking is not implemented for this carrier yet. Use --mock for testing."
-		} else if errors.Is(err, models.ErrShipmentNotFound) || strings.Contains(strings.ToLower(err.Error()), "not found") {
-			code = "NOT_FOUND"
-			suggestion = "Shipment not found by carrier. Ensure the tracking number is correct or use --mock for testing."
-		}
+		code, suggestion := classifyTrackError(err)
 
 		if *jsonOutput {
 			_ = ui.RenderJSON(os.Stdout, map[string]string{
@@ -254,3 +243,32 @@ func normalizeArgsWithPositional(args []string) ([]string, string) {
 
 	return flags, positional
 }
+
+func classifyTrackError(err error) (string, string) {
+	code := "NOT_FOUND"
+	suggestion := "Check the tracking number or pass --mock to allow simulated test data."
+	if errors.Is(err, models.ErrCarrierRateLimited) {
+		code = "CARRIER_RATE_LIMITED"
+		suggestion = "The carrier rate limit has been exceeded. Please wait before trying again or configure a proxy with OPEN_PARCELS_PROXY."
+	} else if errors.Is(err, models.ErrCarrierBlocked) {
+		code = "CARRIER_BLOCKED"
+		suggestion = "The carrier portal blocked the request (WAF, anti-bot challenge, or HTTP 403). Configure a proxy with OPEN_PARCELS_PROXY or retry later."
+	} else if errors.Is(err, models.ErrScraperSchemaChanged) {
+		code = "SCRAPER_ERROR"
+		suggestion = "The carrier website structure or API schema changed. An adapter update may be required."
+	} else if errors.Is(err, models.ErrMissingPostalCode) || strings.Contains(strings.ToLower(err.Error()), "postal code") {
+		code = "MISSING_POSTAL_CODE"
+		suggestion = "This carrier requires a destination postal code. Pass --postal-code <CP> (or -z <CP>)."
+	} else if errors.Is(err, models.ErrCarrierNotImplemented) || strings.Contains(strings.ToLower(err.Error()), "not implemented") {
+		code = "NOT_IMPLEMENTED"
+		suggestion = "Live API tracking is not implemented for this carrier yet. Use --mock for testing."
+	} else if errors.Is(err, models.ErrCarrierTemporarilyUnavailable) {
+		code = "CARRIER_UNAVAILABLE"
+		suggestion = "The carrier service is temporarily unavailable. Please retry shortly."
+	} else if errors.Is(err, models.ErrShipmentNotFound) || strings.Contains(strings.ToLower(err.Error()), "not found") {
+		code = "NOT_FOUND"
+		suggestion = "Shipment not found by carrier. Ensure the tracking number is correct or use --mock for testing."
+	}
+	return code, suggestion
+}
+

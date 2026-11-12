@@ -1,8 +1,12 @@
 package cmd
 
 import (
+	"errors"
+	"fmt"
 	"reflect"
 	"testing"
+
+	"open-parcels/pkg/models"
 )
 
 func TestNormalizeArgsWithPositional(t *testing.T) {
@@ -65,3 +69,32 @@ func TestNormalizeArgsWithPositional(t *testing.T) {
 		})
 	}
 }
+
+func TestClassifyTrackError(t *testing.T) {
+	tests := []struct {
+		name         string
+		err          error
+		expectedCode string
+	}{
+		{"carrier blocked", fmt.Errorf("wrapped: %w", models.ErrCarrierBlocked), "CARRIER_BLOCKED"},
+		{"scraper schema changed", fmt.Errorf("wrapped: %w", models.ErrScraperSchemaChanged), "SCRAPER_ERROR"},
+		{"rate limited", models.ErrCarrierRateLimited, "CARRIER_RATE_LIMITED"},
+		{"missing postal code", models.ErrPostalCodeRequired, "MISSING_POSTAL_CODE"},
+		{"not implemented", models.ErrCarrierNotImplemented, "NOT_IMPLEMENTED"},
+		{"not found", models.ErrShipmentNotFound, "NOT_FOUND"},
+		{"unknown fallback", errors.New("unexpected failure"), "NOT_FOUND"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			code, suggestion := classifyTrackError(tt.err)
+			if code != tt.expectedCode {
+				t.Errorf("expected code %s, got %s", tt.expectedCode, code)
+			}
+			if suggestion == "" {
+				t.Errorf("expected non-empty suggestion")
+			}
+		})
+	}
+}
+

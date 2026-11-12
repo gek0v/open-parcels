@@ -1,6 +1,7 @@
 package carriers
 
 import (
+	"net/http"
 	"os"
 	"testing"
 	"time"
@@ -91,3 +92,43 @@ func TestTransportConfigAndCredentials(t *testing.T) {
 		t.Errorf("expected User-Agent header populated")
 	}
 }
+
+func TestProxySupportAndResolution(t *testing.T) {
+	// 1. OPEN_PARCELS_PROXY takes precedence
+	os.Setenv("OPEN_PARCELS_PROXY", "socks5://127.0.0.1:1080")
+	os.Setenv("HTTP_PROXY", "http://fallback.proxy:8080")
+	defer func() {
+		os.Unsetenv("OPEN_PARCELS_PROXY")
+		os.Unsetenv("HTTP_PROXY")
+	}()
+
+	resolved := ResolveProxyURL()
+	if resolved != "socks5://127.0.0.1:1080" {
+		t.Errorf("expected socks5 proxy, got %s", resolved)
+	}
+
+	req, err := http.NewRequest("GET", "https://api.example.com", nil)
+	if err != nil {
+		t.Fatalf("failed to create request: %v", err)
+	}
+
+	proxyURL, err := ResolveProxy(req)
+	if err != nil {
+		t.Fatalf("unexpected error resolving proxy: %v", err)
+	}
+	if proxyURL == nil || proxyURL.Scheme != "socks5" || proxyURL.Host != "127.0.0.1:1080" {
+		t.Errorf("expected resolved socks5 proxy URL, got %v", proxyURL)
+	}
+
+	// 2. Test fallback to HTTP_PROXY when OPEN_PARCELS_PROXY is unset
+	os.Unsetenv("OPEN_PARCELS_PROXY")
+	fallbackReq, _ := http.NewRequest("GET", "http://api.example.com", nil)
+	fallbackProxy, err := ResolveProxy(fallbackReq)
+	if err != nil {
+		t.Fatalf("unexpected error on fallback proxy: %v", err)
+	}
+	if fallbackProxy == nil || fallbackProxy.Host != "fallback.proxy:8080" {
+		t.Errorf("expected fallback proxy host fallback.proxy:8080, got %v", fallbackProxy)
+	}
+}
+
