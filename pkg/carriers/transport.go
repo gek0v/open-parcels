@@ -165,6 +165,7 @@ func NewCarrierHTTPClientWithConfig(cfg TransportConfig) *http.Client {
 		IdleConnTimeout:     60 * time.Second,
 		DisableCompression: false,
 		Proxy:               ResolveProxy,
+		ForceAttemptHTTP2:   true,
 	}
 
 	if proxyStr := strings.TrimSpace(cfg.ProxyURL); proxyStr != "" {

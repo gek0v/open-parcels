@@ -24,7 +24,17 @@ func IsDeliveredText(desc string) bool {
 		strings.Contains(d, "pendiente de entrega") ||
 		strings.Contains(d, "en reparto") ||
 		strings.Contains(d, "out for delivery") ||
-		strings.Contains(d, "in consegna") {
+		strings.Contains(d, "in consegna") ||
+		strings.Contains(d, "recogido por el mensajero") ||
+		strings.Contains(d, "recogido por mensajero") ||
+		strings.Contains(d, "collected by the courier") ||
+		strings.Contains(d, "collected by courier") ||
+		strings.Contains(d, "será recogido") ||
+		strings.Contains(d, "sera recogido") ||
+		strings.Contains(d, "listo para ser recogido") ||
+		strings.Contains(d, "courier will pick it up") ||
+		strings.Contains(d, "soon our courier") ||
+		strings.Contains(d, "will pick it up") {
 		return false
 	}
 
@@ -107,7 +117,11 @@ func NormalizeEventStatus(desc string) (models.Status, models.Stage) {
 	if strings.Contains(d, "picked up") ||
 		strings.Contains(d, "admitido") ||
 		strings.Contains(d, "preso in carico") ||
-		strings.Contains(d, "presa in carico") {
+		strings.Contains(d, "presa in carico") ||
+		strings.Contains(d, "recogido por el mensajero") ||
+		strings.Contains(d, "recogido por mensajero") ||
+		strings.Contains(d, "collected by the courier") ||
+		strings.Contains(d, "collected by courier") {
 		return models.StatusInTransit, models.StagePickedUp
 	}
 

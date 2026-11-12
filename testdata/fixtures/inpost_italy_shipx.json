@@ -1,0 +1,64 @@
+[
+  {
+    "mainTrackingNumber": "3400000001",
+    "events": [
+      {
+        "eventCode": "MMD.1001",
+        "timestamp": "2026-11-11T12:53:58.564+00:00",
+        "carrier": "ILS_IT",
+        "eventTitle": "Parcel in the warehouse",
+        "eventDescription": "The parcel is in our warehouse, from here it will continue its journey.",
+        "location": {
+          "type": "LOGISTIC_CENTER",
+          "countryCode": "IT",
+          "city": "Roma (RM)"
+        }
+      },
+      {
+        "eventCode": "FMD.1002",
+        "timestamp": "2026-11-11T10:56:51.253+00:00",
+        "carrier": "ILS_PTES",
+        "eventTitle": "Collected by courier",
+        "eventDescription": "Your parcel has been picked up by the courier and it is on its way to one of our sorting centers.",
+        "location": {
+          "type": "PUDO_POINT",
+          "locationCode": "ITLOC00001",
+          "countryCode": "IT",
+          "city": "Roma"
+        }
+      },
+      {
+        "eventCode": "FMD.1001",
+        "timestamp": "2026-11-10T19:01:43.002+00:00",
+        "carrier": "ILS_IT",
+        "eventTitle": "Parcel handed over to Locker or InPost Point",
+        "eventDescription": "The parcel has been delivered to the Locker or InPost Point and soon our courier will pick it up.",
+        "location": {
+          "type": "PUDO_POINT",
+          "locationCode": "ITLOC00001",
+          "countryCode": "IT",
+          "city": "Roma"
+        }
+      },
+      {
+        "eventCode": "CRE.1001",
+        "timestamp": "2026-11-06T19:52:46.000+01:00",
+        "eventTitle": "In preparation",
+        "eventDescription": "The shipment has been created but your parcel has not been yet handed over to our network.",
+        "location": null
+      }
+    ],
+    "origin": {
+      "countryCode": "IT",
+      "postalCode": "00100",
+      "city": "Roma",
+      "street": "Via Example 1"
+    },
+    "destination": {
+      "countryCode": "ES",
+      "postalCode": "28001",
+      "city": "Madrid",
+      "street": "Calle Ejemplo 1"
+    }
+  }
+]

@@ -430,3 +430,53 @@ func TestEngineNeverCachesTransientErrors(t *testing.T) {
 		t.Errorf("postal code validation error must never be saved to cache")
 	}
 }
+
+func TestEngineInPostAutoDetectAndInTransitNotDelivered(t *testing.T) {
+	fixtureData, err := carriers.LoadFixture("inpost_intransit.html")
+	if err != nil {
+		t.Fatalf("failed to load fixture: %v", err)
+	}
+	teardown := carriers.SetInPostHTTPClientForTest(carriers.NewFixtureClient(http.StatusOK, fixtureData, "text/html"))
+	defer teardown()
+
+	eng := New()
+
+	// Auto-detect 12345678 with postal code 28001 (must pick InPost, not GLS, and stay in_transit)
+	shipment, err := eng.Track(context.Background(), "12345678", models.TrackOptions{
+		PostalCode:     "28001",
+		Language:       "es",
+		AllowSimulated: false,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error tracking 12345678: %v", err)
+	}
+	if shipment.Carrier.Slug != "inpost" {
+		t.Errorf("expected auto-detected carrier inpost, got %s", shipment.Carrier.Slug)
+	}
+	if shipment.Status != models.StatusInTransit {
+		t.Errorf("expected StatusInTransit, got %s", shipment.Status)
+	}
+	if shipment.StatusText != "En tránsito" {
+		t.Errorf("expected StatusText 'En tránsito', got %q", shipment.StatusText)
+	}
+	if shipment.DeliveredAt != nil {
+		t.Errorf("expected DeliveredAt nil for in-transit parcel, got %v", shipment.DeliveredAt)
+	}
+	if shipment.Progress != 35 {
+		t.Errorf("expected progress 35, got %d", shipment.Progress)
+	}
+	if shipment.Destination.Code != "ES" {
+		t.Errorf("expected Destination.Code ES, got %s", shipment.Destination.Code)
+	}
+
+	// Auto-detect 12345678 without postal code must return ErrPostalCodeRequired
+	_, err = eng.Track(context.Background(), "12345678", models.TrackOptions{
+		AllowSimulated: false,
+	})
+	if err == nil {
+		t.Fatalf("expected error for 12345678 without postal code")
+	}
+	if !errors.Is(err, models.ErrPostalCodeRequired) && !errors.Is(err, models.ErrMissingPostalCode) {
+		t.Errorf("expected ErrPostalCodeRequired, got: %v", err)
+	}
+}
