@@ -65,3 +65,30 @@ func TestNormalizeArgsWithPositional(t *testing.T) {
 		})
 	}
 }
+
+func TestParseServeFlags(t *testing.T) {
+	cfg, err := parseServeFlags([]string{"--port", "9090", "--mcp=false", "--api-key", "k1,k2", "--rate-limit", "120/m", "--rate-burst", "10"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Port != 9090 {
+		t.Errorf("expected port 9090, got %d", cfg.Port)
+	}
+	if cfg.EnableMCP {
+		t.Errorf("expected EnableMCP false")
+	}
+	if cfg.APIKey != "k1,k2" {
+		t.Errorf("expected APIKey 'k1,k2', got %q", cfg.APIKey)
+	}
+	if cfg.RateLimit != 2.0 {
+		t.Errorf("expected RateLimit 2.0, got %v", cfg.RateLimit)
+	}
+	if cfg.RateBurst != 10 {
+		t.Errorf("expected RateBurst 10, got %d", cfg.RateBurst)
+	}
+
+	_, err = parseServeFlags([]string{"--rate-limit", "invalid"})
+	if err == nil {
+		t.Errorf("expected error for invalid rate-limit flag")
+	}
+}
