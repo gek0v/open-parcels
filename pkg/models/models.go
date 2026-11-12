@@ -41,10 +41,10 @@ const (
 type CarrierType string
 
 const (
-	CarrierTypePostal     CarrierType = "postal"
-	CarrierTypeExpress    CarrierType = "express"
-	CarrierTypeLogistics  CarrierType = "logistics"
-	CarrierTypeFreight    CarrierType = "freight"
+	CarrierTypePostal      CarrierType = "postal"
+	CarrierTypeExpress     CarrierType = "express"
+	CarrierTypeLogistics   CarrierType = "logistics"
+	CarrierTypeFreight     CarrierType = "freight"
 	CarrierTypeCrossBorder CarrierType = "cross_border"
 )
 
@@ -52,11 +52,11 @@ const (
 type CarrierInfo struct {
 	Slug        string      `json:"slug"`
 	Name        string      `json:"name"`
-	Country     string      `json:"country,omitempty"`     // ISO-2 country code (e.g. "ES", "CN", "US", "GLOBAL")
-	CountryName string      `json:"country_name,omitempty"`// e.g. "Spain", "China"
+	Country     string      `json:"country,omitempty"`      // ISO-2 country code (e.g. "ES", "CN", "US", "GLOBAL")
+	CountryName string      `json:"country_name,omitempty"` // e.g. "Spain", "China"
 	Type        CarrierType `json:"type,omitempty"`
 	Website     string      `json:"website,omitempty"`
-	TrackingURL string      `json:"tracking_url,omitempty"`// Template or base URL
+	TrackingURL string      `json:"tracking_url,omitempty"` // Template or base URL
 	Phone       string      `json:"phone,omitempty"`
 	Logo        string      `json:"logo,omitempty"`
 }
@@ -96,26 +96,26 @@ type FlightLeg struct {
 
 // Shipment is the complete unified view of a tracked parcel.
 type Shipment struct {
-	TrackingNumber           string          `json:"tracking_number"`
-	Carrier                  CarrierInfo     `json:"carrier"`
-	AdditionalCarriers       []CarrierInfo   `json:"additional_carriers,omitempty"`
-	LastMileTrackingNumber   string          `json:"last_mile_tracking_number,omitempty"`
-	LastMileCarrier          *CarrierInfo    `json:"last_mile_carrier,omitempty"`
-	Status                   Status          `json:"status"`
-	StatusText               string          `json:"status_text"`
-	Progress                 int             `json:"progress"` // 0 to 100%
-	Origin                   CountryInfo     `json:"origin,omitempty"`
-	Destination              CountryInfo     `json:"destination,omitempty"`
-	EstimatedDelivery        *time.Time      `json:"estimated_delivery,omitempty"`
-	DeliveredAt              *time.Time      `json:"delivered_at,omitempty"`
-	Events                   []TrackingEvent `json:"events"`
-	DaysInTransit            int             `json:"days_in_transit"`
-	Weight                   string          `json:"weight,omitempty"`
-	ServiceType              string          `json:"service_type,omitempty"`
-	FlightLegs               []FlightLeg     `json:"flight_legs,omitempty"`
-	FromCache                bool            `json:"from_cache"`
-	UpdatedAt                time.Time       `json:"updated_at"`
-	Error                    string          `json:"error,omitempty"`
+	TrackingNumber         string          `json:"tracking_number"`
+	Carrier                CarrierInfo     `json:"carrier"`
+	AdditionalCarriers     []CarrierInfo   `json:"additional_carriers,omitempty"`
+	LastMileTrackingNumber string          `json:"last_mile_tracking_number,omitempty"`
+	LastMileCarrier        *CarrierInfo    `json:"last_mile_carrier,omitempty"`
+	Status                 Status          `json:"status"`
+	StatusText             string          `json:"status_text"`
+	Progress               int             `json:"progress"` // 0 to 100%
+	Origin                 CountryInfo     `json:"origin,omitempty"`
+	Destination            CountryInfo     `json:"destination,omitempty"`
+	EstimatedDelivery      *time.Time      `json:"estimated_delivery,omitempty"`
+	DeliveredAt            *time.Time      `json:"delivered_at,omitempty"`
+	Events                 []TrackingEvent `json:"events"`
+	DaysInTransit          int             `json:"days_in_transit"`
+	Weight                 string          `json:"weight,omitempty"`
+	ServiceType            string          `json:"service_type,omitempty"`
+	FlightLegs             []FlightLeg     `json:"flight_legs,omitempty"`
+	FromCache              bool            `json:"from_cache"`
+	UpdatedAt              time.Time       `json:"updated_at"`
+	Error                  string          `json:"error,omitempty"`
 }
 
 // DetectResult represents a candidate carrier match from the detector engine.
@@ -141,9 +141,10 @@ type TrackOptions struct {
 
 // ParcelsApp v4 API compatibility response types
 type ParcelsAppTrackingRequest struct {
-	Language        string                 `json:"language,omitempty"`
-	WebhookURL      string                 `json:"webhook_url,omitempty"`
-	Shipments       []ParcelsAppShipmentIn `json:"shipments"`
+	Language      string                 `json:"language,omitempty"`
+	WebhookURL    string                 `json:"webhook_url,omitempty"`
+	WebhookSecret string                 `json:"webhook_secret,omitempty"`
+	Shipments     []ParcelsAppShipmentIn `json:"shipments"`
 }
 
 type ParcelsAppShipmentIn struct {
@@ -159,12 +160,12 @@ type ParcelsAppShipmentIn struct {
 }
 
 type ParcelsAppResponse struct {
-	RequestID string                  `json:"request_id"`
-	Status    string                  `json:"status"` // "completed" | "processing"
-	Done      bool                    `json:"done"`
-	ExpiresAt string                  `json:"expires_at"`
-	Results   []ParcelsAppResultItem  `json:"results"`
-	Rejected  []ParcelsAppRejected    `json:"rejected,omitempty"`
+	RequestID string                 `json:"request_id"`
+	Status    string                 `json:"status"` // "completed" | "processing"
+	Done      bool                   `json:"done"`
+	ExpiresAt string                 `json:"expires_at"`
+	Results   []ParcelsAppResultItem `json:"results"`
+	Rejected  []ParcelsAppRejected   `json:"rejected,omitempty"`
 }
 
 type ParcelsAppResultItem struct {

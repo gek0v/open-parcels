@@ -23,12 +23,13 @@ type cachedRequest struct {
 
 // Server is the HTTP REST and MCP server daemon.
 type Server struct {
-	engine     *engine.Engine
-	store      storage.Store
-	mcpServer  *mcp.Server
-	port       int
-	enableMCP  bool
-	httpServer *http.Server
+	engine            *engine.Engine
+	store             storage.Store
+	mcpServer         *mcp.Server
+	port              int
+	enableMCP         bool
+	httpServer        *http.Server
+	webhookDispatcher *WebhookDispatcher
 
 	mu       sync.RWMutex
 	requests map[string]*cachedRequest
@@ -37,10 +38,11 @@ type Server struct {
 
 // Config configures the Server.
 type Config struct {
-	Port      int
-	EnableMCP bool
-	Store     storage.Store
-	Engine    *engine.Engine
+	Port              int
+	EnableMCP         bool
+	Store             storage.Store
+	Engine            *engine.Engine
+	WebhookDispatcher *WebhookDispatcher
 }
 
 // New creates a new Server instance.
@@ -70,13 +72,19 @@ func New(cfg Config) *Server {
 		eng.SetStore(st)
 	}
 
+	dispatcher := cfg.WebhookDispatcher
+	if dispatcher == nil {
+		dispatcher = NewWebhookDispatcher()
+	}
+
 	s := &Server{
-		engine:    eng,
-		store:     st,
-		mcpServer: mcp.NewServer(eng),
-		port:      cfg.Port,
-		enableMCP: cfg.EnableMCP,
-		requests:  make(map[string]*cachedRequest),
+		engine:            eng,
+		store:             st,
+		mcpServer:         mcp.NewServer(eng),
+		port:              cfg.Port,
+		enableMCP:         cfg.EnableMCP,
+		webhookDispatcher: dispatcher,
+		requests:          make(map[string]*cachedRequest),
 	}
 
 	return s
@@ -90,6 +98,18 @@ func (s *Server) Store() storage.Store {
 // Engine returns the underlying tracking engine.
 func (s *Server) Engine() *engine.Engine {
 	return s.engine
+}
+
+// WebhookDispatcher returns the server's webhook dispatcher instance.
+func (s *Server) WebhookDispatcher() *WebhookDispatcher {
+	return s.webhookDispatcher
+}
+
+// SetWebhookDispatcher replaces the server's webhook dispatcher.
+func (s *Server) SetWebhookDispatcher(d *WebhookDispatcher) {
+	if d != nil {
+		s.webhookDispatcher = d
+	}
 }
 
 func (s *Server) setRequest(reqID string, resp *models.ParcelsAppResponse, ttl time.Duration) {
