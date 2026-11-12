@@ -3,26 +3,61 @@ package engine
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
 	"open-parcels/pkg/carriers"
 	"open-parcels/pkg/detector"
 	"open-parcels/pkg/models"
+	"open-parcels/pkg/storage"
 )
 
 // Engine is the central multi-carrier parcel tracking and journey merging orchestrator.
 type Engine struct {
 	detector *detector.Detector
 	registry *carriers.Registry
+	store    storage.Store
 }
 
 // New creates an initialized Engine instance.
 func New() *Engine {
-	return &Engine{
+	eng := &Engine{
 		detector: detector.New(),
 		registry: carriers.GetRegistry(),
 	}
+	if dbPath := os.Getenv(storage.EnvDBPath); dbPath != "" {
+		if st, err := storage.NewStore(dbPath); err == nil {
+			eng.SetStore(st)
+		}
+	}
+	return eng
+}
+
+// NewWithStore creates an Engine backed by a persistent Store.
+func NewWithStore(store storage.Store) *Engine {
+	eng := New()
+	eng.SetStore(store)
+	return eng
+}
+
+// WithStore sets the storage backend on the Engine.
+func (e *Engine) WithStore(store storage.Store) *Engine {
+	e.SetStore(store)
+	return e
+}
+
+// SetStore attaches a storage backend to the Engine.
+func (e *Engine) SetStore(store storage.Store) {
+	e.store = store
+	if store != nil {
+		carriers.SetGlobalOAuthStore(store)
+	}
+}
+
+// Store returns the attached storage backend, or nil if none is configured.
+func (e *Engine) Store() storage.Store {
+	return e.store
 }
 
 // Detector returns the underlying carrier detector engine.
@@ -83,6 +118,18 @@ func (e *Engine) Track(ctx context.Context, trackingNumber string, opts models.T
 	// Strictly reject simulated fallbacks unless AllowSimulated is explicitly true
 	if !opts.AllowSimulated && !carriers.HasLiveTracking(primaryCarrier) {
 		return nil, fmt.Errorf("%w: carrier %s does not have an active live tracking adapter", models.ErrCarrierNotImplemented, primaryCarrier.Name())
+	}
+
+	// Cache lookup after carrier resolution so live-tracking checks and canonical carrier slug are respected
+	if !opts.ForceRefresh && e.store != nil {
+		cached, found, err := e.store.GetShipment(ctx, primaryCarrier.Slug(), cleanNumber, opts.PostalCode)
+		if err == nil && found && cached != nil {
+			cached.FromCache = true
+			if opts.Language != "" {
+				cached.StatusText = LocalizedStatusText(cached.Status, opts.Language)
+			}
+			return cached, nil
+		}
 	}
 
 	// 2. Track primary carrier
@@ -226,6 +273,16 @@ func (e *Engine) Track(ctx context.Context, trackingNumber string, opts models.T
 				}
 			}
 		}
+	}
+
+	// Cache successful shipment with smart TTL based on status (never cache transient errors)
+	if e.store != nil && finalShipment != nil && finalShipment.Error == "" && finalShipment.Status != "" {
+		ttl := SmartTTL(finalShipment.Status)
+		carrierSlug := finalShipment.Carrier.Slug
+		if carrierSlug == "" && primaryCarrier != nil {
+			carrierSlug = primaryCarrier.Slug()
+		}
+		_ = e.store.SetShipment(ctx, carrierSlug, cleanNumber, opts.PostalCode, finalShipment, ttl)
 	}
 
 	return finalShipment, nil

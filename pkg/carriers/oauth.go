@@ -15,10 +15,17 @@ import (
 	"open-parcels/pkg/models"
 )
 
-// OAuthTokenCache manages in-memory caching of OAuth2 client credentials tokens.
+// OAuthTokenStore defines an optional persistent backend for OAuth2 access tokens.
+type OAuthTokenStore interface {
+	GetOAuthToken(ctx context.Context, provider string) (token string, expiresAt time.Time, found bool, err error)
+	SetOAuthToken(ctx context.Context, provider, token string, expiresAt time.Time) error
+}
+
+// OAuthTokenCache manages in-memory and optional persistent caching of OAuth2 client credentials tokens.
 type OAuthTokenCache struct {
 	mu     sync.RWMutex
 	tokens map[string]cachedToken
+	store  OAuthTokenStore
 }
 
 type cachedToken struct {
@@ -26,8 +33,33 @@ type cachedToken struct {
 	expiresAt   time.Time
 }
 
-var globalOAuthCache = &OAuthTokenCache{
-	tokens: make(map[string]cachedToken),
+var globalOAuthCache = NewOAuthTokenCache(nil)
+
+// NewOAuthTokenCache creates a new OAuthTokenCache optionally backed by a persistent store.
+func NewOAuthTokenCache(store OAuthTokenStore) *OAuthTokenCache {
+	return &OAuthTokenCache{
+		tokens: make(map[string]cachedToken),
+		store:  store,
+	}
+}
+
+// SetStore attaches a persistent OAuthTokenStore to the cache.
+func (c *OAuthTokenCache) SetStore(store OAuthTokenStore) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.store = store
+}
+
+// Clear removes all in-memory cached tokens.
+func (c *OAuthTokenCache) Clear() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.tokens = make(map[string]cachedToken)
+}
+
+// SetGlobalOAuthStore configures the persistent token store for the global OAuth cache.
+func SetGlobalOAuthStore(store OAuthTokenStore) {
+	globalOAuthCache.SetStore(store)
 }
 
 type oauthTokenResponse struct {
@@ -65,6 +97,19 @@ func (c *OAuthTokenCache) GetToken(
 	// Double-check under write lock
 	if cached, found := c.tokens[cacheKey]; found && time.Now().Add(60*time.Second).Before(cached.expiresAt) {
 		return cached.accessToken, nil
+	}
+
+	// Check persistent store if configured
+	if c.store != nil {
+		if token, expiresAt, ok, err := c.store.GetOAuthToken(ctx, cacheKey); err == nil && ok {
+			if time.Now().Add(60*time.Second).Before(expiresAt) {
+				c.tokens[cacheKey] = cachedToken{
+					accessToken: token,
+					expiresAt:   expiresAt,
+				}
+				return token, nil
+			}
+		}
 	}
 
 	data := url.Values{}
@@ -126,9 +171,14 @@ func (c *OAuthTokenCache) GetToken(
 		expiresIn = 3600
 	}
 
+	expiresAt := time.Now().UTC().Add(time.Duration(expiresIn) * time.Second)
 	c.tokens[cacheKey] = cachedToken{
 		accessToken: tokenResp.AccessToken,
-		expiresAt:   time.Now().Add(time.Duration(expiresIn) * time.Second),
+		expiresAt:   expiresAt,
+	}
+
+	if c.store != nil {
+		_ = c.store.SetOAuthToken(ctx, cacheKey, tokenResp.AccessToken, expiresAt)
 	}
 
 	return tokenResp.AccessToken, nil
