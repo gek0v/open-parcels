@@ -21,11 +21,12 @@ type cachedRequest struct {
 
 // Server is the HTTP REST and MCP server daemon.
 type Server struct {
-	engine     *engine.Engine
-	mcpServer  *mcp.Server
-	port       int
-	enableMCP  bool
-	httpServer *http.Server
+	engine            *engine.Engine
+	mcpServer         *mcp.Server
+	port              int
+	enableMCP         bool
+	httpServer        *http.Server
+	webhookDispatcher *WebhookDispatcher
 
 	mu       sync.RWMutex
 	requests map[string]*cachedRequest
@@ -33,8 +34,9 @@ type Server struct {
 
 // Config configures the Server.
 type Config struct {
-	Port      int
-	EnableMCP bool
+	Port              int
+	EnableMCP         bool
+	WebhookDispatcher *WebhookDispatcher
 }
 
 // New creates a new Server instance.
@@ -43,16 +45,34 @@ func New(cfg Config) *Server {
 		cfg.Port = 8080
 	}
 
+	dispatcher := cfg.WebhookDispatcher
+	if dispatcher == nil {
+		dispatcher = NewWebhookDispatcher()
+	}
+
 	eng := engine.New()
 	s := &Server{
-		engine:    eng,
-		mcpServer: mcp.NewServer(eng),
-		port:      cfg.Port,
-		enableMCP: cfg.EnableMCP,
-		requests:  make(map[string]*cachedRequest),
+		engine:            eng,
+		mcpServer:         mcp.NewServer(eng),
+		port:              cfg.Port,
+		enableMCP:         cfg.EnableMCP,
+		webhookDispatcher: dispatcher,
+		requests:          make(map[string]*cachedRequest),
 	}
 
 	return s
+}
+
+// WebhookDispatcher returns the server's webhook dispatcher instance.
+func (s *Server) WebhookDispatcher() *WebhookDispatcher {
+	return s.webhookDispatcher
+}
+
+// SetWebhookDispatcher replaces the server's webhook dispatcher.
+func (s *Server) SetWebhookDispatcher(d *WebhookDispatcher) {
+	if d != nil {
+		s.webhookDispatcher = d
+	}
 }
 
 func (s *Server) setRequest(reqID string, resp *models.ParcelsAppResponse, ttl time.Duration) {

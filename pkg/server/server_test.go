@@ -14,7 +14,11 @@ import (
 )
 
 func setupTestServer() *Server {
-	return New(Config{Port: 8089, EnableMCP: true})
+	dispatcher := NewWebhookDispatcher(
+		WithInitialBackoff(5*time.Millisecond),
+		WithMaxRetries(3),
+	)
+	return New(Config{Port: 8089, EnableMCP: true, WebhookDispatcher: dispatcher})
 }
 
 func TestHealthEndpoint(t *testing.T) {
@@ -340,6 +344,7 @@ func TestParcelsAppAsyncPolling(t *testing.T) {
 }
 
 func TestParcelsAppWebhookCallback(t *testing.T) {
+	t.Setenv("OPEN_PARCELS_ALLOW_PRIVATE_WEBHOOKS", "true")
 	fixtureData, err := carriers.LoadFixture("cainiao_delivered.json")
 	if err != nil {
 		t.Fatalf("failed to load fixture: %v", err)
