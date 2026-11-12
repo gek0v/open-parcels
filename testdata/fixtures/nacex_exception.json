@@ -1,0 +1,21 @@
+{
+  "albaran": "NCX999888777",
+  "estado": "INCIDENCIA",
+  "descripcionEstado": "Direcci?n incompleta o incorrecta",
+  "origen": "Bilbao",
+  "destino": "Madrid",
+  "eventos": [
+    {
+      "fecha": "15/11/2024 15:30:00",
+      "estado": "INCIDENCIA",
+      "descripcion": "Incidencia: Falta n?mero de piso en direcci?n",
+      "agencia": "Madrid"
+    },
+    {
+      "fecha": "15/11/2024 09:00:00",
+      "estado": "EN REPARTO",
+      "descripcion": "En reparto con veh?culo",
+      "agencia": "Madrid"
+    }
+  ]
+}
