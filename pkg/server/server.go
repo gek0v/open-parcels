@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 
 	"open-parcels/pkg/engine"
 	"open-parcels/pkg/mcp"
 	"open-parcels/pkg/models"
+	"open-parcels/pkg/storage"
 )
 
 type cachedRequest struct {
@@ -22,6 +24,7 @@ type cachedRequest struct {
 // Server is the HTTP REST and MCP server daemon.
 type Server struct {
 	engine     *engine.Engine
+	store      storage.Store
 	mcpServer  *mcp.Server
 	port       int
 	enableMCP  bool
@@ -29,12 +32,15 @@ type Server struct {
 
 	mu       sync.RWMutex
 	requests map[string]*cachedRequest
+	wg       sync.WaitGroup
 }
 
 // Config configures the Server.
 type Config struct {
 	Port      int
 	EnableMCP bool
+	Store     storage.Store
+	Engine    *engine.Engine
 }
 
 // New creates a new Server instance.
@@ -43,9 +49,30 @@ func New(cfg Config) *Server {
 		cfg.Port = 8080
 	}
 
-	eng := engine.New()
+	st := cfg.Store
+	if st == nil {
+		if dbPath := os.Getenv(storage.EnvDBPath); dbPath != "" {
+			var err error
+			st, err = storage.NewStore(dbPath)
+			if err != nil {
+				log.Printf("[open-parcels] warning: failed to open store from %s: %v, falling back to memory store", dbPath, err)
+				st = storage.NewMemoryStore()
+			}
+		} else {
+			st = storage.NewMemoryStore()
+		}
+	}
+
+	eng := cfg.Engine
+	if eng == nil {
+		eng = engine.NewWithStore(st)
+	} else if eng.Store() == nil {
+		eng.SetStore(st)
+	}
+
 	s := &Server{
 		engine:    eng,
+		store:     st,
 		mcpServer: mcp.NewServer(eng),
 		port:      cfg.Port,
 		enableMCP: cfg.EnableMCP,
@@ -55,27 +82,72 @@ func New(cfg Config) *Server {
 	return s
 }
 
+// Store returns the underlying persistent store.
+func (s *Server) Store() storage.Store {
+	return s.store
+}
+
+// Engine returns the underlying tracking engine.
+func (s *Server) Engine() *engine.Engine {
+	return s.engine
+}
+
 func (s *Server) setRequest(reqID string, resp *models.ParcelsAppResponse, ttl time.Duration) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
+	expiresAt := time.Now().Add(ttl)
 	s.requests[reqID] = &cachedRequest{
 		response:  resp,
-		expiresAt: time.Now().Add(ttl),
+		expiresAt: expiresAt,
+	}
+	s.mu.Unlock()
+
+	if s.store != nil {
+		status := "processing"
+		if resp != nil && (resp.Done || resp.Status == "completed") {
+			status = "completed"
+		}
+		job := &storage.AsyncJob{
+			RequestID: reqID,
+			Status:    status,
+			Response:  resp,
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+			ExpiresAt: expiresAt,
+		}
+		_ = s.store.SetAsyncJob(context.Background(), job)
 	}
 }
 
 func (s *Server) getRequest(reqID string) (*models.ParcelsAppResponse, bool) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	cached, found := s.requests[reqID]
-	if !found {
-		return nil, false
+	if found {
+		if !time.Now().Before(cached.expiresAt) {
+			delete(s.requests, reqID)
+			s.mu.Unlock()
+			return nil, false
+		}
+		resp := cached.response
+		s.mu.Unlock()
+		return resp, true
 	}
-	if time.Now().After(cached.expiresAt) {
-		delete(s.requests, reqID)
-		return nil, false
+	s.mu.Unlock()
+
+	// Check persistent store if not found in memory (e.g. after server restart)
+	if s.store != nil {
+		job, ok, err := s.store.GetAsyncJob(context.Background(), reqID)
+		if err == nil && ok && job != nil && job.Response != nil {
+			s.mu.Lock()
+			s.requests[reqID] = &cachedRequest{
+				response:  job.Response,
+				expiresAt: job.ExpiresAt,
+			}
+			s.mu.Unlock()
+			return job.Response, true
+		}
 	}
-	return cached.response, true
+
+	return nil, false
 }
 
 // Start launches the HTTP server and blocks until ctx is canceled or an error occurs.
@@ -129,8 +201,15 @@ func (s *Server) Start(ctx context.Context) error {
 	case <-ctx.Done():
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		return s.httpServer.Shutdown(shutdownCtx)
+		err := s.httpServer.Shutdown(shutdownCtx)
+		if s.store != nil {
+			_ = s.store.Close()
+		}
+		return err
 	case err := <-errChan:
+		if s.store != nil {
+			_ = s.store.Close()
+		}
 		return err
 	}
 }

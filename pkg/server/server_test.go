@@ -11,6 +11,8 @@ import (
 
 	"open-parcels/pkg/carriers"
 	"open-parcels/pkg/models"
+	"open-parcels/pkg/storage"
+	"path/filepath"
 )
 
 func setupTestServer() *Server {
@@ -411,5 +413,148 @@ func TestParcelsAppTTLExpiration(t *testing.T) {
 
 	if rec.Code != http.StatusNotFound {
 		t.Errorf("expected 404 for expired record, got %d", rec.Code)
+	}
+}
+
+
+func TestParcelsAppPersistenceAcrossServerRestart(t *testing.T) {
+	fixtureData, err := carriers.LoadFixture("cainiao_delivered.json")
+	if err != nil {
+		t.Fatalf("failed to load fixture: %v", err)
+	}
+	teardown := carriers.SetCainiaoHTTPClientForTest(carriers.NewFixtureClient(http.StatusOK, fixtureData, "application/json"))
+	defer teardown()
+
+	dbPath := filepath.Join(t.TempDir(), "server_restart.db")
+
+	// Instance 1: Create server backed by SQLiteStore
+	st1, err := storage.NewSQLiteStore(dbPath)
+	if err != nil {
+		t.Fatalf("failed to open sqlite store 1: %v", err)
+	}
+	srv1 := New(Config{Port: 0, EnableMCP: false, Store: st1})
+
+	reqPayload := models.ParcelsAppTrackingRequest{
+		Language: "es",
+		Shipments: []models.ParcelsAppShipmentIn{
+			{
+				TrackingNumber: "LP00561234567890",
+				AllowSimulated: true,
+			},
+		},
+	}
+	body, _ := json.Marshal(reqPayload)
+
+	req := httptest.NewRequest(http.MethodPost, "/trackings?async=true", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+	srv1.handleParcelsAppTrackings(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK, got %d", rec.Code)
+	}
+
+	var asyncResp models.ParcelsAppResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &asyncResp); err != nil {
+		t.Fatalf("invalid json: %v", err)
+	}
+
+	// Wait for async job completion on srv1
+	var completed bool
+	for i := 0; i < 40; i++ {
+		time.Sleep(50 * time.Millisecond)
+		resp, found := srv1.getRequest(asyncResp.RequestID)
+		if found && resp.Done && resp.Status == "completed" {
+			completed = true
+			break
+		}
+	}
+	if !completed {
+		t.Fatalf("async job did not complete on srv1")
+	}
+
+	// Simulate srv1 shutdown & store close
+	srv1.wg.Wait()
+	if err := st1.Close(); err != nil {
+		t.Fatalf("failed to close st1: %v", err)
+	}
+
+	// Instance 2: Reopen SQLiteStore and start fresh Server instance (empty memory)
+	st2, err := storage.NewSQLiteStore(dbPath)
+	if err != nil {
+		t.Fatalf("failed to reopen sqlite store 2: %v", err)
+	}
+	defer st2.Close()
+
+	srv2 := New(Config{Port: 0, EnableMCP: false, Store: st2})
+
+	getReq := httptest.NewRequest(http.MethodGet, "/trackings/"+asyncResp.RequestID, nil)
+	getRec := httptest.NewRecorder()
+	srv2.handleParcelsAppGetTracking(getRec, getReq)
+
+	if getRec.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK from restarted server srv2, got %d: %s", getRec.Code, getRec.Body.String())
+	}
+
+	var restoredResp models.ParcelsAppResponse
+	if err := json.Unmarshal(getRec.Body.Bytes(), &restoredResp); err != nil {
+		t.Fatalf("invalid json from srv2: %v", err)
+	}
+	if !restoredResp.Done || restoredResp.Status != "completed" {
+		t.Errorf("expected completed status after restart, got done=%v status=%s", restoredResp.Done, restoredResp.Status)
+	}
+	if len(restoredResp.Results) != 1 || restoredResp.Results[0].Shipment.TrackingID != "LP00561234567890" {
+		t.Errorf("expected preserved tracking result after restart, got %+v", restoredResp.Results)
+	}
+}
+
+func TestServerV1TrackCacheAndForceRefresh(t *testing.T) {
+	fixtureData, err := carriers.LoadFixture("cainiao_delivered.json")
+	if err != nil {
+		t.Fatalf("failed to load fixture: %v", err)
+	}
+	teardown := carriers.SetCainiaoHTTPClientForTest(carriers.NewFixtureClient(http.StatusOK, fixtureData, "application/json"))
+	defer teardown()
+
+	st := storage.NewMemoryStore()
+	defer st.Close()
+	srv := New(Config{Port: 0, EnableMCP: false, Store: st})
+
+	// 1. First request -> from_cache: false
+	r1 := httptest.NewRequest(http.MethodGet, "/api/v1/track?number=LP00561234567890&allow_simulated=true", nil)
+	w1 := httptest.NewRecorder()
+	srv.handleTrackV1(w1, r1)
+	if w1.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w1.Code)
+	}
+	var s1 models.Shipment
+	_ = json.Unmarshal(w1.Body.Bytes(), &s1)
+	if s1.FromCache {
+		t.Errorf("expected first request FromCache=false")
+	}
+
+	// 2. Second request -> from_cache: true
+	r2 := httptest.NewRequest(http.MethodGet, "/api/v1/track?number=LP00561234567890&allow_simulated=true", nil)
+	w2 := httptest.NewRecorder()
+	srv.handleTrackV1(w2, r2)
+	if w2.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w2.Code)
+	}
+	var s2 models.Shipment
+	_ = json.Unmarshal(w2.Body.Bytes(), &s2)
+	if !s2.FromCache {
+		t.Errorf("expected second request FromCache=true")
+	}
+
+	// 3. Third request with force_refresh=true -> from_cache: false
+	r3 := httptest.NewRequest(http.MethodGet, "/api/v1/track?number=LP00561234567890&allow_simulated=true&force_refresh=true", nil)
+	w3 := httptest.NewRecorder()
+	srv.handleTrackV1(w3, r3)
+	if w3.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w3.Code)
+	}
+	var s3 models.Shipment
+	_ = json.Unmarshal(w3.Body.Bytes(), &s3)
+	if s3.FromCache {
+		t.Errorf("expected force_refresh request FromCache=false")
 	}
 }

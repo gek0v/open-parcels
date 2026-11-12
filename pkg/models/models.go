@@ -155,6 +155,7 @@ type ParcelsAppShipmentIn struct {
 	Email              string            `json:"email,omitempty"`
 	Phone              string            `json:"phone,omitempty"`
 	AdditionalFields   map[string]string `json:"additional_fields,omitempty"`
+	ForceRefresh       bool              `json:"force_refresh,omitempty"`
 }
 
 type ParcelsAppResponse struct {

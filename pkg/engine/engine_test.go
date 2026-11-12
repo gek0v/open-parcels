@@ -8,6 +8,9 @@ import (
 
 	"open-parcels/pkg/carriers"
 	"open-parcels/pkg/models"
+	"open-parcels/pkg/storage"
+	"path/filepath"
+	"time"
 )
 
 func TestEngineTrackChaining(t *testing.T) {
@@ -306,3 +309,127 @@ func TestEngineNoSimulatedByDefault(t *testing.T) {
 }
 
 
+
+
+func TestSmartTTL(t *testing.T) {
+	if got := SmartTTL(models.StatusDelivered); got != 24*time.Hour {
+		t.Errorf("expected 24h for delivered, got %v", got)
+	}
+	if got := SmartTTL(models.StatusExpired); got != 24*time.Hour {
+		t.Errorf("expected 24h for expired, got %v", got)
+	}
+	if got := SmartTTL(models.StatusInTransit); got != 10*time.Minute {
+		t.Errorf("expected 10m for in_transit, got %v", got)
+	}
+	if got := SmartTTL(models.StatusOutForDelivery); got != 10*time.Minute {
+		t.Errorf("expected 10m for out_for_delivery, got %v", got)
+	}
+	if got := SmartTTL(models.StatusInfoReceived); got != 10*time.Minute {
+		t.Errorf("expected 10m for info_received, got %v", got)
+	}
+	if got := SmartTTL(models.StatusFailedAttempt); got != 10*time.Minute {
+		t.Errorf("expected 10m for failed_attempt, got %v", got)
+	}
+}
+
+func TestEngineSmartCachingAndForceRefresh(t *testing.T) {
+	fixtureData, err := carriers.LoadFixture("cainiao_delivered.json")
+	if err != nil {
+		t.Fatalf("failed to load fixture: %v", err)
+	}
+	teardown := carriers.SetCainiaoHTTPClientForTest(carriers.NewFixtureClient(http.StatusOK, fixtureData, "application/json"))
+	defer teardown()
+
+	stores := map[string]storage.Store{
+		"memory": storage.NewMemoryStore(),
+	}
+	tempDB := filepath.Join(t.TempDir(), "engine_cache.db")
+	sqlStore, err := storage.NewSQLiteStore(tempDB)
+	if err != nil {
+		t.Fatalf("failed to open sqlite store: %v", err)
+	}
+	stores["sqlite"] = sqlStore
+
+	for name, st := range stores {
+		t.Run(name, func(t *testing.T) {
+			defer st.Close()
+			eng := NewWithStore(st)
+
+			// 1. First track: live tracking executed, FromCache is false
+			s1, err := eng.Track(context.Background(), "LP00561234567890", models.TrackOptions{
+				AllowSimulated: true,
+				Language:       "es",
+			})
+			if err != nil {
+				t.Fatalf("unexpected error tracking: %v", err)
+			}
+			if s1.FromCache {
+				t.Errorf("first tracking must have FromCache=false")
+			}
+			if s1.Status != models.StatusDelivered {
+				t.Errorf("expected StatusDelivered, got %s", s1.Status)
+			}
+
+			// 2. Second track: fetched from cache, FromCache is true
+			s2, err := eng.Track(context.Background(), "LP00561234567890", models.TrackOptions{
+				AllowSimulated: true,
+				Language:       "en",
+			})
+			if err != nil {
+				t.Fatalf("unexpected error on second tracking: %v", err)
+			}
+			if !s2.FromCache {
+				t.Errorf("second tracking must hit cache (FromCache=true)")
+			}
+			if s2.StatusText != "Delivered" {
+				t.Errorf("expected status text localized to English from cache, got %s", s2.StatusText)
+			}
+
+			// 3. Third track with ForceRefresh: bypasses cache and updates record
+			s3, err := eng.Track(context.Background(), "LP00561234567890", models.TrackOptions{
+				AllowSimulated: true,
+				Language:       "es",
+				ForceRefresh:   true,
+			})
+			if err != nil {
+				t.Fatalf("unexpected error on forced refresh: %v", err)
+			}
+			if s3.FromCache {
+				t.Errorf("forced refresh must have FromCache=false")
+			}
+		})
+	}
+}
+
+func TestEngineNeverCachesTransientErrors(t *testing.T) {
+	st := storage.NewMemoryStore()
+	eng := NewWithStore(st)
+
+	// 1. Not found tracking
+	_, err := eng.Track(context.Background(), "NONEXISTENT12345", models.TrackOptions{
+		CarrierHint:    "cainiao",
+		AllowSimulated: true,
+	})
+	if err == nil {
+		t.Fatalf("expected error for non-existent tracking")
+	}
+
+	cached, found, _ := st.GetShipment(context.Background(), "cainiao", "NONEXISTENT12345", "")
+	if found || cached != nil {
+		t.Errorf("transient error must never be saved to cache")
+	}
+
+	// 2. Missing postal code
+	_, err = eng.Track(context.Background(), "7561674", models.TrackOptions{
+		CarrierHint:    "inpost",
+		AllowSimulated: false,
+	})
+	if err == nil {
+		t.Fatalf("expected postal code error")
+	}
+
+	cached, found, _ = st.GetShipment(context.Background(), "inpost", "7561674", "")
+	if found || cached != nil {
+		t.Errorf("postal code validation error must never be saved to cache")
+	}
+}
