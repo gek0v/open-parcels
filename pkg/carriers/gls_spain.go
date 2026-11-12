@@ -87,7 +87,7 @@ func parseGLSSpainDate(dateStr string) time.Time {
 	}
 
 	for _, layout := range layouts {
-		if t, err := time.ParseInLocation(layout, clean, time.UTC); err == nil {
+		if t, err := ParseLocalTimeWithZone(layout, clean, "Europe/Madrid"); err == nil {
 			return t
 		}
 	}

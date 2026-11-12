@@ -300,9 +300,7 @@ func TestEngineNoSimulatedByDefault(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected error for InPost without postal code")
 	}
-	if !errors.Is(err, models.ErrPostalCodeRequired) && !errors.Is(err, models.ErrMissingPostalCode) {
+	if !errors.Is(err, models.ErrPostalCodeRequired) {
 		t.Errorf("expected ErrPostalCodeRequired, got: %v", err)
 	}
 }
-
-

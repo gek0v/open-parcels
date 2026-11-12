@@ -97,7 +97,7 @@ func (s *Server) handleTrackV1(w http.ResponseWriter, r *http.Request) {
 
 	shipment, err := s.engine.Track(r.Context(), trackingNumber, opts)
 	if err != nil {
-		if errors.Is(err, models.ErrPostalCodeRequired) || errors.Is(err, models.ErrMissingPostalCode) {
+		if errors.Is(err, models.ErrPostalCodeRequired) {
 			writeError(w, http.StatusUnprocessableEntity, "POSTAL_CODE_REQUIRED", err.Error())
 			return
 		}
@@ -189,7 +189,7 @@ func (s *Server) handleParcelsAppTrackings(w http.ResponseWriter, r *http.Reques
 		shipment, err := s.engine.Track(r.Context(), shp.TrackingNumber, opts)
 		if err != nil {
 			errCode := "TRACKING_FAILED"
-			if errors.Is(err, models.ErrPostalCodeRequired) || errors.Is(err, models.ErrMissingPostalCode) {
+			if errors.Is(err, models.ErrPostalCodeRequired) {
 				errCode = "POSTAL_CODE_REQUIRED"
 			} else if errors.Is(err, models.ErrShipmentNotFound) {
 				errCode = "SHIPMENT_NOT_FOUND"
@@ -270,7 +270,7 @@ func (s *Server) processAsyncTrackings(reqID string, req models.ParcelsAppTracki
 		shipment, err := s.engine.Track(ctx, shp.TrackingNumber, opts)
 		if err != nil {
 			errCode := "TRACKING_FAILED"
-			if errors.Is(err, models.ErrPostalCodeRequired) || errors.Is(err, models.ErrMissingPostalCode) {
+			if errors.Is(err, models.ErrPostalCodeRequired) {
 				errCode = "POSTAL_CODE_REQUIRED"
 			} else if errors.Is(err, models.ErrShipmentNotFound) {
 				errCode = "SHIPMENT_NOT_FOUND"

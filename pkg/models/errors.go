@@ -14,6 +14,7 @@ var (
 	ErrPostalCodeRequired = errors.New("postal code is required for this carrier")
 
 	// ErrMissingPostalCode is an alias for ErrPostalCodeRequired for backward compatibility.
+	// Deprecated: use ErrPostalCodeRequired.
 	ErrMissingPostalCode = ErrPostalCodeRequired
 
 	// ErrCarrierRateLimited indicates the carrier API rate limit has been exceeded.

@@ -133,7 +133,7 @@ func runTrack(args []string) {
 	if err != nil {
 		code := "NOT_FOUND"
 		suggestion := "Check the tracking number or pass --mock to allow simulated test data."
-		if errors.Is(err, models.ErrMissingPostalCode) || strings.Contains(strings.ToLower(err.Error()), "postal code") {
+		if errors.Is(err, models.ErrPostalCodeRequired) || strings.Contains(strings.ToLower(err.Error()), "postal code") {
 			code = "MISSING_POSTAL_CODE"
 			suggestion = "This carrier requires a destination postal code. Pass --postal-code <CP> (or -z <CP>)."
 		} else if errors.Is(err, models.ErrCarrierNotImplemented) || strings.Contains(strings.ToLower(err.Error()), "not implemented") {

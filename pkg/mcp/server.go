@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -33,7 +34,7 @@ func NewServer(eng *engine.Engine) *Server {
 func (s *Server) initTools() {
 	s.tools = []Tool{
 		{
-			Name: "track_shipment",
+			Name:        "track_shipment",
 			Description: "Track a shipment/parcel with automatic multi-carrier detection, international-to-local handover chaining (e.g. Cainiao/AliExpress to Correos Express), and unified chronological event merging.",
 			InputSchema: InputSchema{
 				Type: "object",
@@ -67,7 +68,7 @@ func (s *Server) initTools() {
 			},
 		},
 		{
-			Name: "detect_carrier",
+			Name:        "detect_carrier",
 			Description: "Identify candidate delivery carriers for a tracking number with confidence scoring and regex/format validation.",
 			InputSchema: InputSchema{
 				Type: "object",
@@ -85,7 +86,7 @@ func (s *Server) initTools() {
 			},
 		},
 		{
-			Name: "list_carriers",
+			Name:        "list_carriers",
 			Description: "List all supported logistics carriers, tracking slugs, countries, and service types.",
 			InputSchema: InputSchema{
 				Type: "object",
@@ -98,7 +99,7 @@ func (s *Server) initTools() {
 			},
 		},
 		{
-			Name: "check_carrier_status",
+			Name:        "check_carrier_status",
 			Description: "Inspect the operational status, integration mode (live_api, public_scraper, or not_implemented), and capabilities of a carrier.",
 			InputSchema: InputSchema{
 				Type: "object",
@@ -112,7 +113,7 @@ func (s *Server) initTools() {
 			},
 		},
 		{
-			Name: "estimate_delivery",
+			Name:        "estimate_delivery",
 			Description: "Estimate shipment delivery progress, transit time, and status based on tracked milestones.",
 			InputSchema: InputSchema{
 				Type: "object",
@@ -280,6 +281,9 @@ func (s *Server) executeTool(ctx context.Context, name string, args map[string]a
 			Language:           lang,
 		})
 		if err != nil {
+			if errors.Is(err, models.ErrPostalCodeRequired) {
+				return errorResult(fmt.Sprintf("Postal code is required for this carrier: %v", err))
+			}
 			return errorResult(fmt.Sprintf("Failed to track package: %v", err))
 		}
 
@@ -412,6 +416,9 @@ func (s *Server) executeTool(ctx context.Context, name string, args map[string]a
 			AllowSimulated: allowSimulated,
 		})
 		if err != nil {
+			if errors.Is(err, models.ErrPostalCodeRequired) {
+				return errorResult(fmt.Sprintf("Postal code is required for this carrier: %v", err))
+			}
 			return errorResult(fmt.Sprintf("Failed to retrieve shipment for estimate: %v", err))
 		}
 

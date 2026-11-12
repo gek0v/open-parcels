@@ -91,13 +91,18 @@ type cainiaoResponse struct {
 }
 
 func parseCainiaoTime(det cainiaoDetailItem) (time.Time, string) {
+	zone := "Asia/Shanghai"
+	if det.TimeZone != "" {
+		zone = det.TimeZone
+	}
+
 	if det.TimeStr != "" {
 		for _, layout := range []string{
 			"2006-01-02 15:04:05",
 			"2006-01-02 15:04",
 			time.RFC3339,
 		} {
-			if t, err := time.Parse(layout, det.TimeStr); err == nil {
+			if t, err := ParseLocalTimeWithZone(layout, det.TimeStr, zone); err == nil {
 				return t, det.TimeStr
 			}
 		}
@@ -107,7 +112,7 @@ func parseCainiaoTime(det cainiaoDetailItem) (time.Time, string) {
 		switch v := det.Time.(type) {
 		case float64:
 			if v > 0 {
-				t := time.UnixMilli(int64(v))
+				t := time.UnixMilli(int64(v)).UTC()
 				return t, t.Format("2006-01-02 15:04:05")
 			}
 		case string:
@@ -117,7 +122,7 @@ func parseCainiaoTime(det cainiaoDetailItem) (time.Time, string) {
 					"2006-01-02 15:04",
 					time.RFC3339,
 				} {
-					if t, err := time.Parse(layout, v); err == nil {
+					if t, err := ParseLocalTimeWithZone(layout, v, zone); err == nil {
 						return t, v
 					}
 				}
@@ -126,7 +131,7 @@ func parseCainiaoTime(det cainiaoDetailItem) (time.Time, string) {
 	}
 
 	if det.Date != "" {
-		if t, err := time.Parse("2006-01-02", det.Date); err == nil {
+		if t, err := ParseLocalTimeWithZone("2006-01-02", det.Date, zone); err == nil {
 			return t, det.Date
 		}
 	}
