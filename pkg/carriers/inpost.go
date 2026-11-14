@@ -382,26 +382,51 @@ func fetchInPostLive(ctx context.Context, carrier Carrier, trackingNumber, posta
 	}
 
 	// Enrich origin, destination city, and event locations via InPost ShipX IT proxy when running live
-	if origin.Name == "Unknown" && (inpostHTTPClient == defaultInPostHTTPClient || inpostItalyHTTPClient != defaultInPostItalyHTTPClient) {
-		enrichCtx, enrichCancel := context.WithTimeout(ctx, 3*time.Second)
+	if inpostHTTPClient == defaultInPostHTTPClient || inpostItalyHTTPClient != defaultInPostItalyHTTPClient {
+		enrichCtx, enrichCancel := context.WithTimeout(ctx, 4*time.Second)
 		defer enrichCancel()
 		if itShipment, err := fetchInPostItalyLive(enrichCtx, carrier, trackingNumber, opts); err == nil && itShipment != nil {
 			if itShipment.Origin.Name != "" && itShipment.Origin.Name != "Unknown" {
 				origin = itShipment.Origin
 			}
-			if itShipment.Destination.Name != "" && itShipment.Destination.Name != "Unknown" && itShipment.Destination.Code == destination.Code {
+			if itShipment.Destination.Name != "" && itShipment.Destination.Name != "Unknown" && (destination.Code == "" || destination.Code == itShipment.Destination.Code) {
 				destination = itShipment.Destination
 			}
 			for i := range events {
-				if events[i].Location != "" {
-					continue
-				}
-				for _, itEv := range itShipment.Events {
-					if itEv.Location != "" && ((events[i].EventCode != "" && itEv.EventCode == events[i].EventCode) || itEv.Date.Equal(events[i].Date)) {
-						events[i].Location = itEv.Location
-						break
+				var bestMatch *models.TrackingEvent
+				var bestDiff time.Duration = 10 * time.Minute
+				for j := range itShipment.Events {
+					itEv := &itShipment.Events[j]
+					diff := events[i].Date.Sub(itEv.Date)
+					if diff < 0 {
+						diff = -diff
+					}
+					if diff < bestDiff {
+						bestDiff = diff
+						bestMatch = itEv
 					}
 				}
+				if bestMatch != nil && bestMatch.Location != "" {
+					events[i].Location = bestMatch.Location
+				}
+			}
+		}
+	}
+
+	// Apply smart regional / stage fallback for any remaining events without location
+	for i := range events {
+		if events[i].Location != "" {
+			continue
+		}
+		switch {
+		case events[i].Stage == models.StageLastMile || events[i].Stage == models.StageDelivery ||
+			events[i].Status == models.StatusOutForDelivery || events[i].Status == models.StatusDelivered:
+			if destination.Name != "" && destination.Name != "Unknown" {
+				events[i].Location = destination.Name
+			}
+		case events[i].Stage == models.StageCreated || events[i].Status == models.StatusInfoReceived:
+			if origin.Name != "" && origin.Name != "Unknown" {
+				events[i].Location = origin.Name
 			}
 		}
 	}
