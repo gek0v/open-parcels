@@ -480,3 +480,34 @@ func TestEngineInPostAutoDetectAndInTransitNotDelivered(t *testing.T) {
 		t.Errorf("expected ErrPostalCodeRequired, got: %v", err)
 	}
 }
+
+func TestEngineAutoDetectFallbackToAlternativeCandidate(t *testing.T) {
+	itFixture, err := carriers.LoadFixture("inpost_italy_shipx.json")
+	if err != nil {
+		t.Fatalf("failed to load fixture: %v", err)
+	}
+	teardownIT := carriers.SetInPostItalyHTTPClientForTest(carriers.NewFixtureClient(http.StatusOK, itFixture, "application/json"))
+	defer teardownIT()
+
+	eng := New()
+
+	// 75616714 matches inpost and inpost-it.
+	// inpost fails because PostalCode is empty.
+	// Engine must automatically try inpost-it and succeed.
+	shipment, err := eng.Track(context.Background(), "75616714", models.TrackOptions{
+		AllowSimulated: false,
+	})
+	if err != nil {
+		t.Fatalf("expected auto-detect to fallback to inpost-it and succeed, got err: %v", err)
+	}
+	if shipment.Carrier.Slug != "inpost-it" {
+		t.Errorf("expected carrier inpost-it, got %s", shipment.Carrier.Slug)
+	}
+	if shipment.Origin.Name != "Roma, Italy" {
+		t.Errorf("expected Origin Roma, Italy, got %s", shipment.Origin.Name)
+	}
+	if len(shipment.Events) == 0 {
+		t.Errorf("expected tracking events from fallback candidate")
+	}
+}
+

@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -133,9 +134,44 @@ func (e *Engine) Track(ctx context.Context, trackingNumber string, opts models.T
 	}
 
 	// 2. Track primary carrier
-	primaryShipment, err := primaryCarrier.Track(ctx, cleanNumber, opts)
-	if err != nil {
-		return nil, fmt.Errorf("failed tracking with primary carrier %s: %w", primaryCarrier.Name(), err)
+	var primaryShipment *models.Shipment
+	if opts.CarrierHint != "" {
+		s, err := primaryCarrier.Track(ctx, cleanNumber, opts)
+		if err != nil {
+			return nil, fmt.Errorf("failed tracking with primary carrier %s: %w", primaryCarrier.Name(), err)
+		}
+		primaryShipment = s
+	} else {
+		tried := map[string]bool{primaryCarrier.Slug(): true}
+		s, err := primaryCarrier.Track(ctx, cleanNumber, opts)
+		if err != nil {
+			firstErr := err
+			if errors.Is(err, models.ErrPostalCodeRequired) || errors.Is(err, models.ErrShipmentNotFound) {
+				candidates := e.detector.Detect(cleanNumber, opts.DestinationCountry)
+				for _, cand := range candidates {
+					if tried[cand.Carrier.Slug] {
+						continue
+					}
+					tried[cand.Carrier.Slug] = true
+					altC, ok := e.registry.Get(cand.Carrier.Slug)
+					if !ok || (!opts.AllowSimulated && !carriers.HasLiveTracking(altC)) {
+						continue
+					}
+					altShipment, altErr := altC.Track(ctx, cleanNumber, opts)
+					if altErr == nil && altShipment != nil {
+						s = altShipment
+						err = nil
+						primaryCarrier = altC
+						carrierInfo = altC.Info()
+						break
+					}
+				}
+			}
+			if err != nil {
+				return nil, fmt.Errorf("failed tracking with primary carrier %s: %w", primaryCarrier.Name(), firstErr)
+			}
+		}
+		primaryShipment = s
 	}
 
 	primaryShipment.Carrier = carrierInfo
