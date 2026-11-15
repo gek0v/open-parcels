@@ -15,6 +15,7 @@ import (
 	"open-parcels/pkg/mcp"
 	"open-parcels/pkg/models"
 	"open-parcels/pkg/storage"
+	"open-parcels/pkg/ui/web"
 )
 
 type cachedRequest struct {
@@ -250,6 +251,7 @@ func (s *Server) Handler() http.Handler {
 	// Carriers catalog
 	mux.HandleFunc("/api/v1/carriers", s.handleCarriers)
 	mux.HandleFunc("/tracking-carriers", s.handleCarriers)
+	mux.HandleFunc("/api/v1/capabilities", s.handleCapabilities)
 
 	// Carrier detection
 	mux.HandleFunc("/api/v1/detect", s.handleDetect)
@@ -263,6 +265,9 @@ func (s *Server) Handler() http.Handler {
 	if s.enableMCP {
 		mux.HandleFunc("/mcp", s.handleMCPHTTP)
 	}
+
+	// Embedded web dashboard
+	mux.Handle("/", web.Handler())
 
 	return s.corsMiddleware(s.rateLimitMiddleware(s.authMiddleware(mux)))
 }
@@ -334,7 +339,7 @@ func (s *Server) authMiddleware(next http.Handler) http.Handler {
 		return next
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/health" {
+		if r.URL.Path == "/health" || web.IsAsset(r.URL.Path) {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -354,7 +359,7 @@ func (s *Server) rateLimitMiddleware(next http.Handler) http.Handler {
 		return next
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/health" {
+		if r.URL.Path == "/health" || web.IsAsset(r.URL.Path) {
 			next.ServeHTTP(w, r)
 			return
 		}

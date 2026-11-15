@@ -964,3 +964,78 @@ func TestParseRateLimit(t *testing.T) {
 		}
 	}
 }
+
+func TestWebDashboardEndpoint(t *testing.T) {
+	// Server without API key
+	srv := setupTestServer()
+	handler := srv.Handler()
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for GET /, got %d", rec.Code)
+	}
+
+	if !bytes.Contains(rec.Body.Bytes(), []byte("OPEN PARCELS")) {
+		t.Errorf("expected dashboard HTML to contain 'OPEN PARCELS'")
+	}
+	if !bytes.Contains(rec.Body.Bytes(), []byte("Tracking Inspector")) {
+		t.Errorf("expected dashboard HTML to contain 'Tracking Inspector'")
+	}
+
+	// Server WITH API key: web dashboard must still be accessible publicly
+	authSrv := New(Config{Port: 8099, APIKey: "secret-token-123"})
+	authHandler := authSrv.Handler()
+
+	reqAuth := httptest.NewRequest(http.MethodGet, "/", nil)
+	recAuth := httptest.NewRecorder()
+	authHandler.ServeHTTP(recAuth, reqAuth)
+
+	if recAuth.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for GET / with auth configured, got %d", recAuth.Code)
+	}
+	if !bytes.Contains(recAuth.Body.Bytes(), []byte("OPEN PARCELS")) {
+		t.Errorf("expected dashboard HTML to contain 'OPEN PARCELS'")
+	}
+}
+
+func TestCapabilitiesEndpoint(t *testing.T) {
+	srv := setupTestServer()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/capabilities?query=cainiao", nil)
+	rec := httptest.NewRecorder()
+
+	srv.handleCapabilities(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK, got %d", rec.Code)
+	}
+
+	var res struct {
+		Total    int                     `json:"total"`
+		Carriers []CarrierCapabilityItem `json:"carriers"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &res); err != nil {
+		t.Fatalf("failed to parse capabilities JSON: %v", err)
+	}
+	if res.Total < 1 {
+		t.Errorf("expected at least 1 carrier for query cainiao, got %d", res.Total)
+	}
+	found := false
+	for _, c := range res.Carriers {
+		if c.Slug == "cainiao" {
+			found = true
+			if c.Mode != "live_api" {
+				t.Errorf("expected cainiao to have mode live_api, got %q", c.Mode)
+			}
+			if !c.IsLiveAdapter {
+				t.Errorf("expected cainiao to have IsLiveAdapter=true")
+			}
+		}
+	}
+	if !found {
+		t.Errorf("expected cainiao in capabilities response")
+	}
+}
+

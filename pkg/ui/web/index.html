@@ -1,0 +1,1509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Open Parcels &mdash; Developer Dashboard</title>
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: #111827;
+      --card-header: #1e293b;
+      --border: #1f293d;
+      --border-focus: #38bdf8;
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --primary: #0284c7;
+      --primary-hover: #0369a1;
+      --accent: #38bdf8;
+      --success: #10b981;
+      --success-bg: rgba(16, 185, 129, 0.12);
+      --warning: #f59e0b;
+      --warning-bg: rgba(245, 158, 11, 0.12);
+      --danger: #ef4444;
+      --danger-bg: rgba(239, 68, 68, 0.12);
+      --info: #3b82f6;
+      --info-bg: rgba(59, 130, 246, 0.12);
+      --purple: #a855f7;
+      --purple-bg: rgba(168, 85, 247, 0.12);
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: var(--font-sans);
+      line-height: 1.5;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Header */
+    header {
+      background: var(--card-bg);
+      border-bottom: 1px solid var(--border);
+      padding: 0.85rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .brand-icon {
+      font-size: 1.5rem;
+      line-height: 1;
+    }
+    .brand-title {
+      font-weight: 700;
+      font-size: 1.15rem;
+      letter-spacing: -0.02em;
+      color: #fff;
+    }
+    .brand-tag {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      font-weight: 700;
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--accent);
+      padding: 0.15rem 0.45rem;
+      border-radius: 4px;
+      letter-spacing: 0.05em;
+    }
+    .nav-tabs {
+      display: flex;
+      gap: 0.35rem;
+      background: var(--bg);
+      padding: 0.25rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 0.45rem 0.95rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      transition: all 0.15s ease;
+    }
+    .tab-btn:hover {
+      color: var(--text);
+    }
+    .tab-btn.active {
+      background: var(--card-bg);
+      color: var(--accent);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    }
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 0.25rem 0.6rem;
+      border-radius: 9999px;
+      background: var(--card-header);
+      border: 1px solid var(--border);
+    }
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--text-dim);
+    }
+    .status-dot.online { background: var(--success); box-shadow: 0 0 6px var(--success); }
+    .status-dot.offline { background: var(--danger); }
+    .btn-icon {
+      background: var(--card-header);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      cursor: pointer;
+      border-radius: 6px;
+      padding: 0.4rem 0.65rem;
+      font-size: 0.8rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      transition: all 0.15s ease;
+    }
+    .btn-icon:hover {
+      color: var(--text);
+      border-color: var(--text-dim);
+    }
+
+    /* Container */
+    main {
+      flex: 1;
+      max-width: 1300px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 1.5rem;
+    }
+
+    /* Card styling */
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+    }
+    .card-title {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: #fff;
+    }
+
+    /* Form Controls */
+    .form-grid {
+      display: grid;
+      grid-template-columns: 2fr 1.3fr 1fr 1fr;
+      gap: 0.75rem;
+      margin-bottom: 0.75rem;
+    }
+    @media (max-width: 900px) {
+      .form-grid { grid-template-columns: 1fr; }
+      header { flex-direction: column; gap: 0.75rem; align-items: stretch; }
+      .header-actions { justify-content: space-between; }
+    }
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+    .form-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .form-input, .form-select {
+      background: #0b1120;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 0.9rem;
+      padding: 0.6rem 0.8rem;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.15s ease;
+    }
+    .form-input:focus, .form-select:focus {
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 1px var(--border-focus);
+    }
+    .form-input.code {
+      font-family: var(--font-mono);
+      font-weight: 600;
+      letter-spacing: 0.05em;
+    }
+    .form-options {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding-top: 0.5rem;
+      border-top: 1px solid var(--border);
+      margin-top: 0.5rem;
+    }
+    .checkbox-group {
+      display: flex;
+      align-items: center;
+      gap: 1.25rem;
+    }
+    .checkbox-label {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      cursor: pointer;
+      user-select: none;
+    }
+    .checkbox-label input {
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+    .actions-group {
+      display: flex;
+      gap: 0.5rem;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+      padding: 0.55rem 1.15rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .btn-primary {
+      background: var(--primary);
+      color: #fff;
+    }
+    .btn-primary:hover {
+      background: var(--primary-hover);
+    }
+    .btn-secondary {
+      background: var(--card-header);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-secondary:hover {
+      border-color: var(--text-dim);
+    }
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* Quick Test Chips */
+    .quick-chips {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.4rem;
+      margin-top: 0.75rem;
+    }
+    .chip-label {
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      font-weight: 600;
+    }
+    .chip {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 0.2rem 0.55rem;
+      font-size: 0.75rem;
+      font-family: var(--font-mono);
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .chip:hover {
+      background: rgba(56, 189, 248, 0.1);
+      color: var(--accent);
+      border-color: var(--accent);
+    }
+
+    /* Shipment Result Card */
+    .shipment-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .shipment-id-wrap {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .shipment-id {
+      font-family: var(--font-mono);
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: #fff;
+    }
+    .btn-copy {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+      border-radius: 4px;
+      padding: 0.25rem 0.5rem;
+      font-size: 0.75rem;
+      cursor: pointer;
+    }
+    .btn-copy:hover { color: var(--text); border-color: var(--text-muted); }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 0.25rem 0.65rem;
+      border-radius: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .badge-delivered { background: var(--success-bg); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.3); }
+    .badge-in_transit { background: var(--info-bg); color: var(--info); border: 1px solid rgba(59, 130, 246, 0.3); }
+    .badge-out_for_delivery { background: var(--purple-bg); color: var(--purple); border: 1px solid rgba(168, 85, 247, 0.3); }
+    .badge-info_received { background: var(--warning-bg); color: var(--warning); border: 1px solid rgba(245, 158, 11, 0.3); }
+    .badge-exception, .badge-failed_attempt { background: var(--danger-bg); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.3); }
+    .badge-pending { background: rgba(100, 116, 139, 0.2); color: var(--text-muted); border: 1px solid var(--border); }
+
+    /* Progress bar */
+    .progress-section {
+      padding: 1.25rem 0;
+    }
+    .progress-bar-bg {
+      height: 8px;
+      background: #1e293b;
+      border-radius: 9999px;
+      overflow: hidden;
+      margin-bottom: 0.75rem;
+      position: relative;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #0284c7, #38bdf8);
+      border-radius: 9999px;
+      transition: width 0.5s ease;
+    }
+    .progress-bar-fill.delivered {
+      background: linear-gradient(90deg, #059669, #10b981);
+    }
+    .progress-stages {
+      display: flex;
+      justify-content: space-between;
+      position: relative;
+    }
+    .stage-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.3rem;
+      font-size: 0.7rem;
+      color: var(--text-dim);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .stage-item.completed { color: var(--text-muted); }
+    .stage-item.current { color: var(--accent); font-weight: 700; }
+    .stage-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #334155;
+    }
+    .stage-item.completed .stage-dot { background: var(--info); }
+    .stage-item.current .stage-dot {
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent);
+      transform: scale(1.3);
+    }
+
+    /* Meta Grid */
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      padding: 1rem;
+      background: #0b1120;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      margin-bottom: 1.25rem;
+    }
+    .meta-item {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+    }
+    .meta-title {
+      font-size: 0.7rem;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+    .meta-val {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    /* Timeline */
+    .timeline {
+      position: relative;
+      padding-left: 2rem;
+      margin-top: 1rem;
+    }
+    .timeline::before {
+      content: '';
+      position: absolute;
+      left: 7px;
+      top: 6px;
+      bottom: 6px;
+      width: 2px;
+      background: #1e293b;
+    }
+    .timeline-event {
+      position: relative;
+      margin-bottom: 1.25rem;
+    }
+    .timeline-event:last-child { margin-bottom: 0; }
+    .timeline-dot {
+      position: absolute;
+      left: -2rem;
+      top: 4px;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--card-bg);
+      border: 3px solid var(--text-dim);
+      z-index: 1;
+    }
+    .timeline-event:first-child .timeline-dot {
+      border-color: var(--accent);
+      background: var(--accent);
+      box-shadow: 0 0 8px rgba(56, 189, 248, 0.6);
+    }
+    .timeline-content {
+      background: #0e1526;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.75rem 1rem;
+    }
+    .timeline-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      margin-bottom: 0.35rem;
+    }
+    .timeline-time {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--accent);
+      font-weight: 600;
+    }
+    .timeline-location {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+    .timeline-carrier {
+      font-size: 0.7rem;
+      background: rgba(255, 255, 255, 0.06);
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      color: var(--text-muted);
+    }
+    .timeline-desc {
+      font-size: 0.88rem;
+      color: #fff;
+    }
+
+    /* JSON Details */
+    details.raw-json {
+      background: #0b1120;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      margin-top: 1.5rem;
+    }
+    details.raw-json summary {
+      padding: 0.75rem 1rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      user-select: none;
+    }
+    details.raw-json summary:hover { color: var(--text); }
+    .json-code {
+      padding: 1rem;
+      margin: 0;
+      background: #070b14;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      line-height: 1.4;
+      overflow-x: auto;
+      border-top: 1px solid var(--border);
+      max-height: 500px;
+    }
+
+    /* Carriers Health Table */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.25rem;
+    }
+    .stat-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem;
+    }
+    .stat-num {
+      font-size: 1.75rem;
+      font-weight: 800;
+      color: #fff;
+      font-family: var(--font-mono);
+    }
+    .stat-desc {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .table-container {
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      text-align: left;
+    }
+    th {
+      background: #0e1526;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      font-weight: 600;
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    td {
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(255, 255, 255, 0.02); }
+
+    .tag-mode {
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .tag-live { background: var(--success-bg); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.3); }
+    .tag-scraper { background: var(--info-bg); color: var(--info); border: 1px solid rgba(59, 130, 246, 0.3); }
+    .tag-catalog { background: rgba(148, 163, 184, 0.1); color: var(--text-muted); border: 1px solid var(--border); }
+
+    .cap-pill {
+      display: inline-block;
+      font-size: 0.7rem;
+      background: #1e293b;
+      color: var(--text-muted);
+      padding: 0.15rem 0.4rem;
+      border-radius: 3px;
+      margin-right: 0.25rem;
+      margin-bottom: 0.25rem;
+    }
+    .cap-pill.active {
+      color: var(--accent);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+    }
+
+    /* Modal */
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      width: 100%;
+      max-width: 480px;
+      padding: 1.5rem;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+    }
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+    .modal-title { font-size: 1.1rem; font-weight: 700; color: #fff; }
+
+    /* Alert / Error Banner */
+    .alert {
+      padding: 0.85rem 1rem;
+      border-radius: 6px;
+      margin-bottom: 1.25rem;
+      font-size: 0.85rem;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+    .alert-error {
+      background: var(--danger-bg);
+      color: #fca5a5;
+      border: 1px solid rgba(239, 68, 68, 0.4);
+    }
+    .alert-info {
+      background: var(--info-bg);
+      color: #93c5fd;
+      border: 1px solid rgba(59, 130, 246, 0.4);
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <div class="brand">
+      <div class="brand-icon">📦</div>
+      <div>
+        <div class="brand-title">OPEN PARCELS</div>
+      </div>
+      <span class="brand-tag">v1.0.0</span>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <nav class="nav-tabs">
+      <button class="tab-btn active" id="tabNavInspector" onclick="switchTab('inspector')">
+        <span>🔍</span> Tracking Inspector
+      </button>
+      <button class="tab-btn" id="tabNavCarriers" onclick="switchTab('carriers')">
+        <span>⚡</span> Carrier Matrix &amp; Health
+      </button>
+    </nav>
+
+    <!-- Header Actions -->
+    <div class="header-actions">
+      <div class="status-badge" id="serverStatusBadge" title="Server ping">
+        <span class="status-dot" id="serverStatusDot"></span>
+        <span id="serverStatusText">Connecting...</span>
+      </div>
+      <button class="btn-icon" onclick="openSettingsModal()" title="API Key settings">
+        <span>⚙</span> Settings
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main>
+
+    <!-- TAB 1: TRACKING INSPECTOR -->
+    <div id="tabInspector">
+      <!-- Search Card -->
+      <section class="card">
+        <h2 class="card-title"><span>🔍</span> Track Parcel or Detect Courier</h2>
+        <form id="trackForm" onsubmit="event.preventDefault(); trackParcel();">
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label" for="trackingNumInput">Tracking Number *</label>
+              <input type="text" id="trackingNumInput" class="form-input code" placeholder="e.g. 75616714, LP00561234567890, PQ4F6P0..." required autofocus autocomplete="off" />
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="carrierSelect">Carrier Adapter</label>
+              <select id="carrierSelect" class="form-select">
+                <option value="">Auto-detect Carrier (Recommended)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="postalCodeInput">Postal Code</label>
+              <input type="text" id="postalCodeInput" class="form-input" placeholder="e.g. 28001" />
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="countryInput">Dest Country</label>
+              <input type="text" id="countryInput" class="form-input" placeholder="e.g. ES, IT" maxlength="2" />
+            </div>
+          </div>
+
+          <div class="form-options">
+            <div class="checkbox-group">
+              <label class="checkbox-label">
+                <input type="checkbox" id="mockCheck" />
+                <span>Simulated / Mock fallback</span>
+              </label>
+              <label class="checkbox-label">
+                <input type="checkbox" id="refreshCheck" />
+                <span>Force refresh (bypass cache)</span>
+              </label>
+            </div>
+            <div class="actions-group">
+              <button type="button" class="btn btn-secondary" onclick="detectCarrier()">
+                <span>🔎</span> Detect Only
+              </button>
+              <button type="submit" class="btn btn-primary" id="btnTrack">
+                <span id="trackBtnText">Track Shipment</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Quick Test Chips -->
+          <div class="quick-chips">
+            <span class="chip-label">Quick Tests:</span>
+            <button type="button" class="chip" onclick="loadSample('75616714', 'inpost-italy', '')">InPost IT (75616714)</button>
+            <button type="button" class="chip" onclick="loadSample('LP00561234567890', 'cainiao', '')">Cainiao (LP00561...)</button>
+            <button type="button" class="chip" onclick="loadSample('PQ4F6P07000000000000000', 'correos-spain', '28001')">Correos ES (PQ4F...)</button>
+            <button type="button" class="chip" onclick="loadSample('0028700000000000000000', 'ctt-express', '28001')">CTT Express</button>
+            <button type="button" class="chip" onclick="loadSample('000012345678', 'asm-gls-spain', '28001')">GLS Spain</button>
+            <button type="button" class="chip" onclick="loadSample('1Z9999999999999999', 'ups', '')">UPS Express</button>
+          </div>
+        </form>
+      </section>
+
+      <!-- Alert / Status Banner -->
+      <div id="inspectorAlert" style="display: none;"></div>
+
+      <!-- Detection Results Card (if detect-only clicked) -->
+      <section id="detectionResultCard" class="card" style="display: none;">
+        <h2 class="card-title"><span>🔎</span> Detected Carriers</h2>
+        <div id="detectionContent"></div>
+      </section>
+
+      <!-- Tracking Results Card -->
+      <section id="shipmentResultCard" class="card" style="display: none;">
+        <!-- Header -->
+        <div class="shipment-header">
+          <div class="shipment-id-wrap">
+            <span class="shipment-id" id="resTrackingNum">---</span>
+            <button class="btn-copy" onclick="copyTrackingNumber()" title="Copy tracking number">Copy</button>
+          </div>
+          <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <span class="badge" id="resStatusBadge">---</span>
+            <span class="badge badge-pending" id="resDaysInTransit" style="display: none;"></span>
+          </div>
+        </div>
+
+        <!-- Progress Bar & Stages -->
+        <div class="progress-section">
+          <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.35rem;">
+            <span>Journey Progress</span>
+            <span id="resProgressText" style="font-weight: 700; color: #fff;">0%</span>
+          </div>
+          <div class="progress-bar-bg">
+            <div class="progress-bar-fill" id="resProgressBar" style="width: 0%;"></div>
+          </div>
+          <div class="progress-stages">
+            <div class="stage-item" id="stageCreated"><div class="stage-dot"></div><span>Created</span></div>
+            <div class="stage-item" id="stagePickedUp"><div class="stage-dot"></div><span>Picked Up</span></div>
+            <div class="stage-item" id="stageTransit"><div class="stage-dot"></div><span>In Transit</span></div>
+            <div class="stage-item" id="stageCustoms"><div class="stage-dot"></div><span>Customs</span></div>
+            <div class="stage-item" id="stageLastMile"><div class="stage-dot"></div><span>Last Mile</span></div>
+            <div class="stage-item" id="stageDelivered"><div class="stage-dot"></div><span>Delivered</span></div>
+          </div>
+        </div>
+
+        <!-- Metadata Grid -->
+        <div class="meta-grid">
+          <div class="meta-item">
+            <span class="meta-title">Carrier</span>
+            <span class="meta-val" id="resCarrier">---</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-title">Route</span>
+            <span class="meta-val" id="resRoute">---</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-title">Estimated Delivery</span>
+            <span class="meta-val" id="resEstDelivery">---</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-title">Cache Status</span>
+            <span class="meta-val" id="resCacheStatus">---</span>
+          </div>
+        </div>
+
+        <!-- Handover / Additional Carriers Note -->
+        <div id="resAdditionalCarriersWrap" style="display: none; background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 6px; padding: 0.65rem 1rem; margin-bottom: 1.25rem; font-size: 0.85rem;">
+          <span style="font-weight: 700; color: var(--accent);">➔ Handover / Multi-Carrier:</span>
+          <span id="resAdditionalCarriersText" style="margin-left: 0.4rem; color: #fff;"></span>
+        </div>
+
+        <!-- Milestones Timeline -->
+        <h3 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 0.5rem; color: #fff; display: flex; align-items: center; gap: 0.4rem;">
+          <span>📍</span> Milestone Events Timeline (<span id="resEventCount">0</span>)
+        </h3>
+        <div class="timeline" id="resTimeline"></div>
+
+        <!-- Collapsible Raw JSON -->
+        <details class="raw-json" id="rawJsonDetails">
+          <summary>
+            <span>Raw JSON Payload</span>
+            <button type="button" class="btn-copy" onclick="event.preventDefault(); copyRawJson();">Copy JSON</button>
+          </summary>
+          <pre class="json-code"><code id="rawJsonContent">// JSON will appear here...</code></pre>
+        </details>
+      </section>
+    </div>
+
+    <!-- TAB 2: CARRIERS HEALTH & CAPABILITIES MATRIX -->
+    <div id="tabCarriers" style="display: none;">
+      <!-- Stats Summary -->
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-num" id="statTotalCarriers">--</div>
+          <div class="stat-desc">Total Registered Couriers</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-num" id="statLiveAdapters" style="color: var(--success);">--</div>
+          <div class="stat-desc">Live API Adapters</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-num" id="statScraperAdapters" style="color: var(--info);">--</div>
+          <div class="stat-desc">Public Scraper Drivers</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-num" id="statCatalogCarriers" style="color: var(--text-dim);">--</div>
+          <div class="stat-desc">Catalog Couriers</div>
+        </div>
+      </div>
+
+      <!-- Filter Bar -->
+      <section class="card" style="padding: 1rem;">
+        <div style="display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; justify-content: space-between;">
+          <div style="display: flex; gap: 0.75rem; flex: 1; min-width: 280px;">
+            <input type="text" id="carrierFilterInput" class="form-input" placeholder="Filter couriers by name, slug, country..." oninput="filterCarriersTable()" style="width: 100%;" />
+          </div>
+          <div style="display: flex; gap: 0.35rem;">
+            <button class="btn btn-secondary" onclick="setModeFilter('all')" id="btnFilterAll" style="font-size: 0.75rem; padding: 0.4rem 0.75rem;">All</button>
+            <button class="btn btn-secondary" onclick="setModeFilter('live_api')" id="btnFilterLive" style="font-size: 0.75rem; padding: 0.4rem 0.75rem;">Live API</button>
+            <button class="btn btn-secondary" onclick="setModeFilter('public_scraper')" id="btnFilterScraper" style="font-size: 0.75rem; padding: 0.4rem 0.75rem;">Scrapers</button>
+            <button class="btn btn-secondary" onclick="setModeFilter('catalog')" id="btnFilterCatalog" style="font-size: 0.75rem; padding: 0.4rem 0.75rem;">Catalog</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Matrix Table -->
+      <section class="card" style="padding: 0; overflow: hidden;">
+        <div class="table-container">
+          <table id="carriersTable">
+            <thead>
+              <tr>
+                <th>Carrier</th>
+                <th>Country</th>
+                <th>Service Type</th>
+                <th>Integration Mode</th>
+                <th>Capabilities</th>
+                <th style="text-align: right;">Action</th>
+              </tr>
+            </thead>
+            <tbody id="carriersTableBody">
+              <tr>
+                <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 2rem;">Loading carrier matrix...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+  </main>
+
+  <!-- Settings Modal (API Key) -->
+  <div class="modal-backdrop" id="settingsModal" onclick="if(event.target === this) closeSettingsModal()">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title">⚙ Developer Settings</h3>
+        <button class="btn-copy" onclick="closeSettingsModal()">✕</button>
+      </div>
+      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
+        If your Open Parcels daemon was launched with <code>--api-key</code>, enter your token below. It will be stored locally in your browser and automatically sent via the <code>X-API-Key</code> header.
+      </p>
+      <div class="form-group" style="margin-bottom: 1rem;">
+        <label class="form-label" for="apiKeyInput">API Key / Bearer Token</label>
+        <input type="password" id="apiKeyInput" class="form-input code" placeholder="Enter configured API key..." />
+      </div>
+      <div style="display: flex; justify-content: flex-end; gap: 0.5rem;">
+        <button class="btn btn-secondary" onclick="clearApiKey()">Clear</button>
+        <button class="btn btn-primary" onclick="saveApiKey()">Save Key</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // State
+    let currentTab = 'inspector';
+    let carrierCapabilities = [];
+    let currentRawJson = null;
+    let activeModeFilter = 'all';
+
+    // Initialization
+    document.addEventListener('DOMContentLoaded', () => {
+      loadStoredApiKey();
+      pingServerHealth();
+      fetchCarriers();
+      setInterval(pingServerHealth, 30000);
+    });
+
+    // API Key helpers
+    function getApiKey() {
+      return localStorage.getItem('open_parcels_api_key') || '';
+    }
+    function loadStoredApiKey() {
+      const key = getApiKey();
+      const input = document.getElementById('apiKeyInput');
+      if (input && key) input.value = key;
+    }
+    function saveApiKey() {
+      const input = document.getElementById('apiKeyInput');
+      const val = (input ? input.value : '').trim();
+      if (val) {
+        localStorage.setItem('open_parcels_api_key', val);
+      } else {
+        localStorage.removeItem('open_parcels_api_key');
+      }
+      closeSettingsModal();
+      pingServerHealth();
+      fetchCarriers();
+    }
+    function clearApiKey() {
+      localStorage.removeItem('open_parcels_api_key');
+      const input = document.getElementById('apiKeyInput');
+      if (input) input.value = '';
+      closeSettingsModal();
+      pingServerHealth();
+      fetchCarriers();
+    }
+    function openSettingsModal() {
+      loadStoredApiKey();
+      document.getElementById('settingsModal').classList.add('open');
+    }
+    function closeSettingsModal() {
+      document.getElementById('settingsModal').classList.remove('open');
+    }
+
+    // HTTP Helper with API Key injection
+    async function apiFetch(url, options = {}) {
+      options.headers = options.headers || {};
+      const key = getApiKey();
+      if (key) {
+        options.headers['X-API-Key'] = key;
+      }
+      return fetch(url, options);
+    }
+
+    // Tab Switching
+    function switchTab(tab) {
+      currentTab = tab;
+      const isInspector = tab === 'inspector';
+      document.getElementById('tabInspector').style.display = isInspector ? 'block' : 'none';
+      document.getElementById('tabCarriers').style.display = isInspector ? 'none' : 'block';
+      document.getElementById('tabNavInspector').classList.toggle('active', isInspector);
+      document.getElementById('tabNavCarriers').classList.toggle('active', !isInspector);
+      if (!isInspector && carrierCapabilities.length === 0) {
+        fetchCarriers();
+      }
+    }
+
+    // Health ping
+    async function pingServerHealth() {
+      const dot = document.getElementById('serverStatusDot');
+      const text = document.getElementById('serverStatusText');
+      const start = performance.now();
+      try {
+        const res = await apiFetch('/health');
+        const elapsed = Math.round(performance.now() - start);
+        if (res.ok) {
+          const data = await res.json();
+          dot.className = 'status-dot online';
+          text.textContent = `Online (${elapsed}ms)`;
+        } else {
+          dot.className = 'status-dot offline';
+          text.textContent = `HTTP ${res.status}`;
+        }
+      } catch (err) {
+        dot.className = 'status-dot offline';
+        text.textContent = 'Offline';
+      }
+    }
+
+    // Fetch Carriers & Populate Dropdown / Table
+    async function fetchCarriers() {
+      try {
+        const res = await apiFetch('/api/v1/capabilities');
+        if (res.ok) {
+          const data = await res.json();
+          carrierCapabilities = data.carriers || [];
+          populateCarrierSelect(carrierCapabilities);
+          renderCarriersTable(carrierCapabilities);
+          updateCarrierStats(carrierCapabilities);
+        } else {
+          // Fallback to /api/v1/carriers if capabilities is not yet ready
+          const res2 = await apiFetch('/api/v1/carriers');
+          if (res2.ok) {
+            const data2 = await res2.json();
+            carrierCapabilities = (data2.carriers || []).map(c => ({
+              ...c,
+              mode: 'catalog',
+              status: 'catalog',
+              is_live_adapter: false,
+              requires_postal_code: false,
+              requires_auth: false
+            }));
+            populateCarrierSelect(carrierCapabilities);
+            renderCarriersTable(carrierCapabilities);
+            updateCarrierStats(carrierCapabilities);
+          }
+        }
+      } catch (e) {
+        console.error('Failed to load carriers:', e);
+      }
+    }
+
+    function populateCarrierSelect(carriers) {
+      const select = document.getElementById('carrierSelect');
+      const currentVal = select.value;
+      select.innerHTML = '<option value="">Auto-detect Carrier (Recommended)</option>';
+
+      // Sort by Name
+      const sorted = [...carriers].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      sorted.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.slug;
+        const liveLabel = c.is_live_adapter || c.mode === 'live_api' ? '⚡ ' : '';
+        const countryLabel = c.country ? ` [${c.country}]` : '';
+        opt.textContent = `${liveLabel}${c.name}${countryLabel}`;
+        select.appendChild(opt);
+      });
+
+      if (currentVal) select.value = currentVal;
+    }
+
+    function updateCarrierStats(carriers) {
+      let live = 0, scrapers = 0, catalog = 0;
+      carriers.forEach(c => {
+        if (c.mode === 'live_api' || (c.is_live_adapter && !c.supports_web_scraping)) live++;
+        else if (c.mode === 'public_scraper' || c.supports_web_scraping) scrapers++;
+        else catalog++;
+      });
+      document.getElementById('statTotalCarriers').textContent = carriers.length;
+      document.getElementById('statLiveAdapters').textContent = live;
+      document.getElementById('statScraperAdapters').textContent = scrapers;
+      document.getElementById('statCatalogCarriers').textContent = catalog;
+    }
+
+    function renderCarriersTable(carriers) {
+      const tbody = document.getElementById('carriersTableBody');
+      const query = (document.getElementById('carrierFilterInput')?.value || '').toLowerCase().trim();
+
+      const filtered = carriers.filter(c => {
+        if (activeModeFilter !== 'all') {
+          if (activeModeFilter === 'live_api' && c.mode !== 'live_api') return false;
+          if (activeModeFilter === 'public_scraper' && c.mode !== 'public_scraper') return false;
+          if (activeModeFilter === 'catalog' && c.mode !== 'catalog') return false;
+        }
+        if (!query) return true;
+        return (c.slug || '').toLowerCase().includes(query) ||
+               (c.name || '').toLowerCase().includes(query) ||
+               (c.country || '').toLowerCase().includes(query) ||
+               (c.country_name || '').toLowerCase().includes(query);
+      });
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-dim); padding: 2rem;">No carriers match filter.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(c => {
+        let modeTag = '<span class="tag-mode tag-catalog">Catalog</span>';
+        if (c.mode === 'live_api' || c.supports_live_api) {
+          modeTag = '<span class="tag-mode tag-live">Live API</span>';
+        } else if (c.mode === 'public_scraper' || c.supports_web_scraping) {
+          modeTag = '<span class="tag-mode tag-scraper">Scraper</span>';
+        }
+
+        let capsHtml = '';
+        if (c.requires_postal_code) capsHtml += '<span class="cap-pill active">Postal Code Req</span>';
+        if (c.requires_auth) capsHtml += '<span class="cap-pill active">Auth Req</span>';
+        if (c.supports_proof_of_delivery) capsHtml += '<span class="cap-pill active">Proof of Delivery</span>';
+        if (!capsHtml) capsHtml = '<span class="cap-pill">Standard</span>';
+
+        const countryStr = c.country ? `${c.country} (${c.country_name || ''})` : 'Global';
+
+        return `
+          <tr>
+            <td>
+              <div style="font-weight: 700; color: #fff;">${escapeHtml(c.name)}</div>
+              <div style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--accent);">${escapeHtml(c.slug)}</div>
+            </td>
+            <td><span style="font-family: var(--font-mono);">${escapeHtml(countryStr)}</span></td>
+            <td><span style="color: var(--text-muted); text-transform: capitalize;">${escapeHtml(c.type || 'postal')}</span></td>
+            <td>${modeTag}</td>
+            <td>${capsHtml}</td>
+            <td style="text-align: right;">
+              <button class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.6rem;" onclick="testCarrier('${escapeHtml(c.slug)}')">
+                Test
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function filterCarriersTable() {
+      renderCarriersTable(carrierCapabilities);
+    }
+
+    function setModeFilter(mode) {
+      activeModeFilter = mode;
+      ['All', 'Live', 'Scraper', 'Catalog'].forEach(k => {
+        const btn = document.getElementById('btnFilter' + k);
+        if (btn) btn.classList.remove('btn-primary');
+      });
+      const activeBtnId = mode === 'all' ? 'btnFilterAll' : (mode === 'live_api' ? 'btnFilterLive' : (mode === 'public_scraper' ? 'btnFilterScraper' : 'btnFilterCatalog'));
+      const activeBtn = document.getElementById(activeBtnId);
+      if (activeBtn) activeBtn.classList.add('btn-primary');
+      renderCarriersTable(carrierCapabilities);
+    }
+
+    function testCarrier(slug) {
+      switchTab('inspector');
+      const select = document.getElementById('carrierSelect');
+      select.value = slug;
+      document.getElementById('trackingNumInput').focus();
+    }
+
+    // Sample Loader
+    function loadSample(num, carrier, postal) {
+      document.getElementById('trackingNumInput').value = num;
+      if (carrier) document.getElementById('carrierSelect').value = carrier;
+      if (postal) document.getElementById('postalCodeInput').value = postal;
+      trackParcel();
+    }
+
+    // Detect Carrier Only
+    async function detectCarrier() {
+      const num = document.getElementById('trackingNumInput').value.trim();
+      const country = document.getElementById('countryInput').value.trim();
+      if (!num) {
+        showAlert('Please enter a tracking number to detect.', 'error');
+        return;
+      }
+
+      hideAlert();
+      hideShipmentResult();
+      const detectCard = document.getElementById('detectionResultCard');
+      const detectContent = document.getElementById('detectionContent');
+      detectCard.style.display = 'block';
+      detectContent.innerHTML = '<div style="display: flex; align-items: center; gap: 0.5rem; color: var(--text-muted);"><span class="spinner"></span> Detecting matching couriers...</div>';
+
+      try {
+        let url = `/api/v1/detect?number=${encodeURIComponent(num)}`;
+        if (country) url += `&country=${encodeURIComponent(country)}`;
+        const res = await apiFetch(url);
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          detectContent.innerHTML = `<div class="alert alert-error">Detection failed: ${escapeHtml(err.error?.message || res.statusText)}</div>`;
+          return;
+        }
+
+        const data = await res.json();
+        const candidates = data.candidates || [];
+        if (candidates.length === 0) {
+          detectContent.innerHTML = `<div class="alert alert-info">No confident courier patterns detected for <code>${escapeHtml(num)}</code>. You can select a courier manually.</div>`;
+          return;
+        }
+
+        detectContent.innerHTML = `
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+            Detected <strong>${candidates.length}</strong> possible carrier candidate(s) for <code>${escapeHtml(num)}</code>:
+          </p>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 0.75rem;">
+            ${candidates.map((c, i) => `
+              <div style="background: #0b1120; border: 1px solid var(--border); border-radius: 6px; padding: 0.75rem; display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                  <div style="font-weight: 700; color: #fff;">${escapeHtml(c.carrier.name)}</div>
+                  <div style="font-size: 0.75rem; color: var(--accent); font-family: var(--font-mono);">${escapeHtml(c.carrier.slug)} [${escapeHtml(c.carrier.country || 'GLOBAL')}]</div>
+                  <div style="font-size: 0.7rem; color: var(--text-dim); margin-top: 0.2rem;">Confidence: ${(c.confidence * 100).toFixed(0)}% &bull; ${escapeHtml(c.reason || 'Pattern match')}</div>
+                </div>
+                <button class="btn btn-primary" style="font-size: 0.75rem; padding: 0.35rem 0.7rem;" onclick="selectCandidateAndTrack('${escapeHtml(c.carrier.slug)}')">
+                  Track
+                </button>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      } catch (err) {
+        detectContent.innerHTML = `<div class="alert alert-error">Network error: ${escapeHtml(err.message)}</div>`;
+      }
+    }
+
+    function selectCandidateAndTrack(slug) {
+      document.getElementById('carrierSelect').value = slug;
+      document.getElementById('detectionResultCard').style.display = 'none';
+      trackParcel();
+    }
+
+    // Track Parcel Execution
+    async function trackParcel() {
+      const num = document.getElementById('trackingNumInput').value.trim();
+      const carrier = document.getElementById('carrierSelect').value;
+      const postal = document.getElementById('postalCodeInput').value.trim();
+      const country = document.getElementById('countryInput').value.trim();
+      const mock = document.getElementById('mockCheck').checked;
+      const refresh = document.getElementById('refreshCheck').checked;
+
+      if (!num) {
+        showAlert('Please enter a tracking number.', 'error');
+        return;
+      }
+
+      hideAlert();
+      document.getElementById('detectionResultCard').style.display = 'none';
+      setLoading(true);
+
+      let url = `/api/v1/track?number=${encodeURIComponent(num)}`;
+      if (carrier) url += `&carrier=${encodeURIComponent(carrier)}`;
+      if (postal) url += `&postal_code=${encodeURIComponent(postal)}`;
+      if (country) url += `&country=${encodeURIComponent(country)}`;
+      if (mock) url += `&mock=true`;
+      if (refresh) url += `&refresh=true`;
+
+      try {
+        const res = await apiFetch(url);
+        const data = await res.json().catch(() => null);
+
+        if (!res.ok) {
+          const errMsg = data?.error?.message || `HTTP ${res.status} ${res.statusText}`;
+          const errCode = data?.error?.code ? `[${data.error.code}] ` : '';
+          showAlert(`${errCode}${errMsg}`, 'error');
+          hideShipmentResult();
+          return;
+        }
+
+        renderShipment(data);
+      } catch (err) {
+        showAlert(`Tracking request failed: ${err.message}`, 'error');
+        hideShipmentResult();
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    // Render Shipment Details
+    function renderShipment(s) {
+      currentRawJson = s;
+      const card = document.getElementById('shipmentResultCard');
+      card.style.display = 'block';
+
+      // Header
+      document.getElementById('resTrackingNum').textContent = s.tracking_number || '---';
+
+      const badge = document.getElementById('resStatusBadge');
+      badge.className = `badge badge-${s.status || 'pending'}`;
+      badge.textContent = s.status_text || (s.status || 'UNKNOWN').toUpperCase();
+
+      const daysBadge = document.getElementById('resDaysInTransit');
+      if (s.days_in_transit > 0) {
+        daysBadge.style.display = 'inline-flex';
+        daysBadge.textContent = `${s.days_in_transit} day${s.days_in_transit === 1 ? '' : 's'} in transit`;
+      } else {
+        daysBadge.style.display = 'none';
+      }
+
+      // Progress bar
+      const progress = Math.max(0, Math.min(100, s.progress || 0));
+      const fill = document.getElementById('resProgressBar');
+      fill.style.width = `${progress}%`;
+      fill.classList.toggle('delivered', s.status === 'delivered');
+      document.getElementById('resProgressText').textContent = `${progress}%`;
+
+      // Lifecycle stages update
+      updateLifecycleStages(s.status, progress);
+
+      // Meta grid
+      let carrierName = s.carrier?.name || 'Unknown';
+      if (s.carrier?.slug) carrierName += ` (${s.carrier.slug})`;
+      document.getElementById('resCarrier').textContent = carrierName;
+
+      let routeStr = (s.origin?.name || s.origin?.code || 'Origin') + ' ➔ ' + (s.destination?.name || s.destination?.code || 'Destination');
+      document.getElementById('resRoute').textContent = routeStr;
+
+      let estText = '---';
+      if (s.estimated_delivery) {
+        estText = formatDate(s.estimated_delivery);
+      } else if (s.delivered_at) {
+        estText = `Delivered on ${formatDate(s.delivered_at)}`;
+      }
+      document.getElementById('resEstDelivery').textContent = estText;
+
+      let cacheText = s.from_cache ? '⚡ Cached' : '🌐 Live Fetch';
+      if (s.updated_at) cacheText += ` (${formatDate(s.updated_at)})`;
+      document.getElementById('resCacheStatus').textContent = cacheText;
+
+      // Additional carriers / handover
+      const handoverWrap = document.getElementById('resAdditionalCarriersWrap');
+      const handoverText = document.getElementById('resAdditionalCarriersText');
+      if (s.additional_carriers && s.additional_carriers.length > 0) {
+        handoverWrap.style.display = 'block';
+        handoverText.textContent = s.additional_carriers.map(ac => `${ac.name} (${ac.slug})`).join(', ');
+      } else if (s.last_mile_carrier) {
+        handoverWrap.style.display = 'block';
+        handoverText.textContent = `${s.last_mile_carrier.name} (${s.last_mile_carrier.slug}) [Last-Mile]`;
+      } else {
+        handoverWrap.style.display = 'none';
+      }
+
+      // Timeline events
+      const timeline = document.getElementById('resTimeline');
+      const events = s.events || [];
+      document.getElementById('resEventCount').textContent = events.length;
+
+      if (events.length === 0) {
+        timeline.innerHTML = '<div style="color: var(--text-dim); font-size: 0.85rem; padding-left: 0.5rem;">No milestone events recorded yet.</div>';
+      } else {
+        timeline.innerHTML = events.map(e => {
+          const locStr = e.location ? `<span class="timeline-location">📍 ${escapeHtml(e.location)}</span>` : '';
+          const carrierTag = e.carrier_name ? `<span class="timeline-carrier">${escapeHtml(e.carrier_name)}</span>` : '';
+          return `
+            <div class="timeline-event">
+              <div class="timeline-dot"></div>
+              <div class="timeline-content">
+                <div class="timeline-header">
+                  <span class="timeline-time">${formatDate(e.date || e.raw_date)}</span>
+                  <div style="display: flex; gap: 0.4rem; align-items: center;">
+                    ${locStr}
+                    ${carrierTag}
+                  </div>
+                </div>
+                <div class="timeline-desc">${escapeHtml(e.description || '')}</div>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      // Raw JSON
+      document.getElementById('rawJsonContent').textContent = JSON.stringify(s, null, 2);
+    }
+
+    function updateLifecycleStages(status, progress) {
+      const stages = ['stageCreated', 'stagePickedUp', 'stageTransit', 'stageCustoms', 'stageLastMile', 'stageDelivered'];
+      stages.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.className = 'stage-item';
+      });
+
+      if (status === 'delivered') {
+        stages.forEach(id => document.getElementById(id).classList.add('completed'));
+        document.getElementById('stageDelivered').classList.add('current');
+      } else if (status === 'out_for_delivery') {
+        ['stageCreated', 'stagePickedUp', 'stageTransit', 'stageCustoms'].forEach(id => document.getElementById(id).classList.add('completed'));
+        document.getElementById('stageLastMile').classList.add('current');
+      } else if (status === 'in_transit') {
+        document.getElementById('stageCreated').classList.add('completed');
+        document.getElementById('stagePickedUp').classList.add('completed');
+        document.getElementById('stageTransit').classList.add('current');
+      } else {
+        document.getElementById('stageCreated').classList.add('current');
+      }
+    }
+
+    function formatDate(dateStr) {
+      if (!dateStr) return '---';
+      try {
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return dateStr;
+        return d.toLocaleString(undefined, {
+          year: 'numeric',
+          month: 'short',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+      } catch {
+        return dateStr;
+      }
+    }
+
+    // UI Feedback Helpers
+    function setLoading(isLoading) {
+      const btn = document.getElementById('btnTrack');
+      const text = document.getElementById('trackBtnText');
+      btn.disabled = isLoading;
+      text.innerHTML = isLoading ? '<span class="spinner"></span> Tracking...' : 'Track Shipment';
+    }
+
+    function showAlert(msg, type = 'error') {
+      const alert = document.getElementById('inspectorAlert');
+      alert.className = `alert alert-${type}`;
+      alert.innerHTML = `<span>${type === 'error' ? '⚠️' : 'ℹ️'}</span> <span>${escapeHtml(msg)}</span>`;
+      alert.style.display = 'flex';
+    }
+
+    function hideAlert() {
+      document.getElementById('inspectorAlert').style.display = 'none';
+    }
+
+    function hideShipmentResult() {
+      document.getElementById('shipmentResultCard').style.display = 'none';
+    }
+
+    function copyTrackingNumber() {
+      const num = document.getElementById('resTrackingNum').textContent;
+      if (num && num !== '---') {
+        navigator.clipboard.writeText(num);
+      }
+    }
+
+    function copyRawJson() {
+      if (currentRawJson) {
+        navigator.clipboard.writeText(JSON.stringify(currentRawJson, null, 2));
+      }
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+  </script>
+</body>
+</html>
