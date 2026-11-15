@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
+	"open-parcels/pkg/carriers"
 	"open-parcels/pkg/models"
 )
 
@@ -28,6 +30,91 @@ func (s *Server) handleCarriers(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"total":    len(carriers),
 		"carriers": carriers,
+	})
+}
+
+// CarrierCapabilityItem represents the operational status and capabilities of a carrier adapter.
+type CarrierCapabilityItem struct {
+	Slug                    string             `json:"slug"`
+	Name                    string             `json:"name"`
+	Country                 string             `json:"country,omitempty"`
+	CountryName             string             `json:"country_name,omitempty"`
+	Type                    models.CarrierType `json:"type,omitempty"`
+	Website                 string             `json:"website,omitempty"`
+	TrackingURL             string             `json:"tracking_url,omitempty"`
+	Mode                    string             `json:"mode"`
+	Status                  string             `json:"status"`
+	IsLiveAdapter           bool               `json:"is_live_adapter"`
+	RequiresPostalCode      bool               `json:"requires_postal_code"`
+	RequiresAuth            bool               `json:"requires_auth"`
+	SupportsProofOfDelivery bool               `json:"supports_proof_of_delivery"`
+	SupportsLiveAPI         bool               `json:"supports_live_api"`
+	SupportsWebScraping     bool               `json:"supports_web_scraping"`
+}
+
+func (s *Server) handleCapabilities(w http.ResponseWriter, r *http.Request) {
+	query := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("query")))
+	allCarriers := s.engine.Registry().AllCarriers()
+
+	var list []CarrierCapabilityItem
+	seen := make(map[string]bool)
+
+	for _, c := range allCarriers {
+		if seen[c.Slug()] {
+			continue
+		}
+		seen[c.Slug()] = true
+
+		if query != "" {
+			qMatch := strings.Contains(strings.ToLower(c.Slug()), query) ||
+				strings.Contains(strings.ToLower(c.Name()), query) ||
+				strings.Contains(strings.ToLower(c.Country()), query) ||
+				strings.Contains(strings.ToLower(c.CountryName()), query)
+			if !qMatch {
+				continue
+			}
+		}
+
+		var caps carriers.CarrierCapabilities
+		if adapter, ok := c.(carriers.CarrierAdapter); ok {
+			caps = adapter.Capabilities()
+		}
+		isLive := carriers.HasLiveTracking(c)
+		mode := "catalog"
+		if caps.SupportsLiveAPI {
+			mode = "live_api"
+		} else if caps.SupportsWebScraping {
+			mode = "public_scraper"
+		} else if isLive {
+			mode = "live_api"
+		}
+
+		list = append(list, CarrierCapabilityItem{
+			Slug:                    c.Slug(),
+			Name:                    c.Name(),
+			Country:                 c.Country(),
+			CountryName:             c.CountryName(),
+			Type:                    c.Type(),
+			Website:                 c.Website(),
+			TrackingURL:             c.TrackingURL("{number}"),
+			Mode:                    mode,
+			Status:                  mode,
+			IsLiveAdapter:           isLive,
+			RequiresPostalCode:      caps.RequiresPostalCode,
+			RequiresAuth:            caps.RequiresAuth,
+			SupportsProofOfDelivery: caps.SupportsProofOfDelivery,
+			SupportsLiveAPI:         caps.SupportsLiveAPI,
+			SupportsWebScraping:     caps.SupportsWebScraping,
+		})
+	}
+
+	sort.Slice(list, func(i, j int) bool {
+		return list[i].Name < list[j].Name
+	})
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"total":    len(list),
+		"carriers": list,
 	})
 }
 
